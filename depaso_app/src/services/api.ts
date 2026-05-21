@@ -38,9 +38,10 @@ class ApiClient {
       (response) => response,
       async (error) => {
         if (error.response?.status === 401) {
-          // Token expirado o inválido
           await SecureStore.deleteItemAsync("auth_token");
-          // TODO: dispatch logout action or navigate to login
+          // Importación dinámica para evitar dependencia circular
+          const { useAuthStore } = await import("../stores/authStore");
+          useAuthStore.getState().logout();
         }
         return Promise.reject(error);
       },

@@ -22,3 +22,7 @@ class Carrier(Base, TimestampMixin):
     reputation = Column(Float, default=5.0)
     is_active = Column(Boolean, default=True)
     is_verified = Column(Boolean, default=False)
+    # Location for matching
+    current_lat = Column(Float, nullable=True)
+    current_lon = Column(Float, nullable=True)
+    is_available = Column(Boolean, default=False)

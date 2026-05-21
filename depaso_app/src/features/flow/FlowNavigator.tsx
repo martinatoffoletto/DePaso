@@ -1,33 +1,87 @@
 import { useMemo, useState } from "react";
-import { SafeAreaView } from "react-native-safe-area-context";
 import { MD3LightTheme, PaperProvider } from "react-native-paper";
 
-import { MatchingScreen } from "./screens/MatchingScreen";
+import { HomeScreen }           from "./screens/HomeScreen";
+import { MatchingScreen }       from "./screens/MatchingScreen";
 import { OfferSelectionScreen } from "./screens/OfferSelectionScreen";
-import { PackageDetailsScreen } from "./screens/PackageDetailsScreen";
-import { RequestRideScreen } from "./screens/RequestRideScreen";
+import { PackageCategoryScreen } from "./screens/PackageCategoryScreen";
+import { RequestRideScreen }    from "./screens/RequestRideScreen";
+import { SummaryScreen }        from "./screens/SummaryScreen";
+import type { CarrierScoreResponse } from "@/src/types";
 
-type Step = "request" | "offer" | "package" | "matching";
+type Step = "home" | "request" | "package" | "offer" | "matching" | "summary";
 type DeliveryMode = "dedicada" | "colaborativa";
 
+export interface Coords {
+  latitude: number;
+  longitude: number;
+}
+
+const CATEGORY_LABEL: Record<string, string> = {
+  xs: "Sobre / Documento",
+  s:  "Caja chica",
+  m:  "Caja mediana",
+  l:  "Caja grande",
+  xl: "Voluminoso / Flete",
+};
+
 export function FlowNavigator() {
-  const [step, setStep] = useState<Step>("request");
-  const [origin, setOrigin] = useState("Palermo, CABA");
-  const [destination, setDestination] = useState("Quilmes Centro");
-  const [mode, setMode] = useState<DeliveryMode>("colaborativa");
-  const [packageData, setPackageData] = useState<{
-    weight: string;
-    measures: string;
-    description: string;
-  } | null>(null);
+  const [step, setStep]                   = useState<Step>("home");
+  const [origin, setOrigin]               = useState("");
+  const [destination, setDestination]     = useState("");
+  const [originCoords, setOriginCoords]   = useState<Coords | null>(null);
+  const [destinationCoords, setDestinationCoords] = useState<Coords | null>(null);
+  const [categoryId, setCategoryId]       = useState<string>("m");
+  const [weightKg, setWeightKg]           = useState<number>(2);
+  const [mode, setMode]                   = useState<DeliveryMode>("colaborativa");
+  const [matchedCarrier, setMatchedCarrier] = useState<CarrierScoreResponse | null>(null);
+  const [shipmentId, setShipmentId]       = useState<number | null>(null);
+
+  function resetAll() {
+    setStep("home");
+    setOrigin("");
+    setDestination("");
+    setOriginCoords(null);
+    setDestinationCoords(null);
+    setCategoryId("m");
+    setWeightKg(2);
+    setMode("colaborativa");
+    setMatchedCarrier(null);
+    setShipmentId(null);
+  }
 
   const screen = useMemo(() => {
+    if (step === "home") {
+      return <HomeScreen onStart={() => setStep("request")} />;
+    }
+
     if (step === "request") {
       return (
         <RequestRideScreen
-          onNext={({ origin, destination }) => {
-            setOrigin(origin);
-            setDestination(destination);
+          initialOrigin={origin}
+          initialDestination={destination}
+          initialOriginCoords={originCoords}
+          initialDestinationCoords={destinationCoords}
+          onNext={(payload) => {
+            setOrigin(payload.origin);
+            setDestination(payload.destination);
+            setOriginCoords(payload.originCoords);
+            setDestinationCoords(payload.destinationCoords);
+            setStep("package");
+          }}
+        />
+      );
+    }
+
+    if (step === "package") {
+      return (
+        <PackageCategoryScreen
+          initialCategoryId={categoryId}
+          initialWeightKg={weightKg}
+          onBack={() => setStep("request")}
+          onNext={(payload) => {
+            setCategoryId(payload.categoryId);
+            setWeightKg(payload.weightKg);
             setStep("offer");
           }}
         />
@@ -39,43 +93,53 @@ export function FlowNavigator() {
         <OfferSelectionScreen
           origin={origin}
           destination={destination}
-          onBack={() => setStep("request")}
+          packageLabel={CATEGORY_LABEL[categoryId] ?? categoryId}
+          initialMode={mode}
+          onBack={() => setStep("package")}
           onNext={(selectedMode) => {
             setMode(selectedMode);
-            setStep("package");
-          }}
-        />
-      );
-    }
-
-    if (step === "package") {
-      return (
-        <PackageDetailsScreen
-          mode={mode}
-          onBack={() => setStep("offer")}
-          onNext={(pkgData) => {
-            setPackageData(pkgData);
             setStep("matching");
           }}
         />
       );
     }
 
+    if (step === "matching") {
+      return (
+        <MatchingScreen
+          mode={mode}
+          categoryId={categoryId}
+          weightKg={weightKg}
+          originCoords={originCoords}
+          destinationCoords={destinationCoords}
+          onBack={() => setStep("offer")}
+          onConfirm={(carrier, sid) => {
+            setMatchedCarrier(carrier);
+            setShipmentId(sid);
+            setStep("summary");
+          }}
+          onReset={resetAll}
+        />
+      );
+    }
+
+    // summary
     return (
-      <MatchingScreen
+      <SummaryScreen
+        origin={origin}
+        destination={destination}
+        originCoords={originCoords}
+        destinationCoords={destinationCoords}
+        categoryId={categoryId}
+        weightKg={weightKg}
         mode={mode}
-        packageData={packageData}
-        onReset={() => {
-          setPackageData(null);
-          setStep("request");
-        }}
+        carrier={matchedCarrier}
+        shipmentId={shipmentId}
+        onBack={() => setStep("matching")}
+        onConfirm={resetAll}
       />
     );
-  }, [destination, mode, origin, step, packageData]);
+  }, [step, origin, destination, originCoords, destinationCoords, categoryId, weightKg, mode, matchedCarrier, shipmentId]);
 
-  return (
-    <PaperProvider theme={MD3LightTheme}>
-      <SafeAreaView style={{ flex: 1 }}>{screen}</SafeAreaView>
-    </PaperProvider>
-  );
+  return <PaperProvider theme={MD3LightTheme}>{screen}</PaperProvider>;
 }

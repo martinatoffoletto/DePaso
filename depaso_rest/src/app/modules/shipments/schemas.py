@@ -20,10 +20,18 @@ class ShipmentBase(BaseModel):
     photo_url: str | None = None
 
 
-class ShipmentCreate(ShipmentBase):
-    """Schema for shipment creation."""
+class ShipmentCreate(BaseModel):
+    """Schema for shipment creation — client_id is injected from JWT, not sent by client."""
 
-    pass
+    package_size: str
+    modality: str
+    assignment_mode: str
+    origin_lat: float = Field(..., ge=-90, le=90)
+    origin_lon: float = Field(..., ge=-180, le=180)
+    destination_lat: float = Field(..., ge=-90, le=90)
+    destination_lon: float = Field(..., ge=-180, le=180)
+    weight_kg: float = Field(..., gt=0)
+    photo_url: str | None = None
 
 
 class ShipmentResponse(ShipmentBase):

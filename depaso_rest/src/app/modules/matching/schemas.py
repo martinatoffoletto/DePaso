@@ -5,10 +5,12 @@ from pydantic import BaseModel
 
 
 class CarrierScoreResponse(BaseModel):
-    """Response for carrier scoring."""
+    """Score breakdown for a single carrier candidate."""
 
     carrier_id: int
     company_name: str
+    vehicle_type: str
+    license_plate: str
     total_score: float
     distance_score: float
     detour_score: float
@@ -18,7 +20,7 @@ class CarrierScoreResponse(BaseModel):
 
 
 class MatchingResponse(BaseModel):
-    """Response for matching results."""
+    """Full matching result for a shipment."""
 
     shipment_id: int
     matched_carrier_id: int

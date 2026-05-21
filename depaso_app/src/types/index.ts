@@ -158,3 +158,23 @@ export interface Location {
   longitude: number;
   address?: string;
 }
+
+export interface CarrierScoreResponse {
+  carrier_id: number;
+  company_name: string;
+  vehicle_type: TransportType;
+  license_plate: string;
+  total_score: number;
+  distance_score: number;
+  detour_score: number;
+  capacity_score: number;
+  reputation_score: number;
+  time_window_score: number;
+}
+
+export interface MatchingResponse {
+  shipment_id: number;
+  matched_carrier_id: number;
+  total_score: number;
+  ranked_carriers: CarrierScoreResponse[];
+}

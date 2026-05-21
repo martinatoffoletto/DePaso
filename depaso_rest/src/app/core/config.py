@@ -9,7 +9,7 @@ class Settings(BaseSettings):
     """Application settings from environment variables."""
 
     # Database — defaults to SQLite for local dev, set DATABASE_URL env var for PostgreSQL
-    database_url: str = "sqlite:///./depaso_dev.db"
+    database_url: str = "sqlite:///./depaso_dev.db"  # Override con DATABASE_URL en .env
 
     # JWT
     jwt_secret_key: str = "your-secret-key-change-this"

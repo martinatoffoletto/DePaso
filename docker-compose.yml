@@ -1,0 +1,21 @@
+services:
+  db:
+    image: postgis/postgis:15-3.3
+    container_name: depaso_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: depaso
+      POSTGRES_PASSWORD: depaso123
+      POSTGRES_DB: depaso_dev
+    ports:
+      - "5432:5432"
+    volumes:
+      - depaso_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U depaso -d depaso_dev"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  depaso_pgdata:

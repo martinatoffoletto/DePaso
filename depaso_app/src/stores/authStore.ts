@@ -95,9 +95,10 @@ export const useAuthStore = create<AuthState>((set) => ({
           isAuthenticated: true,
         });
       }
-    } catch (error) {
-      console.error("Restore token error:", error);
+    } catch {
+      // Token inválido o expirado — limpiar y redirigir al login
       await SecureStore.deleteItemAsync("auth_token");
+      set({ isAuthenticated: false, user: null, token: null });
     } finally {
       set({ isLoading: false });
     }

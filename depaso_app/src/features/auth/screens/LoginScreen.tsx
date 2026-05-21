@@ -37,14 +37,12 @@ export const LoginScreen = () => {
     setServerError(null);
     try {
       await login(data.email, data.password);
-      router.replace("/(tabs)");
+      // La navegación la maneja AuthGuard en _layout.tsx reactivamente
     } catch (error) {
-      setServerError(
-        error instanceof Error
-          ? error.message
-          : "Login failed. Please try again.",
-      );
-      Alert.alert("Error", serverError || "Login failed");
+      const msg =
+        error instanceof Error ? error.message : "Login failed. Please try again.";
+      setServerError(msg);
+      Alert.alert("Error", msg);
     }
   };
 

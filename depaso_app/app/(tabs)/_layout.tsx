@@ -1,11 +1,21 @@
 import React from "react";
-import { Text } from "react-native";
 import { Tabs } from "expo-router";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useAuthStore } from "@/src/stores/authStore";
 import { UserType } from "@/src/types";
 
-function TabIcon({ emoji }: { emoji: string }) {
-  return <Text style={{ fontSize: 22 }}>{emoji}</Text>;
+type IconName = React.ComponentProps<typeof MaterialCommunityIcons>["name"];
+
+function TabIcon({
+  name,
+  color,
+  size,
+}: {
+  name: IconName;
+  color: string;
+  size: number;
+}) {
+  return <MaterialCommunityIcons name={name} color={color} size={size} />;
 }
 
 export default function TabLayout() {
@@ -16,46 +26,56 @@ export default function TabLayout() {
     <Tabs
       screenOptions={{
         headerShown: false,
-        tabBarActiveTintColor: "#3B82F6",
-        tabBarInactiveTintColor: "#64748B",
+        tabBarActiveTintColor: "#16A34A",
+        tabBarInactiveTintColor: "#94A3B8",
         tabBarStyle: {
-          backgroundColor: "#0F172A",
-          borderTopColor: "#1E293B",
+          backgroundColor: "#FFFFFF",
+          borderTopColor: "#E2E8F0",
           borderTopWidth: 1,
-          paddingTop: 8,
-          paddingBottom: 8,
-          height: 60,
+          paddingTop: 6,
+          paddingBottom: 6,
+          height: 62,
         },
         tabBarLabelStyle: {
-          fontSize: 12,
+          fontSize: 11,
           fontWeight: "600",
+          marginTop: 2,
         },
       }}
     >
-      {/* Home — different label per role */}
       <Tabs.Screen
         name="index"
         options={{
           title: isCarrier ? "Pedidos" : "Enviar",
-          tabBarIcon: () => <TabIcon emoji={isCarrier ? "📋" : "📦"} />,
+          tabBarIcon: ({ color, size }) => (
+            <TabIcon
+              name={isCarrier ? "clipboard-list-outline" : "package-variant-closed"}
+              color={color}
+              size={size}
+            />
+          ),
         }}
       />
-
-      {/* Activity — different label per role */}
       <Tabs.Screen
         name="explore"
         options={{
           title: isCarrier ? "Mis Viajes" : "Mis Envíos",
-          tabBarIcon: () => <TabIcon emoji={isCarrier ? "🚗" : "📍"} />,
+          tabBarIcon: ({ color, size }) => (
+            <TabIcon
+              name={isCarrier ? "truck-outline" : "map-marker-path"}
+              color={color}
+              size={size}
+            />
+          ),
         }}
       />
-
-      {/* Profile — shared */}
       <Tabs.Screen
         name="profile"
         options={{
           title: "Perfil",
-          tabBarIcon: () => <TabIcon emoji="👤" />,
+          tabBarIcon: ({ color, size }) => (
+            <TabIcon name="account-circle-outline" color={color} size={size} />
+          ),
         }}
       />
     </Tabs>

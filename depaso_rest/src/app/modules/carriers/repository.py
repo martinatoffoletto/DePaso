@@ -42,3 +42,14 @@ class CarrierRepository(BaseRepository[Carrier]):
             Carrier.is_verified == True,
             Carrier.capacity_kg >= min_capacity_kg,
         ).all()
+
+    def list_available_with_location(self, min_capacity_kg: float) -> list[Carrier]:
+        """List available carriers that have a known location (for matching)."""
+        return self.db.query(Carrier).filter(
+            Carrier.is_active == True,
+            Carrier.is_verified == True,
+            Carrier.is_available == True,
+            Carrier.capacity_kg >= min_capacity_kg,
+            Carrier.current_lat.isnot(None),
+            Carrier.current_lon.isnot(None),
+        ).all()

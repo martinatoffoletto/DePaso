@@ -11,13 +11,11 @@ import { UserType } from "@/types";
 import { Button, FormInput } from "@/components";
 
 const registerSchema = z.object({
-  first_name: z.string().min(2, "First name is required"),
-  last_name: z.string().min(2, "Last name is required"),
-  email: z.string().email("Invalid email address"),
-  password: z.string().min(8, "Password must be at least 8 characters"),
-  phone_number: z.string().min(10, "Invalid phone number"),
-  dni: z.string().min(7, "Invalid DNI"),
-  birth_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Format: YYYY-MM-DD"),
+  first_name: z.string().min(2, "Nombre requerido"),
+  last_name: z.string().min(2, "Apellido requerido"),
+  email: z.string().email("Email inválido"),
+  password: z.string().min(8, "Mínimo 8 caracteres"),
+  phone_number: z.string().min(8, "Teléfono inválido").optional(),
 });
 
 type RegisterFormData = z.infer<typeof registerSchema>;
@@ -26,7 +24,7 @@ export const RegisterScreen = () => {
   const router = useRouter();
   const { register, isLoading } = useAuthStore();
   const [serverError, setServerError] = useState<string | null>(null);
-  const [userType, setUserType] = useState<UserType>(UserType.CLIENTE);
+  const [userType, setUserType] = useState<UserType>(UserType.CLIENT);
 
   const {
     control,
@@ -40,41 +38,33 @@ export const RegisterScreen = () => {
       email: "",
       password: "",
       phone_number: "",
-      dni: "",
-      birth_date: "",
     },
   });
 
   const onSubmit = async (data: RegisterFormData) => {
     setServerError(null);
     try {
-      await register({
-        ...data,
-        user_type: userType,
-      });
-      router.replace("/(tabs)");
+      await register({ ...data, user_type: userType });
+      // La navegación la maneja AuthGuard en _layout.tsx reactivamente
     } catch (error) {
-      const message =
-        error instanceof Error ? error.message : "Registration failed";
-      setServerError(message);
-      Alert.alert("Error", message);
+      const msg = error instanceof Error ? error.message : "Error al registrarse";
+      setServerError(msg);
+      Alert.alert("Error", msg);
     }
   };
 
   return (
     <ScrollView className="flex-1 bg-white">
       <View className="px-6 py-12">
-        {/* Header */}
         <View className="mb-8">
           <Text variant="headlineLarge" className="font-bold">
-            Create Account
+            Crear cuenta
           </Text>
           <Text variant="bodyMedium" className="text-gray-600 mt-2">
-            Join DePaso to start shipping
+            Unite a DePaso
           </Text>
         </View>
 
-        {/* Error message */}
         {serverError && (
           <View className="bg-red-50 border border-red-200 rounded-lg p-3 mb-6">
             <Text variant="bodySmall" className="text-red-700">
@@ -83,114 +73,78 @@ export const RegisterScreen = () => {
           </View>
         )}
 
-        {/* Account Type Selection */}
+        {/* Tipo de cuenta */}
         <View className="mb-6">
           <Text variant="labelMedium" className="mb-3">
-            Account Type
+            Tipo de cuenta
           </Text>
           <View className="flex-row gap-2">
             <TouchableOpacity
-              onPress={() => setUserType(UserType.CLIENTE)}
+              onPress={() => setUserType(UserType.CLIENT)}
               className={`flex-1 p-3 rounded-lg border-2 ${
-                userType === UserType.CLIENTE
+                userType === UserType.CLIENT
                   ? "bg-blue-50 border-blue-500"
                   : "bg-gray-50 border-gray-200"
               }`}
             >
-              <Text
-                className={
-                  userType === UserType.CLIENTE
-                    ? "text-blue-700"
-                    : "text-gray-700"
-                }
-              >
-                Shipper
+              <Text className={userType === UserType.CLIENT ? "text-blue-700" : "text-gray-700"}>
+                Cliente
               </Text>
             </TouchableOpacity>
             <TouchableOpacity
-              onPress={() => setUserType(UserType.TRANSPORTISTA)}
+              onPress={() => setUserType(UserType.CARRIER)}
               className={`flex-1 p-3 rounded-lg border-2 ${
-                userType === UserType.TRANSPORTISTA
+                userType === UserType.CARRIER
                   ? "bg-blue-50 border-blue-500"
                   : "bg-gray-50 border-gray-200"
               }`}
             >
-              <Text
-                className={
-                  userType === UserType.TRANSPORTISTA
-                    ? "text-blue-700"
-                    : "text-gray-700"
-                }
-              >
-                Carrier
+              <Text className={userType === UserType.CARRIER ? "text-blue-700" : "text-gray-700"}>
+                Transportista
               </Text>
             </TouchableOpacity>
           </View>
         </View>
 
-        {/* Form */}
         <FormInput
           control={control}
           name="first_name"
-          label="First Name"
-          placeholder="John"
+          label="Nombre"
+          placeholder="Valentina"
           error={errors.first_name?.message}
         />
-
         <FormInput
           control={control}
           name="last_name"
-          label="Last Name"
-          placeholder="Doe"
+          label="Apellido"
+          placeholder="Rossi"
           error={errors.last_name?.message}
         />
-
         <FormInput
           control={control}
           name="email"
           label="Email"
-          placeholder="john@example.com"
+          placeholder="valen@ejemplo.com"
           error={errors.email?.message}
           inputProps={{ autoCapitalize: "none", keyboardType: "email-address" }}
         />
-
         <FormInput
           control={control}
           name="password"
-          label="Password"
+          label="Contraseña"
           placeholder="••••••••"
           error={errors.password?.message}
           inputProps={{ secureTextEntry: true }}
         />
-
         <FormInput
           control={control}
           name="phone_number"
-          label="Phone Number"
+          label="Teléfono (opcional)"
           placeholder="+54 11 1234 5678"
           error={errors.phone_number?.message}
           inputProps={{ keyboardType: "phone-pad" }}
         />
 
-        <FormInput
-          control={control}
-          name="dni"
-          label="DNI"
-          placeholder="12345678"
-          error={errors.dni?.message}
-          inputProps={{ keyboardType: "numeric" }}
-        />
-
-        <FormInput
-          control={control}
-          name="birth_date"
-          label="Birth Date"
-          placeholder="YYYY-MM-DD"
-          error={errors.birth_date?.message}
-          inputProps={{ keyboardType: "numeric" }}
-        />
-
-        {/* Register Button */}
         <Button
           mode="contained"
           onPress={handleSubmit(onSubmit)}
@@ -198,15 +152,14 @@ export const RegisterScreen = () => {
           disabled={isLoading}
           className="mt-6"
         >
-          Create Account
+          Crear cuenta
         </Button>
 
-        {/* Login Link */}
         <View className="flex-row justify-center mt-6 gap-2">
-          <Text variant="bodyMedium">Already have an account?</Text>
-          <TouchableOpacity onPress={() => router.push("/login")}>
+          <Text variant="bodyMedium">¿Ya tenés cuenta?</Text>
+          <TouchableOpacity onPress={() => router.push("/_auth/login")}>
             <Text variant="bodyMedium" className="text-blue-500 font-semibold">
-              Sign In
+              Iniciá sesión
             </Text>
           </TouchableOpacity>
         </View>

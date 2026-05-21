@@ -1,9 +1,24 @@
 import { apiClient } from "./api";
+import { MatchingResponse, CarrierScoreResponse } from "../types";
 
-export interface MatchingResponse {
-  score: number;
-  decision: string;
-}
+export const matchingService = {
+  async matchBest(shipmentId: number): Promise<MatchingResponse> {
+    const response = await apiClient.post<MatchingResponse>(
+      `/matching/${shipmentId}/match`,
+    );
+    return response.data;
+  },
+
+  async rankCarriers(
+    shipmentId: number,
+    topK: number = 5,
+  ): Promise<CarrierScoreResponse[]> {
+    const response = await apiClient.get<CarrierScoreResponse[]>(
+      `/matching/${shipmentId}/ranked?top_k=${topK}`,
+    );
+    return response.data;
+  },
+};
 
 export interface CO2Response {
   dedicated_emission_kg: number;
@@ -11,19 +26,6 @@ export interface CO2Response {
   saved_kg: number;
   saved_percent: number;
 }
-
-export const matchingService = {
-  async scoreCarrier(
-    carrierId: number,
-    shipmentId: number,
-  ): Promise<MatchingResponse> {
-    const response = await apiClient.post<MatchingResponse>(`/matching/score`, {
-      carrier_id: carrierId,
-      shipment_id: shipmentId,
-    });
-    return response.data;
-  },
-};
 
 export const co2Service = {
   async calculateEmissions(
