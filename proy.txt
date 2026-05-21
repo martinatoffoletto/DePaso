@@ -1,0 +1,348 @@
+DePaso — Especificación funcional y no funcional
+1. Descripción general
+DePaso es una plataforma digital de logística urbana colaborativa para el Área Metropolitana de Buenos Aires (AMBA). Conecta clientes que necesitan enviar bienes con transportistas dispuestos a realizarlos, ya sea como su actividad principal o aprovechando desplazamientos que ya iban a hacer.
+La plataforma se diferencia de Rappi Favor, PedidosYa Envíos, Uber Flash y DiDi Entrega —que operan bajo un modelo exclusivamente dedicado— al introducir un modelo híbrido con dos modalidades principales:
+
+Envíos dedicados: el transportista se desplaza específicamente para realizar ese envío.
+Envíos colaborativos: el transportista aprovecha un trayecto que ya iba a hacer.
+
+Dentro de cada modalidad, hay dos submodalidades de asignación:
+
+Por demanda: el cliente solicita, el sistema busca transportistas compatibles en tiempo real.
+Por espacio: el transportista publica su disponibilidad (trayecto o ventana de tiempo), el sistema le sugiere pedidos compatibles.
+
+La plataforma no es una aplicación de ruteo: es una plataforma logística que gestiona el ciclo completo del envío (solicitud, clasificación de carga, asignación, seguimiento e impacto ambiental).
+
+2. Actores del sistema
+2.1 Cliente
+Persona, comercio o PyME que necesita enviar o recibir un paquete.
+
+Puede ser individual (persona física) o comercial (negocio).
+Crea pedidos, sube fotos de la carga, consulta estado, califica al transportista.
+
+2.2 Transportista
+Persona que ofrece el servicio de transporte.
+
+Se registra indicando su tipo de movilidad: peatonal, bici, moto, auto, camioneta/utilitario o camión.
+Puede aceptar pedidos por demanda o publicar su disponibilidad para trayectos colaborativos.
+Gestiona su capacidad de carga, su reputación y sus ingresos.
+
+2.3 Administrador
+Responsable de moderar la plataforma: validar transportistas, resolver disputas, monitorear operaciones vía panel.
+
+3. Modalidades de envío (detalle)
+3.1 Envíos dedicados
+El transportista se desplaza específicamente para realizar el envío. Dentro de esta modalidad hay dos formas de asignación:
+3.1.1 Dedicado por demanda
+
+El cliente solicita un envío urgente u on-demand (origen, destino, tamaño, ventana horaria).
+El sistema busca transportistas libres y cercanos al origen.
+El transportista acepta o rechaza; si acepta, se dirige al punto de retiro.
+Flujo tipo "Uber Flash / Rappi Favor".
+
+3.1.2 Dedicado por espacio
+
+El transportista publica que tiene disponibilidad dedicada en una ventana horaria (ej. "disponible hoy de 14 a 18hs, zona CABA").
+El sistema le asigna pedidos compatibles con su vehículo y zona declarada.
+Diferencia con el colaborativo: el transportista no tiene un trayecto prefijado, sino disponibilidad libre en una zona.
+
+3.2 Envíos colaborativos
+El transportista aprovecha un trayecto que ya iba a hacer por motivos propios (ir al trabajo, hacer trámites, volver a su casa). Dos submodalidades:
+3.2.1 Colaborativo por demanda
+
+El cliente solicita un envío con cierta flexibilidad temporal.
+El sistema identifica transportistas cuyo trayecto actual (o próximo) sea compatible con el origen-destino del pedido, con bajo desvío.
+Si hay match, se notifica al transportista para que lo acepte.
+
+3.2.2 Colaborativo por espacio
+
+El transportista publica su trayecto habitual recurrente (ej. "lunes a viernes de 8 a 9hs, Caballito → Microcentro").
+El sistema le sugiere pedidos compatibles con ese trayecto.
+El transportista acepta uno, varios o ninguno, según su capacidad residual.
+
+3.3 Restricciones por tipo de movilidad y categoría de carga
+Categoría de cargaPeatónBiciMotoAutoCamioneta/UtilitarioCamiónPequeños / documentos✅✅✅✅✅✅Medianos❌❌✅✅✅✅Grandes / voluminosos❌❌❌✅✅✅Mudanzas / fletes❌❌❌❌✅✅
+Peatón/bici: habilitados únicamente para paquetes pequeños y documentos en trayectos cortos (<5 km).
+Mudanzas/fletes: siempre modalidad dedicada, nunca colaborativa.
+
+4. Requerimientos funcionales
+4.1 Gestión de usuarios (RF-USR)
+
+RF-USR-01: Registro de cliente con email, contraseña, nombre, teléfono y tipo (individual / comercial).
+RF-USR-02: Registro de transportista con datos personales + tipo de vehículo + documentación (licencia, patente si aplica).
+RF-USR-03: Login con email + contraseña. Autenticación vía JWT.
+RF-USR-04: Recuperación de contraseña por email.
+RF-USR-05: Edición de perfil (foto, datos de contacto).
+RF-USR-06: Un mismo usuario puede tener rol cliente y transportista simultáneamente.
+RF-USR-07: Validación/moderación de transportistas nuevos por admin antes de poder operar.
+
+4.2 Gestión de envíos (RF-SHP)
+
+RF-SHP-01: Cliente crea un pedido indicando origen, destino, ventana horaria y modalidad (dedicada / colaborativa).
+RF-SHP-02: Cliente sube una foto del paquete. El clasificador de IA devuelve categoría sugerida con nivel de confianza.
+RF-SHP-03: Cliente puede aceptar la categoría sugerida o ingresarla manualmente (alternativa).
+RF-SHP-04: Cliente puede subir foto con objeto de referencia (celular, botella) para mejorar la precisión del clasificador.
+RF-SHP-05: Estados del envío: pending → assigned → in_transit → delivered / cancelled.
+RF-SHP-06: Cliente ve el estado en tiempo real y la ubicación aproximada del transportista.
+RF-SHP-07: Cliente puede cancelar el envío antes de que sea aceptado o en la ventana inicial permitida.
+RF-SHP-08: Cliente califica al transportista (1-5 estrellas + comentario) tras la entrega.
+
+4.3 Gestión del transportista (RF-CAR)
+
+RF-CAR-01: Transportista publica un trayecto colaborativo (origen, destino, horario, recurrencia opcional).
+RF-CAR-02: Transportista publica disponibilidad dedicada (zona, ventana horaria).
+RF-CAR-03: Transportista ve un feed de pedidos compatibles, puede aceptar o rechazar.
+RF-CAR-04: Al aceptar un pedido, se reserva capacidad en su vehículo.
+RF-CAR-05: Transportista marca estados: "llegué al origen" → "retiré el paquete" → "llegué al destino" → "entregué".
+RF-CAR-06: Transportista ve su historial de envíos, ingresos acumulados y reputación.
+RF-CAR-07: Transportista puede rechazar un pedido sin penalización en los primeros N segundos; tras aceptar, cancelar penaliza su reputación.
+
+4.4 Matching (RF-MAT)
+
+RF-MAT-01: Al crear un pedido dedicado por demanda, el sistema corre el algoritmo de matching en tiempo real y devuelve los K transportistas mejor rankeados.
+RF-MAT-02: Al crear un pedido colaborativo por demanda, el sistema busca transportistas cuyo trayecto vigente sea compatible (bajo desvío).
+RF-MAT-03: Al publicar disponibilidad (transportista), el sistema le sugiere pedidos compatibles pendientes.
+RF-MAT-04: Notificación push al transportista cuando hay un match.
+RF-MAT-05: Timeout configurable: si el transportista no responde en X minutos, se ofrece al siguiente.
+
+4.5 Clasificación de carga por IA (RF-VIS)
+
+RF-VIS-01: Endpoint POST /classify que recibe imagen y devuelve: categoría de tamaño, confianza.
+RF-VIS-02: Si confianza < umbral, el sistema sugiere al usuario ingresar manualmente.
+RF-VIS-03: Si usuario usa objeto de referencia, el modelo lo tiene en cuenta.
+RF-VIS-04: Registro de todas las clasificaciones realizadas (para fine-tuning futuro y análisis de sesgos).
+
+4.6 Cálculo de impacto ambiental (RF-CO2)
+
+RF-CO2-01: Al completar un envío colaborativo, calcular CO₂ ahorrado comparando escenario real vs contrafactual (viaje dedicado).
+RF-CO2-02: Acumular ahorro por usuario y por plataforma.
+RF-CO2-03: Mostrar al cliente y al transportista su contribución al ahorro.
+
+4.7 Seguimiento en tiempo real (RF-TRK)
+
+RF-TRK-01: Transportista envía su geolocalización periódicamente (cada 15-30 segundos) mientras el envío está activo.
+RF-TRK-02: Cliente visualiza en un mapa la posición actual del transportista.
+RF-TRK-03: Historial de trazas del envío para auditoría.
+
+4.8 Gestión de capacidad (RF-CAP)
+
+RF-CAP-01: Cada vehículo tiene una capacidad máxima (volumen) según tipo.
+RF-CAP-02: Al aceptar un pedido, se descuenta el volumen de la capacidad disponible.
+RF-CAP-03: Al completar la entrega, se reintegra el volumen.
+RF-CAP-04: El matching solo ofrece transportistas cuya capacidad residual sea suficiente para el pedido.
+
+4.9 Panel de monitoreo operativo (RF-ADM)
+
+RF-ADM-01: Dashboard para admin con envíos activos, transportistas en operación, mapa en vivo.
+RF-ADM-02: Estadísticas agregadas: envíos por día, CO₂ ahorrado acumulado, tasa de matching exitoso.
+RF-ADM-03: Herramientas de moderación: suspender transportistas, resolver disputas.
+
+
+5. Algoritmos e inteligencia artificial
+5.1 Modelo de IA — Clasificador de tamaño de carga (único modelo entrenado por el equipo)
+Propósito: dada una foto de un paquete, clasificarlo en una de N categorías de tamaño.
+Arquitectura:
+
+Modelo base: MobileNetV2 preentrenado en ImageNet (transfer learning).
+Capas custom: Global Average Pooling + Dense(128, ReLU) + Dropout(0.3) + Dense(N_categorías, Softmax).
+Framework: TensorFlow / Keras.
+Exportación: formato SavedModel para inferencia en backend (Python).
+
+Categorías de salida:
+
+XS (documentos, sobres)
+S (caja chica, libro)
+M (caja mediana, electrodoméstico chico)
+L (caja grande, TV, valija)
+XL / Flete (muebles, mudanzas)
+
+Dataset:
+
+Fuente: imágenes públicas de Google Open Images + fotos propias tomadas por el equipo.
+Tamaño objetivo: ~1500 imágenes (300 por categoría).
+Split: 70% train / 15% validation / 15% test.
+Data augmentation: rotación ±15°, zoom ±20%, brillo ±0.2, flip horizontal.
+Con y sin objeto de referencia (celular, botella) como feature opcional.
+
+Entrenamiento:
+
+Plataforma: Google Colab (GPU gratis).
+Estrategia: congelar base MobileNetV2, entrenar solo cabeza custom por 20 épocas; luego descongelar últimas capas y fine-tunear por 10 épocas con learning rate bajo.
+Optimizer: Adam, lr=1e-3 inicial, 1e-5 fine-tuning.
+Loss: categorical cross-entropy.
+
+Métricas:
+
+Accuracy global (objetivo: ≥80%).
+Precision/Recall/F1 por clase.
+Matriz de confusión.
+
+Análisis de sesgos:
+
+Evaluar accuracy por condición de iluminación (alta/baja/artificial).
+Por ángulo de captura (frontal/cenital/oblicuo).
+Por color y fondo del objeto.
+Con vs sin objeto de referencia.
+Reportar dónde el modelo es débil y sugerir mitigaciones.
+
+Validación:
+
+Conjunto de test separado nunca visto durante entrenamiento.
+Cross-validation 5-fold en dataset de train.
+
+5.2 Algoritmo — Matching inteligente (scoring multivariable determinístico)
+Propósito: dado un pedido, rankear transportistas candidatos por compatibilidad.
+No es un modelo de IA entrenado, es un algoritmo determinístico con pesos configurables. Esto permite explicabilidad total ("¿por qué me asignaron este pedido?") y no requiere dataset histórico.
+Fórmula general:
+score = w1 · compat_geo + w2 · (1 - desvio_norm) + w3 · compat_carga 
+      + w4 · reputacion_norm + w5 · compat_horaria
+donde cada componente está normalizado entre 0 y 1, y los pesos w1..w5 son configurables por admin (inicialmente: 0.35 / 0.30 / 0.15 / 0.10 / 0.10).
+Componentes:
+
+compat_geo: 1 si el origen y destino del pedido están a menos de X km de la ruta del transportista; decrece linealmente hasta 0 a Y km. Usa PostGIS ST_DWithin y OSRM para calcular trayecto real.
+desvio_norm: desvío adicional en km / km totales del trayecto del transportista. Normalizado y penalizado (a mayor desvío, menor score).
+compat_carga: 1 si el vehículo del transportista puede transportar la categoría del paquete según la tabla de restricciones (4.3), 0 en caso contrario. Si 0, el candidato queda excluido directamente.
+reputacion_norm: rating promedio del transportista / 5.
+compat_horaria: 1 si la ventana horaria del pedido entra dentro del trayecto activo del transportista; decrece según la distancia temporal al trayecto.
+
+Filtros duros (knockout) antes del scoring:
+
+Transportista activo y disponible.
+Capacidad residual ≥ volumen estimado del pedido.
+Vehículo compatible con categoría de carga.
+Desvío máximo permitido según modalidad (colaborativo: hasta 15% del trayecto; dedicado: sin límite).
+
+Salida: lista ordenada descendente por score con los K mejores candidatos (K configurable, default 5).
+Ajuste de pesos: los pesos se configuran en la base de datos, permitiendo iterar sin redeploy.
+5.3 Algoritmo — Cálculo de CO₂ ahorrado (determinístico)
+Propósito: cuantificar el beneficio ambiental de cada envío colaborativo.
+Metodología:
+
+Escenario real: el envío se integra al trayecto ya existente del transportista. Emisión atribuible = emisión del desvío adicional × factor de emisión del vehículo.
+Escenario contrafactual: si el envío se hubiese realizado dedicadamente, el vehículo habría recorrido origen → pedido_origen → pedido_destino → destino_original. Emisión contrafactual = distancia total × factor de emisión.
+Ahorro = Emisión contrafactual − Emisión real.
+
+Factores de emisión (kg CO₂/km):
+Basados en IPCC 2019 Refinement + factores argentinos:
+
+Moto: 0.09
+Auto: 0.18
+Camioneta/utilitario: 0.25
+Camión: 0.60
+Bici y peatón: 0.00
+
+Implementación: función pura determinística en el módulo co2. No requiere ML.
+5.4 Algoritmo — Gestión de capacidad disponible
+Propósito: mantener actualizado en tiempo real el volumen libre por transportista.
+Lógica:
+
+Cada vehículo tiene volumen_max definido por tipo (ej. auto: 0.5 m³, camioneta: 3 m³, camión: 15 m³).
+Cada categoría de paquete tiene volumen_promedio estimado.
+Al aceptar pedido: volumen_disponible -= volumen_pedido.
+Al completar entrega: volumen_disponible += volumen_pedido.
+El matching filtra por volumen_disponible ≥ volumen_pedido.
+
+Es una variante simplificada del problema bin packing con restricciones geoespaciales. Para el prototipo se usa la versión greedy (no se optimiza combinatoriamente).
+
+6. Requerimientos no funcionales
+6.1 Performance (RNF-PERF)
+
+RNF-PERF-01: Respuesta de endpoints REST (excepto clasificación IA) < 500 ms en P95.
+RNF-PERF-02: Inferencia del clasificador de IA < 2 segundos por imagen (imagen preprocesada a 224×224).
+RNF-PERF-03: Matching de un pedido con 100 transportistas candidatos < 1 segundo.
+RNF-PERF-04: Actualización de posición GPS del transportista: tolerancia de hasta 30 segundos de demora.
+
+6.2 Escalabilidad (RNF-SCAL)
+
+RNF-SCAL-01: La arquitectura debe permitir escalar horizontalmente el backend (stateless, JWT, sin sesiones en memoria).
+RNF-SCAL-02: La base de datos debe soportar índices geoespaciales (PostGIS) para queries sobre > 10.000 puntos activos simultáneos.
+RNF-SCAL-03: Para el prototipo se asume hasta ~100 usuarios activos concurrentes. Escalar más queda fuera del alcance del PFI.
+
+6.3 Disponibilidad (RNF-AVL)
+
+RNF-AVL-01: Uptime objetivo en producción de prototipo: 95% (mensual). No es un sistema crítico, tolera downtime planeado.
+RNF-AVL-02: La app mobile debe degradarse con gracia si el backend no responde (caché local, mensajes de error claros).
+
+6.4 Seguridad (RNF-SEC)
+
+RNF-SEC-01: Todas las contraseñas hasheadas con bcrypt (cost factor ≥ 12).
+RNF-SEC-02: Comunicación cliente-servidor exclusivamente sobre HTTPS.
+RNF-SEC-03: JWT con expiración corta (30 min) + refresh token (7 días).
+RNF-SEC-04: Validación estricta de inputs en backend vía Pydantic.
+RNF-SEC-05: Los endpoints que exponen datos personales requieren autorización.
+RNF-SEC-06: Rate limiting en endpoints de login/registro (ej. 5 intentos/minuto por IP).
+RNF-SEC-07: Las fotos subidas se almacenan con acceso restringido (URLs firmadas en Supabase Storage).
+
+6.5 Privacidad (RNF-PRV)
+
+RNF-PRV-01: El dataset usado para entrenar el modelo de IA se construye con imágenes públicas; no contiene datos personales identificables.
+RNF-PRV-02: Ubicaciones GPS de transportistas solo se comparten con clientes de envíos activos.
+RNF-PRV-03: Historial de trayectos no se comparte entre usuarios.
+RNF-PRV-04: Cumplimiento con Ley 25.326 de Protección de Datos Personales (Argentina).
+
+6.6 Mantenibilidad (RNF-MNT)
+
+RNF-MNT-01: Código backend organizado en módulos independientes con 4 capas (router, service, repository, schemas) para facilitar testing y refactors.
+RNF-MNT-02: Cobertura mínima de tests: 60% en módulos core (auth, shipments, matching).
+RNF-MNT-03: Migraciones de base de datos versionadas con Alembic.
+RNF-MNT-04: Documentación de API auto-generada via Swagger/OpenAPI.
+RNF-MNT-05: Logs estructurados (JSON) con niveles INFO, WARNING, ERROR.
+
+6.7 Usabilidad (RNF-UX)
+
+RNF-UX-01: La app debe ser utilizable por usuarios no técnicos con mínima curación (flujo "crear envío" ≤ 4 pantallas).
+RNF-UX-02: Soporte completo en español rioplatense.
+RNF-UX-03: Feedback visual en todas las operaciones (loading, success, error).
+RNF-UX-04: Accesibilidad: tamaño de texto mínimo 14sp, contraste WCAG AA.
+
+6.8 Portabilidad (RNF-PRT)
+
+RNF-PRT-01: Aplicación cliente multiplataforma (iOS + Android) vía React Native + Expo.
+RNF-PRT-02: Backend desplegable en cualquier proveedor cloud que soporte contenedores Docker o runtime Python.
+RNF-PRT-03: Base de datos PostgreSQL + PostGIS estándar (no lock-in con Supabase; portable a RDS, Cloud SQL, etc.).
+
+6.9 Observabilidad (RNF-OBS)
+
+RNF-OBS-01: Logs centralizados del backend con timestamp, user_id y request_id.
+RNF-OBS-02: Métricas básicas expuestas: cantidad de requests, latencia P50/P95, tasa de errores.
+RNF-OBS-03: Panel de monitoreo operativo (ver RF-ADM) como herramienta de observabilidad para admins.
+
+6.10 Restricciones de costos (RNF-COST)
+
+RNF-COST-01: El prototipo se debe desarrollar íntegramente con herramientas open source o de tier gratuito.
+RNF-COST-02: Presupuesto total del proyecto: $0 (excluyendo tiempo de las desarrolladoras).
+RNF-COST-03: En caso de requerir hosting pago durante el tramo final (últimos 2-3 meses), presupuesto máximo USD 20-30 total.
+
+6.11 Compatibilidad con reglamento académico UADE (RNF-UADE)
+
+RNF-UADE-01: El modelo de IA se entrena por el equipo, documentando dataset, arquitectura, métricas, validación y análisis de sesgos.
+RNF-UADE-02: El proyecto tiene impacto potencial sobre más de 100.000 personas (AMBA, 15M habitantes).
+RNF-UADE-03: Se entrega un prototipo funcional operativo para la defensa.
+RNF-UADE-04: No se usan servicios a terceros como insumos declarados en la propuesta (solo herramientas gratuitas y open source).
+
+
+7. Alcance explícito del prototipo
+7.1 Incluido en el PFI
+
+Registro y autenticación completos.
+CRUD de clientes y transportistas.
+Creación, asignación y tracking de envíos en las 4 submodalidades (dedicado por demanda/espacio, colaborativo por demanda/espacio).
+Clasificador de IA funcional y documentado.
+Algoritmo de matching operativo con pesos configurables.
+Cálculo de CO₂ determinístico.
+Gestión de capacidad simplificada.
+Panel de monitoreo operativo básico.
+App móvil Android funcional.
+Despliegue en tier gratuito para demo.
+
+7.2 Excluido del PFI (mencionado como trabajo futuro)
+
+Pasarela de pagos integrada (se simula).
+Push notifications productivas (se simulan con polling).
+Soporte iOS en store.
+Optimización combinatoria real de capacidad (bin packing óptimo).
+Modelo de ML para el matching (se justifica como trabajo futuro con datos reales).
+Integración con flotas empresariales vía API.
+Soporte multi-ciudad (solo AMBA).
+Análisis predictivo de demanda por zona y hora.
+Sistema de incentivos gamificado.

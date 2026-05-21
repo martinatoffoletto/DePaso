@@ -1,0 +1,198 @@
+================================================================================
+                        PROYECTO: DePASO
+================================================================================
+
+DESCRIPCIÓN GENERAL
+-------------------
+DePASO es una plataforma de logística y entregas tipo Uber que permite a usuarios 
+solicitar servicios de envío en la región de AMBA (Área Metropolitana de Buenos Aires).
+
+El proyecto consta de dos partes principales:
+  1. Backend (REST API) - depaso_rest
+  2. Frontend (Mobile App) - depaso_app
+
+
+================================================================================
+BACKEND - depaso_rest (Python + FastAPI)
+================================================================================
+
+Tecnologías:
+  - Framework: FastAPI (async)
+  - Base de Datos: SQLAlchemy ORM (async)
+  - Validación: Pydantic v2
+  - Autenticación: JWT (JSON Web Tokens)
+  - Servidor: Uvicorn
+
+Arquitectura:
+  - Estructura modular por dominio
+  - Módulos: auth, users, carriers, packages
+  - Core abstractions: database, security, schemas
+
+Endpoints Implementados:
+  - Autenticación: registro y login de usuarios
+  - Usuarios: CRUD y gestión de perfil
+  - Carriers: gestión de transportistas/conductores
+  - Packages: gestión de paquetes para envío
+
+Base de Datos:
+  - SQLAlchemy con modelos async
+  - Migraciones de Alembic (preparadas)
+  - Relaciones entre usuarios, transportistas y paquetes
+
+
+================================================================================
+FRONTEND - depaso_app (React Native + Expo)
+================================================================================
+
+Tecnologías:
+  - Framework: Expo SDK 54
+  - Librería UI: React Native 0.81.5
+  - Componentes: React Native Paper (Material Design 3)
+  - Estilos: NativeWind + Tailwind CSS
+  - Mapas: react-native-maps
+  - Ubicación: Expo Location
+  - Enrutamiento: Expo Router
+  - Navegación: React Navigation
+
+Estructura:
+  - app/(tabs): pantallas de pestañas (Home, Explore)
+  - src/features/flow: componentes y lógica del flujo de envío
+
+Pantallas del Flujo de Envío:
+  1. RequestRideScreen: solicitar envío (origen, destino, mapa)
+  2. OfferSelectionScreen: elegir modalidad (dedicada o colaborativa)
+  3. PackageDetailsScreen: cargar datos del paquete (peso, medidas, descripción)
+  4. MatchingScreen: visualizar conductor asignado y resumen
+
+Características Visuales:
+  - Mapa interactivo con marcadores de origen y destino
+  - Tarjetas informativas con detalles de modalidades
+  - Clasificación de paquetes con IA (mock)
+  - Resumen de costos y tiempo estimado
+  - Información del conductor asignado
+
+
+================================================================================
+FLUJO DE USUARIO (MOCK)
+================================================================================
+
+1. Usuario abre la app (Home tab)
+2. Ingresa ubicación de origen y destino
+3. Ve mapa de AMBA con puntos de recogida y entrega
+4. Selecciona modalidad:
+   - Dedicada: retiro inmediato con conductor exclusivo ($6900 ARS, ~28 min)
+   - Colaborativa: comparte trayecto para reducir costo ($3900 ARS, ~54 min, -1.8 kg CO2)
+5. Carga detalles del paquete:
+   - Categoría estimada por IA
+   - Peso (kg) y medidas (cm)
+   - Descripción del contenido
+6. Sistema asigna conductor y muestra:
+   - Nombre y rating del conductor
+   - Transporte y patente
+   - ETA a ubicación de recogida
+   - Resumen del pedido con precio y tiempo
+
+
+================================================================================
+MODALIDADES DE ENVÍO
+================================================================================
+
+DEDICADA:
+  - Conductor exclusivo para el envío
+  - Retiro inmediato
+  - Precio: $6900 ARS
+  - ETA: ~28 minutos
+  - No hay ahorros de CO2
+
+COLABORATIVA:
+  - Aprovecha trayectos existentes
+  - Comparte recorrido con otros envíos
+  - Precio: $3900 ARS (43% más económico)
+  - ETA: ~54 minutos
+  - Ahorro estimado: 1.8 kg de CO2
+
+
+================================================================================
+DATOS MOCK (DEMOSTRACIÓN)
+================================================================================
+
+Ofertas de Transporte:
+  - Título, descripción y características
+  - Precios, tiempo estimado y impacto ambiental
+
+Clasificación IA:
+  - Categoría: mediano
+  - Peso estimado: 3.2 kg
+  - Medidas: 30x25x18 cm
+  - Confianza: 87%
+
+Conductor Asignado:
+  - Nombre: Lucia Fernandez
+  - Transporte: Moto
+  - Rating: 4.9/5
+  - Patente: A123BCD
+  - ETA a recogida: 9 minutos
+
+
+================================================================================
+ESTADO DEL PROYECTO
+================================================================================
+
+Backend:
+  ✓ Estructura y arquitectura completada
+  ✓ Autenticación JWT implementada
+  ✓ CRUD de usuarios y carriers
+  ✓ Base de datos configurada
+
+Frontend:
+  ✓ Proyecto Expo creado y configurado
+  ✓ Pantallas del flujo implementadas
+  ✓ Componentes de UI con React Native Paper
+  ✓ Integración con FlowNavigator en Home tab
+  ✓ Tailwind CSS + NativeWind configurado
+  ✓ Linting y validación TypeScript pasados
+
+Pendiente:
+  - Conectar backend real (actualmente usando datos mock)
+  - Sistema de autenticación en la app
+  - Integración de mapas real
+  - Histórico de pedidos
+  - Sistema de pagos
+  - Chat con conductor
+  - Notificaciones push
+
+
+================================================================================
+CÓMO EJECUTAR
+================================================================================
+
+Backend:
+  cd depaso_rest
+  python -m venv venv
+  source venv/bin/activate
+  pip install -r requirements.txt
+  python -m uvicorn src.app.main:app --reload
+
+Frontend:
+  cd depaso_app
+  npm install
+  npm run start
+  (Presionar 'i' para iOS o 'a' para Android)
+
+
+================================================================================
+OBJETIVOS DEL PROYECTO
+================================================================================
+
+Este es un proyecto académico (TESIS) que demuestra:
+  - Arquitectura de software escalable
+  - Desarrollo full-stack moderno
+  - Implementación de patrones de diseño
+  - Integración frontend-backend
+  - Buenas prácticas de desarrollo
+  - Experiencia de usuario tipo Uber
+
+El proyecto es una POC (Proof of Concept) y está en fase de prototipado
+con datos mock para demostración de funcionalidad y flujo de usuario.
+
+================================================================================
