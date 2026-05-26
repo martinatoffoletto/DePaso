@@ -1,9 +1,8 @@
 import { useState } from "react";
 import {
-  View, StyleSheet, TouchableOpacity, ScrollView,
-  TextInput as RNTextInput, Alert, Image,
+  View, TouchableOpacity, ScrollView,
+  TextInput as RNTextInput, Alert, Image, Text,
 } from "react-native";
-import { Text } from "react-native-paper";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as ImagePicker from "expo-image-picker";
@@ -24,19 +23,20 @@ const AI_MOCK = { categoryId: "m", confidence: 0.94, label: "Paquete mediano", d
 
 function StepDots({ current, total }: { current: number; total: number }) {
   return (
-    <View style={dotStyles.row}>
+    <View className="flex-row gap-[6px] items-center">
       {Array.from({ length: total }).map((_, i) => (
-        <View key={i} style={[dotStyles.dot, { width: i === current - 1 ? 18 : 6, backgroundColor: i < current ? T.forest : T.border }]} />
+        <View
+          key={i}
+          className="h-[6px] rounded-[4px]"
+          style={{ width: i === current - 1 ? 18 : 6, backgroundColor: i < current ? T.forest : T.border }}
+        />
       ))}
-      <Text style={dotStyles.counter}>{String(current).padStart(2, "0")}/{String(total).padStart(2, "0")}</Text>
+      <Text className="text-[10px] tracking-[1.5px] text-inkMute ml-1">
+        {String(current).padStart(2, "0")}/{String(total).padStart(2, "0")}
+      </Text>
     </View>
   );
 }
-const dotStyles = StyleSheet.create({
-  row: { flexDirection: "row", gap: 6, alignItems: "center" },
-  dot: { height: 6, borderRadius: 4 },
-  counter: { fontSize: 10, letterSpacing: 1.5, color: T.inkMute, marginLeft: 4 },
-});
 
 function ScanCorners() {
   const corners: Array<{ top?: number; bottom?: number; left?: number; right?: number }> = [
@@ -45,7 +45,8 @@ function ScanCorners() {
   return (
     <>
       {corners.map((pos, i) => (
-        <View key={i} style={[scanStyles.corner, pos, {
+        <View key={i} style={[{
+          position: "absolute", width: 20, height: 20, borderColor: T.emerald,
           borderTopWidth:    pos.top    !== undefined ? 2.5 : 0,
           borderBottomWidth: pos.bottom !== undefined ? 2.5 : 0,
           borderLeftWidth:   pos.left   !== undefined ? 2.5 : 0,
@@ -54,12 +55,11 @@ function ScanCorners() {
           borderTopRightRadius:   i === 1 ? 6 : 0,
           borderBottomLeftRadius: i === 2 ? 6 : 0,
           borderBottomRightRadius: i === 3 ? 6 : 0,
-        }]} />
+        }, pos]} />
       ))}
     </>
   );
 }
-const scanStyles = StyleSheet.create({ corner: { position: "absolute", width: 20, height: 20, borderColor: T.emerald } });
 
 export type PackagePayload = {
   categoryId: string;
@@ -139,74 +139,97 @@ export function PackageScreen({ initial, onBack, onNext }: Props) {
   }
 
   return (
-    <View style={[s.container, { paddingTop: insets.top }]}>
+    <View className="flex-1 bg-bg" style={{ paddingTop: insets.top }}>
       {/* Step header */}
-      <View style={s.stepHeader}>
-        <TouchableOpacity style={s.headerBtn} onPress={onBack} hitSlop={10}>
+      <View className="flex-row items-center justify-between px-5 pt-2 pb-1">
+        <TouchableOpacity
+          className="w-[38px] h-[38px] rounded-xl border border-border bg-card items-center justify-center"
+          onPress={onBack}
+          hitSlop={10}
+        >
           <MaterialCommunityIcons name="arrow-left" size={18} color={T.ink} />
         </TouchableOpacity>
         <StepDots current={1} total={4} />
-        <View style={s.headerBtn}>
+        <View className="w-[38px] h-[38px] rounded-xl border border-border bg-card items-center justify-center">
           <MaterialCommunityIcons name="creation" size={16} color={T.ink} />
         </View>
       </View>
 
-      <View style={s.stepTitleBlock}>
-        <Text style={s.stepSub}>EL PAQUETE</Text>
-        <Text style={s.stepTitle}>Mostranos qué{"\n"}vas a enviar</Text>
+      <View className="px-5 pt-1 pb-[14px]">
+        <Text className="text-[10px] tracking-[2.5px] text-emeraldDeep uppercase mb-1">EL PAQUETE</Text>
+        <Text className="text-[26px] font-bold text-ink tracking-[-0.8px] leading-[30px]">Mostranos qué{"\n"}vas a enviar</Text>
       </View>
 
       <ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={[s.content, { paddingBottom: insets.bottom + 100 }]}
+        contentContainerStyle={{ paddingHorizontal: 16, gap: 16, paddingBottom: insets.bottom + 100 }}
         keyboardShouldPersistTaps="handled"
       >
         {/* Photo card */}
-        <View style={s.photoCard}>
+        <View className="bg-card rounded-[22px] border border-border p-3 overflow-hidden">
           {photoUri ? (
-            <View style={s.photoWrapper}>
-              <Image source={{ uri: photoUri }} style={s.photoImg} resizeMode="cover" />
-              <View style={s.scanCornersWrap}><ScanCorners /></View>
-              <TouchableOpacity style={s.retakeBtn} onPress={handlePhoto} activeOpacity={0.85}>
+            <View className="rounded-2xl overflow-hidden">
+              <Image source={{ uri: photoUri }} className="w-full h-[170px]" resizeMode="cover" />
+              <View className="absolute top-[18px] right-[18px] bottom-[18px] left-[18px]">
+                <ScanCorners />
+              </View>
+              <TouchableOpacity
+                className="absolute top-[10px] right-[10px] rounded-[10px] flex-row items-center gap-[6px] px-[10px] py-2"
+                style={{ backgroundColor: "rgba(244,239,227,0.94)" }}
+                onPress={handlePhoto}
+                activeOpacity={0.85}
+              >
                 <MaterialCommunityIcons name="image-edit-outline" size={14} color={T.ink} />
-                <Text style={s.retakeBtnText}>Cambiar</Text>
+                <Text className="text-xs font-medium text-ink">Cambiar</Text>
               </TouchableOpacity>
             </View>
           ) : (
-            <TouchableOpacity style={s.photoPlaceholder} onPress={handlePhoto} activeOpacity={0.85} disabled={classifying}>
-              <View style={s.scanCornersWrap}><ScanCorners /></View>
+            <TouchableOpacity
+              className="h-[170px] rounded-2xl bg-[#E8DEC2] items-center justify-center"
+              onPress={handlePhoto}
+              activeOpacity={0.85}
+              disabled={classifying}
+            >
+              <View className="absolute top-[18px] right-[18px] bottom-[18px] left-[18px]">
+                <ScanCorners />
+              </View>
               {classifying ? (
-                <View style={s.photoPrompt}>
+                <View className="items-center gap-[6px]">
                   <MaterialCommunityIcons name="brain" size={28} color={T.emerald} />
-                  <Text style={s.photoPromptTitle}>Clasificando...</Text>
+                  <Text className="text-sm font-semibold text-ink">Clasificando...</Text>
                 </View>
               ) : (
-                <View style={s.photoPrompt}>
+                <View className="items-center gap-[6px]">
                   <MaterialCommunityIcons name="camera-outline" size={28} color={T.emeraldDeep} />
-                  <Text style={s.photoPromptTitle}>Adjuntá una foto</Text>
-                  <Text style={s.photoPromptSub}>La IA detecta el tamaño automáticamente</Text>
+                  <Text className="text-sm font-semibold text-ink">Adjuntá una foto</Text>
+                  <Text className="text-xs text-inkSoft">La IA detecta el tamaño automáticamente</Text>
                 </View>
               )}
-              <View style={s.photoLabel}><Text style={s.photoLabelText}>FOTO DEL PAQUETE</Text></View>
+              <View
+                className="absolute bottom-[10px] left-[10px] rounded-md px-[7px] py-[3px]"
+                style={{ backgroundColor: "rgba(244,239,227,0.75)" }}
+              >
+                <Text className="text-[9px] tracking-[2px] text-forestDeep">FOTO DEL PAQUETE</Text>
+              </View>
             </TouchableOpacity>
           )}
 
           {/* AI bar */}
           {(aiActive || classifying) && (
-            <View style={s.aiBar}>
-              <View style={s.aiBarIcon}>
+            <View className="flex-row items-center gap-[10px] pt-3 pb-1 px-1">
+              <View className="w-7 h-7 rounded-lg bg-forest items-center justify-center">
                 <MaterialCommunityIcons name="creation" size={14} color={T.lime} />
               </View>
-              <View style={{ flex: 1 }}>
-                <Text style={s.aiBarLabel}>ANÁLISIS DE VISIÓN · 1.4s</Text>
-                <Text style={s.aiBarText}>
+              <View className="flex-1">
+                <Text className="text-[9px] tracking-[1.5px] text-inkMute uppercase">ANÁLISIS DE VISIÓN · 1.4s</Text>
+                <Text className="text-[12.5px] text-ink font-medium mt-px">
                   {aiActive ? `Detectamos ${AI_MOCK.label.toLowerCase()}` : "Analizando imagen..."}
                 </Text>
               </View>
               {aiActive && (
-                <View style={s.aiConf}>
-                  <View style={s.aiConfDot} />
-                  <Text style={s.aiConfNum}>{AI_MOCK.confidence * 100}%</Text>
+                <View className="flex-row items-center gap-1 bg-mint px-2 py-1 rounded-lg">
+                  <View className="w-[5px] h-[5px] rounded-full bg-emeraldDeep" />
+                  <Text className="text-[10px] tracking-[0.5px] text-forest font-bold">{AI_MOCK.confidence * 100}%</Text>
                 </View>
               )}
             </View>
@@ -215,79 +238,94 @@ export function PackageScreen({ initial, onBack, onNext }: Props) {
 
         {/* Confirmá la categoría */}
         <View>
-          <Text style={s.sectionTitle}>Confirmá la categoría</Text>
+          <Text className="text-[15px] font-semibold text-ink tracking-[-0.3px] mb-[10px]">Confirmá la categoría</Text>
 
-          {/* Primary selected card */}
-          <View style={s.catPrimary}>
-            <View style={s.catPrimaryIcon}>
+          <View className="bg-card rounded-2xl p-[14px] flex-row items-center gap-3" style={{ borderWidth: 1.5, borderColor: T.forest }}>
+            <View className="w-11 h-11 rounded-xl bg-mint items-center justify-center">
               <MaterialCommunityIcons name={selectedCat.icon} size={22} color={T.forest} />
             </View>
-            <View style={{ flex: 1 }}>
-              <View style={s.catPrimaryTitleRow}>
-                <Text style={s.catPrimaryTitle}>{selectedCat.label}</Text>
-                {aiActive && <View style={s.aiTag}><Text style={s.aiTagText}>IA</Text></View>}
+            <View className="flex-1">
+              <View className="flex-row items-center gap-[6px] mb-0.5">
+                <Text className="text-[16px] font-bold text-ink tracking-[-0.3px]">{selectedCat.label}</Text>
+                {aiActive && (
+                  <View className="bg-forest rounded-[5px] px-[6px] py-0.5">
+                    <Text className="text-[8px] tracking-[1px] text-lime font-bold uppercase">IA</Text>
+                  </View>
+                )}
               </View>
-              <Text style={s.catPrimaryDesc}>{selectedCat.sub}</Text>
+              <Text className="text-[11.5px] text-inkMute">{selectedCat.sub}</Text>
             </View>
-            <View style={s.catCheck}>
+            <View className="w-[22px] h-[22px] rounded-full bg-forest items-center justify-center">
               <MaterialCommunityIcons name="check" size={14} color="#F4EFE3" />
             </View>
           </View>
 
-          <View style={s.divider}>
-            <View style={s.dividerLine} />
-            <Text style={s.dividerText}>O CAMBIÁ A</Text>
-            <View style={s.dividerLine} />
+          <View className="flex-row items-center gap-[10px] my-3">
+            <View className="flex-1 h-px bg-border" />
+            <Text className="text-[9px] tracking-[1.5px] text-inkMute uppercase">O CAMBIÁ A</Text>
+            <View className="flex-1 h-px bg-border" />
           </View>
 
-          {/* 3-col compact chip grid */}
-          <View style={s.chipGrid}>
+          <View className="flex-row flex-wrap gap-2">
             {CATEGORIES.filter((c) => c.id !== selected).map((cat) => (
-              <TouchableOpacity key={cat.id} style={s.chip} onPress={() => setSelected(cat.id)} activeOpacity={0.75}>
+              <TouchableOpacity
+                key={cat.id}
+                className="bg-card rounded-2xl border border-border p-[10px] gap-1"
+                style={{ width: "30.5%" }}
+                onPress={() => setSelected(cat.id)}
+                activeOpacity={0.75}
+              >
                 <MaterialCommunityIcons name={cat.icon} size={18} color={T.inkSoft} />
-                <Text style={s.chipLabel}>{cat.label}</Text>
-                <Text style={s.chipSub}>{cat.sub}</Text>
+                <Text className="text-[12.5px] font-semibold text-ink">{cat.label}</Text>
+                <Text className="text-[9px] tracking-[1px] text-inkMute uppercase">{cat.sub}</Text>
               </TouchableOpacity>
             ))}
           </View>
         </View>
 
         {/* Dimensions card — oculto para Flete */}
-        {selected !== "xl" && <View style={s.dimsCard}>
-          <View style={s.dimsHeader}>
-            <Text style={s.dimsLabel}>MEDIDAS · IA</Text>
-            <Text style={s.dimsEdit}>EDITAR</Text>
-          </View>
-          <View style={s.dimsRow}>
-            {[
-              { l: "LARGO", v: dimL, set: setDimL, u: "cm" },
-              { l: "ANCHO", v: dimW, set: setDimW, u: "cm" },
-              { l: "ALTO",  v: dimH, set: setDimH, u: "cm" },
-              { l: "PESO",  v: dimKg, set: setDimKg, u: "kg" },
-            ].map((d) => (
-              <View key={d.l} style={s.dimBox}>
-                <Text style={s.dimBoxLabel}>{d.l}</Text>
-                <View style={s.dimBoxRow}>
-                  <RNTextInput
-                    style={s.dimBoxInput}
-                    value={d.v}
-                    onChangeText={d.set}
-                    keyboardType="decimal-pad"
-                  />
-                  <Text style={s.dimBoxUnit}>{d.u}</Text>
+        {selected !== "xl" && (
+          <View
+            className="bg-cardSoft rounded-2xl p-[14px]"
+            style={{ borderWidth: 1, borderColor: T.border, borderStyle: "dashed" }}
+          >
+            <View className="flex-row items-center justify-between mb-[10px]">
+              <Text className="text-[10px] tracking-[1.5px] text-inkMute uppercase">MEDIDAS · IA</Text>
+              <Text className="text-[9px] tracking-[1px] text-emeraldDeep uppercase font-bold">EDITAR</Text>
+            </View>
+            <View className="flex-row gap-2">
+              {[
+                { l: "LARGO", v: dimL, set: setDimL, u: "cm" },
+                { l: "ANCHO", v: dimW, set: setDimW, u: "cm" },
+                { l: "ALTO",  v: dimH, set: setDimH, u: "cm" },
+                { l: "PESO",  v: dimKg, set: setDimKg, u: "kg" },
+              ].map((d) => (
+                <View key={d.l} className="flex-1 bg-card rounded-[10px] p-2 border border-borderSoft">
+                  <Text className="text-[8px] tracking-[1px] text-inkMute mb-[3px] uppercase">{d.l}</Text>
+                  <View className="flex-row items-baseline gap-0.5">
+                    <RNTextInput
+                      className="text-[17px] font-bold text-ink flex-1"
+                      style={{ letterSpacing: -0.4, padding: 0 }}
+                      value={d.v}
+                      onChangeText={d.set}
+                      keyboardType="decimal-pad"
+                    />
+                    <Text className="text-[10px] text-inkMute font-medium">{d.u}</Text>
+                  </View>
                 </View>
-              </View>
-            ))}
+              ))}
+            </View>
           </View>
-        </View>}
+        )}
 
         {/* Description — obligatoria */}
-        <View style={s.descSection}>
-          <Text style={s.fieldLabel}>DESCRIPCIÓN</Text>
-          <View style={s.fieldInput}>
+        <View className="gap-2">
+          <Text className="text-[10px] text-inkSoft tracking-[1px] uppercase font-semibold">DESCRIPCIÓN</Text>
+          <View className="flex-row items-start gap-[10px] bg-card rounded-xl border border-border px-[14px] py-3">
             <MaterialCommunityIcons name="text-box-outline" size={18} color={T.inkMute} style={{ marginTop: 2 }} />
             <RNTextInput
-              style={[s.fieldTextInput, { minHeight: 48 }]}
+              className="flex-1 text-[15px] text-ink"
+              style={{ minHeight: 48, padding: 0 }}
               value={description}
               onChangeText={setDescription}
               placeholder="Ej: Laptop en caja original, frágil"
@@ -300,111 +338,20 @@ export function PackageScreen({ initial, onBack, onNext }: Props) {
       </ScrollView>
 
       {/* Sticky CTA */}
-      <View style={[s.ctaWrap, { paddingBottom: insets.bottom + 16 }]}>
+      <View className="absolute bottom-0 left-0 right-0 px-4 pt-6" style={{ paddingBottom: insets.bottom + 16 }}>
         <TouchableOpacity
-          style={[s.cta, !canContinue && s.ctaDisabled]}
+          className={`rounded-2xl h-[54px] flex-row items-center justify-center gap-[10px] ${!canContinue ? "bg-inkMute" : "bg-forest"}`}
+          style={canContinue ? { shadowColor: T.forest, shadowOffset: { width: 0, height: 12 }, shadowOpacity: 0.4, shadowRadius: 20, elevation: 5 } : undefined}
           onPress={handleNext}
           activeOpacity={0.88}
           disabled={!canContinue}
         >
-          <Text style={s.ctaText}>{canContinue ? "Continuar · Dirección" : "Agregá una descripción"}</Text>
+          <Text className="text-[#F4EFE3] font-semibold text-[15px]">
+            {canContinue ? "Continuar · Dirección" : "Agregá una descripción"}
+          </Text>
           {canContinue && <MaterialCommunityIcons name="arrow-right" size={18} color="#F4EFE3" />}
         </TouchableOpacity>
       </View>
     </View>
   );
 }
-
-const s = StyleSheet.create({
-  container: { flex: 1, backgroundColor: T.bg },
-
-  stepHeader: {
-    flexDirection: "row", alignItems: "center", justifyContent: "space-between",
-    paddingHorizontal: 20, paddingTop: 8, paddingBottom: 4,
-  },
-  headerBtn: {
-    width: 38, height: 38, borderRadius: 12,
-    borderWidth: 1, borderColor: T.border,
-    backgroundColor: T.card, alignItems: "center", justifyContent: "center",
-  },
-  stepTitleBlock: { paddingHorizontal: 20, paddingTop: 4, paddingBottom: 14 },
-  stepSub: { fontSize: 10, letterSpacing: 2.5, color: T.emeraldDeep, textTransform: "uppercase", marginBottom: 4 },
-  stepTitle: { fontSize: 26, fontWeight: "700", color: T.ink, letterSpacing: -0.8, lineHeight: 30 },
-
-  content: { paddingHorizontal: 16, gap: 16 },
-
-  photoCard: { backgroundColor: T.card, borderRadius: 22, borderWidth: 1, borderColor: T.border, padding: 12, overflow: "hidden" },
-  photoWrapper: { borderRadius: 14, overflow: "hidden", position: "relative" },
-  photoImg: { width: "100%", height: 170 },
-  scanCornersWrap: { position: "absolute", top: 18, right: 18, bottom: 18, left: 18 },
-  retakeBtn: {
-    position: "absolute", top: 10, right: 10,
-    backgroundColor: "rgba(244,239,227,0.94)", borderRadius: 10,
-    flexDirection: "row", alignItems: "center", gap: 6,
-    paddingHorizontal: 10, paddingVertical: 8,
-  },
-  retakeBtnText: { fontSize: 12, fontWeight: "500", color: T.ink },
-  photoPlaceholder: { height: 170, borderRadius: 14, backgroundColor: "#E8DEC2", alignItems: "center", justifyContent: "center", position: "relative" },
-  photoPrompt: { alignItems: "center", gap: 6 },
-  photoPromptTitle: { fontSize: 14, fontWeight: "600", color: T.ink },
-  photoPromptSub: { fontSize: 12, color: T.inkSoft },
-  photoLabel: { position: "absolute", bottom: 10, left: 10, backgroundColor: "rgba(244,239,227,0.75)", borderRadius: 6, paddingHorizontal: 7, paddingVertical: 3 },
-  photoLabelText: { fontSize: 9, letterSpacing: 2, color: T.forestDeep },
-
-  aiBar: { flexDirection: "row", alignItems: "center", gap: 10, paddingTop: 12, paddingBottom: 4, paddingHorizontal: 4 },
-  aiBarIcon: { width: 28, height: 28, borderRadius: 8, backgroundColor: T.forest, alignItems: "center", justifyContent: "center" },
-  aiBarLabel: { fontSize: 9, letterSpacing: 1.5, color: T.inkMute, textTransform: "uppercase" },
-  aiBarText: { fontSize: 12.5, color: T.ink, fontWeight: "500", marginTop: 1 },
-  aiConf: { flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: T.mint, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8 },
-  aiConfDot: { width: 5, height: 5, borderRadius: 5, backgroundColor: T.emeraldDeep },
-  aiConfNum: { fontSize: 10, letterSpacing: 0.5, color: T.forest, fontWeight: "700" },
-
-  sectionTitle: { fontSize: 15, fontWeight: "600", color: T.ink, letterSpacing: -0.3, marginBottom: 10 },
-
-  catPrimary: { backgroundColor: T.card, borderRadius: 16, borderWidth: 1.5, borderColor: T.forest, padding: 14, flexDirection: "row", alignItems: "center", gap: 12 },
-  catPrimaryIcon: { width: 44, height: 44, borderRadius: 12, backgroundColor: T.mint, alignItems: "center", justifyContent: "center" },
-  catPrimaryTitleRow: { flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 2 },
-  catPrimaryTitle: { fontSize: 16, fontWeight: "700", color: T.ink, letterSpacing: -0.3 },
-  aiTag: { backgroundColor: T.forest, borderRadius: 5, paddingHorizontal: 6, paddingVertical: 2 },
-  aiTagText: { fontSize: 8, letterSpacing: 1, color: T.lime, fontWeight: "700", textTransform: "uppercase" },
-  catPrimaryDesc: { fontSize: 11.5, color: T.inkMute },
-  catCheck: { width: 22, height: 22, borderRadius: 22, backgroundColor: T.forest, alignItems: "center", justifyContent: "center" },
-
-  divider: { flexDirection: "row", alignItems: "center", gap: 10, marginVertical: 12 },
-  dividerLine: { flex: 1, height: 1, backgroundColor: T.border },
-  dividerText: { fontSize: 9, letterSpacing: 1.5, color: T.inkMute, textTransform: "uppercase" },
-
-  chipGrid: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
-  chip: { width: "30.5%", backgroundColor: T.card, borderRadius: 14, borderWidth: 1, borderColor: T.border, padding: 10, gap: 4 },
-  chipLabel: { fontSize: 12.5, fontWeight: "600", color: T.ink },
-  chipSub: { fontSize: 9, letterSpacing: 1, color: T.inkMute, textTransform: "uppercase" },
-
-  dimsCard: { backgroundColor: T.cardSoft, borderRadius: 16, borderWidth: 1, borderColor: T.border, borderStyle: "dashed", padding: 14 },
-  dimsHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 10 },
-  dimsLabel: { fontSize: 10, letterSpacing: 1.5, color: T.inkMute, textTransform: "uppercase" },
-  dimsEdit: { fontSize: 9, letterSpacing: 1, color: T.emeraldDeep, textTransform: "uppercase", fontWeight: "700" },
-  dimsRow: { flexDirection: "row", gap: 8 },
-  dimBox: { flex: 1, backgroundColor: T.card, borderRadius: 10, padding: 8, borderWidth: 1, borderColor: T.borderSoft },
-  dimBoxLabel: { fontSize: 8, letterSpacing: 1, color: T.inkMute, marginBottom: 3, textTransform: "uppercase" },
-  dimBoxRow: { flexDirection: "row", alignItems: "baseline", gap: 2 },
-  dimBoxInput: { fontSize: 17, fontWeight: "700", color: T.ink, letterSpacing: -0.4, padding: 0, flex: 1 },
-  dimBoxUnit: { fontSize: 10, color: T.inkMute, fontWeight: "500" },
-
-  descSection: { gap: 8 },
-  fieldLabel: { fontSize: 10, color: T.inkSoft, letterSpacing: 1, textTransform: "uppercase", fontWeight: "600" },
-  fieldInput: { flexDirection: "row", alignItems: "flex-start", gap: 10, backgroundColor: T.card, borderRadius: 12, borderWidth: 1, borderColor: T.border, paddingHorizontal: 14, paddingVertical: 12 },
-  fieldTextInput: { flex: 1, fontSize: 15, color: T.ink, padding: 0 },
-
-  ctaWrap: {
-    position: "absolute", bottom: 0, left: 0, right: 0,
-    paddingHorizontal: 16, paddingTop: 24,
-    backgroundColor: "rgba(244,239,227,0.0)",
-  },
-  cta: {
-    backgroundColor: T.forest, borderRadius: 16, height: 54,
-    flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10,
-    shadowColor: T.forest, shadowOffset: { width: 0, height: 12 }, shadowOpacity: 0.4, shadowRadius: 20, elevation: 5,
-  },
-  ctaDisabled: { backgroundColor: T.inkMute, shadowOpacity: 0 },
-  ctaText: { color: "#F4EFE3", fontWeight: "600", fontSize: 15 },
-});

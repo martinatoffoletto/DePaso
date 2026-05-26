@@ -43,9 +43,12 @@ cd /d "%BACKEND_DIR%" || exit /b 1
 if errorlevel 1 goto fail
 
 call :log "Abriendo backend en nueva ventana..."
-start "DePaso Backend" /D "%BACKEND_DIR%" cmd /k "call .venv\Scripts\activate.bat && python -m uvicorn src.app.main:app --reload --host 0.0.0.0 --port 8000"
+start "DePaso Backend" /D "%BACKEND_DIR%" cmd /k ".venv\Scripts\python.exe -m uvicorn src.app.main:app --reload --host 0.0.0.0 --port 8000"
 
 timeout /t 2 /nobreak >nul
+
+call :log "Verificando Android emulator..."
+call :start_emulator
 
 call :log "Abriendo frontend en nueva ventana..."
 start "DePaso Frontend" /D "%FRONTEND_DIR%" cmd /k "npm run start"
@@ -97,6 +100,42 @@ if errorlevel 1 (
     goto wait_for_db_loop
 )
 echo.
+exit /b 0
+
+:start_emulator
+setlocal
+set "ADB=%LOCALAPPDATA%\Android\Sdk\platform-tools\adb.exe"
+set "EMULATOR=%LOCALAPPDATA%\Android\Sdk\emulator\emulator.exe"
+
+if not exist "%ADB%" (
+    call :warn "Android SDK no encontrado. Instala Android Studio."
+    exit /b 0
+)
+
+REM Check if emulator is already running
+"%ADB%" devices 2>nul | findstr "emulator" >nul
+if %errorlevel% equ 0 (
+    call :log "Android emulator ya esta corriendo."
+    exit /b 0
+)
+
+REM Start emulator if exists
+if exist "%EMULATOR%" (
+    call :log "Iniciando Android emulator Pixel_6_Pro..."
+    start "" "%EMULATOR%" -avd Pixel_6_Pro -no-snapshot
+    
+    REM Wait for emulator to be ready
+    <nul set /p "=  Esperando que emulator inicie"
+    :emulator_wait_loop
+    timeout /t 3 /nobreak >nul
+    "%ADB%" devices 2>nul | findstr "device$" >nul
+    if errorlevel 1 (
+        <nul set /p "=."
+        goto emulator_wait_loop
+    )
+    echo.
+    call :log "Emulator listo."
+)
 exit /b 0
 
 :fail

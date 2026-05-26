@@ -1,7 +1,7 @@
 import React from "react";
-import { View } from "react-native";
-import { Text } from "react-native-paper";
+import { View, Text } from "react-native";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
+import { T } from "@/constants/tokens";
 
 interface EmptyStateProps {
   icon?: string;
@@ -16,14 +16,10 @@ export const EmptyState: React.FC<EmptyStateProps> = ({
 }) => {
   return (
     <View className="flex-1 justify-center items-center px-6 gap-3">
-      <MaterialCommunityIcons name={icon} size={48} color="#BDBDBD" />
-      <Text variant="titleMedium" className="text-center">
-        {title}
-      </Text>
+      <MaterialCommunityIcons name={icon as any} size={48} color={T.border} />
+      <Text className="text-base font-semibold text-ink text-center">{title}</Text>
       {description && (
-        <Text variant="bodySmall" className="text-center text-gray-500">
-          {description}
-        </Text>
+        <Text className="text-sm text-inkMute text-center">{description}</Text>
       )}
     </View>
   );

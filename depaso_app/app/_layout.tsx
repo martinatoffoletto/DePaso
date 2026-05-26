@@ -1,3 +1,4 @@
+import "../global.css";
 import React, { useEffect, useRef } from "react";
 import { DarkTheme, ThemeProvider } from "@react-navigation/native";
 import { Stack, useRouter, useSegments } from "expo-router";

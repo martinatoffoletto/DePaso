@@ -1,9 +1,8 @@
 import { useCallback, useRef, useState } from "react";
 import {
-  View, StyleSheet, TouchableOpacity, ScrollView,
-  TextInput as RNTextInput, ActivityIndicator, Keyboard,
+  View, TouchableOpacity, ScrollView,
+  TextInput as RNTextInput, ActivityIndicator, Keyboard, Text,
 } from "react-native";
-import { Text } from "react-native-paper";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as Location from "expo-location";
@@ -58,19 +57,20 @@ function formatAddress(s: Suggestion): { label: string; sublabel: string } {
 
 function StepDots({ current, total }: { current: number; total: number }) {
   return (
-    <View style={dotStyles.row}>
+    <View className="flex-row gap-[6px] items-center">
       {Array.from({ length: total }).map((_, i) => (
-        <View key={i} style={[dotStyles.dot, { width: i === current - 1 ? 18 : 6, backgroundColor: i < current ? T.forest : T.border }]} />
+        <View
+          key={i}
+          className="h-[6px] rounded-[4px]"
+          style={{ width: i === current - 1 ? 18 : 6, backgroundColor: i < current ? T.forest : T.border }}
+        />
       ))}
-      <Text style={dotStyles.counter}>{String(current).padStart(2, "0")}/{String(total).padStart(2, "0")}</Text>
+      <Text className="text-[10px] tracking-[1.5px] text-inkMute ml-1">
+        {String(current).padStart(2, "0")}/{String(total).padStart(2, "0")}
+      </Text>
     </View>
   );
 }
-const dotStyles = StyleSheet.create({
-  row: { flexDirection: "row", gap: 6, alignItems: "center" },
-  dot: { height: 6, borderRadius: 4 },
-  counter: { fontSize: 10, letterSpacing: 1.5, color: T.inkMute, marginLeft: 4 },
-});
 
 export type AddressPayload = {
   origin: string;
@@ -151,7 +151,6 @@ export function AddressScreen({ initial, onBack, onNext }: Props) {
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== "granted") return;
 
-      // Last known position is instant; fall back to current with 8 s timeout
       let loc = await Location.getLastKnownPositionAsync();
       if (!loc) {
         const gpsPromise = Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Low });
@@ -197,43 +196,51 @@ export function AddressScreen({ initial, onBack, onNext }: Props) {
   }
 
   return (
-    <View style={[s.container, { paddingTop: insets.top }]}>
+    <View className="flex-1 bg-bg" style={{ paddingTop: insets.top }}>
       {/* Step header */}
-      <View style={s.stepHeader}>
-        <TouchableOpacity style={s.headerBtn} onPress={onBack} hitSlop={10}>
+      <View className="flex-row items-center justify-between px-5 pt-2 pb-1">
+        <TouchableOpacity
+          className="w-[38px] h-[38px] rounded-xl border border-border bg-card items-center justify-center"
+          onPress={onBack}
+          hitSlop={10}
+        >
           <MaterialCommunityIcons name="arrow-left" size={18} color={T.ink} />
         </TouchableOpacity>
         <StepDots current={2} total={4} />
-        <View style={s.headerBtn}>
+        <View className="w-[38px] h-[38px] rounded-xl border border-border bg-card items-center justify-center">
           <MaterialCommunityIcons name="map-marker-path" size={16} color={T.ink} />
         </View>
       </View>
 
-      <View style={s.stepTitleBlock}>
-        <Text style={s.stepSub}>DIRECCIONES</Text>
-        <Text style={s.stepTitle}>¿Desde dónde{"\n"}y hasta dónde?</Text>
+      <View className="px-5 pt-1 pb-[14px]">
+        <Text className="text-[10px] tracking-[2.5px] text-emeraldDeep uppercase mb-1">DIRECCIONES</Text>
+        <Text className="text-[26px] font-bold text-ink tracking-[-0.8px] leading-[30px]">
+          ¿Desde dónde{"\n"}y hasta dónde?
+        </Text>
       </View>
 
       <ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={[s.content, { paddingBottom: insets.bottom + 100 }]}
+        contentContainerStyle={{ paddingHorizontal: 16, gap: 14, paddingBottom: insets.bottom + 100 }}
         keyboardShouldPersistTaps="handled"
       >
         {/* Origin + Destination block */}
         <View>
           {/* Origin card */}
-          <View style={[s.addrCard, activeField === "origin" && s.addrCardActive]}>
+          <View className={`bg-card rounded-2xl overflow-hidden border ${activeField === "origin" ? "border-forest" : "border-border"}`}>
             <TouchableOpacity
-              style={s.addrRow}
+              className="flex-row items-center gap-3 p-[14px]"
               onPress={() => { setActiveField("origin"); origInputRef.current?.focus(); }}
               activeOpacity={0.85}
             >
-              <View style={s.addrPin}><View style={s.pinRing} /></View>
-              <View style={{ flex: 1 }}>
-                <Text style={s.addrCardLabel}>ORIGEN · RETIRO</Text>
+              <View className="w-5 items-center">
+                <View className="w-[14px] h-[14px] rounded-full bg-card" style={{ borderWidth: 2.5, borderColor: T.forest }} />
+              </View>
+              <View className="flex-1">
+                <Text className="text-[9px] tracking-[1.5px] text-inkMute uppercase mb-1">ORIGEN · RETIRO</Text>
                 <RNTextInput
                   ref={origInputRef}
-                  style={s.addrInput}
+                  className="text-sm text-ink font-medium p-0"
                   value={origin}
                   onChangeText={(t) => handleTextChange(t, "origin")}
                   onFocus={() => setActiveField("origin")}
@@ -243,7 +250,12 @@ export function AddressScreen({ initial, onBack, onNext }: Props) {
                   onSubmitEditing={() => { setActiveField("destination"); destInputRef.current?.focus(); }}
                 />
               </View>
-              <TouchableOpacity style={s.gpsBtn} onPress={handleUseLocation} hitSlop={8} disabled={locLoading}>
+              <TouchableOpacity
+                className="w-[30px] h-[30px] rounded-[10px] items-center justify-center"
+                onPress={handleUseLocation}
+                hitSlop={8}
+                disabled={locLoading}
+              >
                 {locLoading
                   ? <ActivityIndicator size={14} color={T.forest} />
                   : <MaterialCommunityIcons name="crosshairs-gps" size={18} color={originCoords ? T.forest : T.inkMute} />
@@ -251,27 +263,27 @@ export function AddressScreen({ initial, onBack, onNext }: Props) {
               </TouchableOpacity>
             </TouchableOpacity>
             {activeField === "origin" && (searching || suggestions.length > 0) && (
-              <View style={s.inlineSugg}>
+              <View className="border-t border-borderSoft">
                 {searching ? (
-                  <View style={s.suggRow}>
+                  <View className="flex-row items-center px-[14px] py-3 gap-3">
                     <ActivityIndicator size={14} color={T.forest} />
-                    <Text style={s.suggSearching}>Buscando...</Text>
+                    <Text className="text-[13px] text-inkMute">Buscando...</Text>
                   </View>
                 ) : suggestions.map((s2, i) => {
                   const { label, sublabel } = formatAddress(s2);
                   return (
                     <TouchableOpacity
                       key={s2.place_id}
-                      style={[s.suggRow, i > 0 && s.suggBorder]}
+                      className={`flex-row items-center px-[14px] py-3 gap-3 ${i > 0 ? "border-t border-borderSoft" : ""}`}
                       onPress={() => handleSelectSuggestion(s2)}
                       activeOpacity={0.7}
                     >
-                      <View style={s.suggIcon}>
+                      <View className="w-[30px] h-[30px] rounded-[10px] bg-mint items-center justify-center">
                         <MaterialCommunityIcons name="map-marker-outline" size={16} color={T.forest} />
                       </View>
-                      <View style={{ flex: 1 }}>
-                        <Text style={s.suggLabel} numberOfLines={1}>{label}</Text>
-                        {!!sublabel && <Text style={s.suggSub} numberOfLines={1}>{sublabel}</Text>}
+                      <View className="flex-1">
+                        <Text className="text-[13.5px] font-semibold text-ink" numberOfLines={1}>{label}</Text>
+                        {!!sublabel && <Text className="text-[11px] text-inkMute mt-px" numberOfLines={1}>{sublabel}</Text>}
                       </View>
                     </TouchableOpacity>
                   );
@@ -281,27 +293,33 @@ export function AddressScreen({ initial, onBack, onNext }: Props) {
           </View>
 
           {/* Swap */}
-          <View style={s.swapRow}>
-            <View style={s.swapLine} />
-            <TouchableOpacity style={s.swapBtn} onPress={handleSwap} hitSlop={8}>
+          <View className="flex-row items-center py-1 px-2">
+            <View className="flex-1 h-px bg-borderSoft" />
+            <TouchableOpacity
+              className="w-8 h-8 rounded-full bg-card border border-border items-center justify-center mx-2"
+              onPress={handleSwap}
+              hitSlop={8}
+            >
               <MaterialCommunityIcons name="swap-vertical" size={16} color={T.inkSoft} />
             </TouchableOpacity>
-            <View style={s.swapLine} />
+            <View className="flex-1 h-px bg-borderSoft" />
           </View>
 
           {/* Destination card */}
-          <View style={[s.addrCard, activeField === "destination" && s.addrCardActive]}>
+          <View className={`bg-card rounded-2xl overflow-hidden border ${activeField === "destination" ? "border-forest" : "border-border"}`}>
             <TouchableOpacity
-              style={s.addrRow}
+              className="flex-row items-center gap-3 p-[14px]"
               onPress={() => { setActiveField("destination"); destInputRef.current?.focus(); }}
               activeOpacity={0.85}
             >
-              <View style={s.addrPin}><View style={s.pinDiamond} /></View>
-              <View style={{ flex: 1 }}>
-                <Text style={s.addrCardLabel}>DESTINO · ENTREGA</Text>
+              <View className="w-5 items-center">
+                <View className="w-3 h-3 rounded-sm bg-emerald rotate-45" />
+              </View>
+              <View className="flex-1">
+                <Text className="text-[9px] tracking-[1.5px] text-inkMute uppercase mb-1">DESTINO · ENTREGA</Text>
                 <RNTextInput
                   ref={destInputRef}
-                  style={s.addrInput}
+                  className="text-sm text-ink font-medium p-0"
                   value={destination}
                   onChangeText={(t) => handleTextChange(t, "destination")}
                   onFocus={() => setActiveField("destination")}
@@ -317,27 +335,27 @@ export function AddressScreen({ initial, onBack, onNext }: Props) {
               }
             </TouchableOpacity>
             {activeField === "destination" && (searching || suggestions.length > 0) && (
-              <View style={s.inlineSugg}>
+              <View className="border-t border-borderSoft">
                 {searching ? (
-                  <View style={s.suggRow}>
+                  <View className="flex-row items-center px-[14px] py-3 gap-3">
                     <ActivityIndicator size={14} color={T.forest} />
-                    <Text style={s.suggSearching}>Buscando...</Text>
+                    <Text className="text-[13px] text-inkMute">Buscando...</Text>
                   </View>
                 ) : suggestions.map((s2, i) => {
                   const { label, sublabel } = formatAddress(s2);
                   return (
                     <TouchableOpacity
                       key={s2.place_id}
-                      style={[s.suggRow, i > 0 && s.suggBorder]}
+                      className={`flex-row items-center px-[14px] py-3 gap-3 ${i > 0 ? "border-t border-borderSoft" : ""}`}
                       onPress={() => handleSelectSuggestion(s2)}
                       activeOpacity={0.7}
                     >
-                      <View style={s.suggIcon}>
+                      <View className="w-[30px] h-[30px] rounded-[10px] bg-mint items-center justify-center">
                         <MaterialCommunityIcons name="map-marker-outline" size={16} color={T.forest} />
                       </View>
-                      <View style={{ flex: 1 }}>
-                        <Text style={s.suggLabel} numberOfLines={1}>{label}</Text>
-                        {!!sublabel && <Text style={s.suggSub} numberOfLines={1}>{sublabel}</Text>}
+                      <View className="flex-1">
+                        <Text className="text-[13.5px] font-semibold text-ink" numberOfLines={1}>{label}</Text>
+                        {!!sublabel && <Text className="text-[11px] text-inkMute mt-px" numberOfLines={1}>{sublabel}</Text>}
                       </View>
                     </TouchableOpacity>
                   );
@@ -349,62 +367,72 @@ export function AddressScreen({ initial, onBack, onNext }: Props) {
 
         {/* Saved addresses */}
         <View>
-          <View style={s.savedHeader}>
-            <Text style={s.savedTitle}>Direcciones guardadas</Text>
-            <Text style={s.savedAll}>VER TODAS</Text>
+          <View className="flex-row items-center justify-between mb-[10px]">
+            <Text className="text-sm font-semibold text-ink tracking-[-0.2px]">Direcciones guardadas</Text>
+            <Text className="text-[9px] tracking-[1.5px] text-emeraldDeep uppercase">VER TODAS</Text>
           </View>
-          <View style={s.savedRow}>
+          <View className="flex-row gap-2">
             {savedAddrs.map((sv) => (
-              <TouchableOpacity key={sv.id} style={s.savedChip} onPress={() => handleSavedAddrPress(sv.address)} activeOpacity={0.75}>
-                <View style={s.savedChipTop}>
+              <TouchableOpacity
+                key={sv.id}
+                className="flex-1 bg-card rounded-[14px] border border-border p-[10px]"
+                onPress={() => handleSavedAddrPress(sv.address)}
+                activeOpacity={0.75}
+              >
+                <View className="flex-row items-center justify-between mb-2">
                   <MaterialCommunityIcons name={sv.icon as IconName} size={16} color={T.inkSoft} />
                 </View>
-                <Text style={s.savedLabel}>{sv.label}</Text>
-                <Text style={s.savedAddr} numberOfLines={1}>{sv.address}</Text>
+                <Text className="text-[8.5px] tracking-[1.2px] text-inkMute uppercase">{sv.label}</Text>
+                <Text className="text-xs text-ink font-medium mt-px" numberOfLines={1}>{sv.address}</Text>
               </TouchableOpacity>
             ))}
           </View>
         </View>
 
         {/* Recipient card */}
-        <View style={s.recipientCard}>
-          <View style={s.recipientHeader}>
-            <View style={s.recipientIconWrap}>
+        <View className="bg-card rounded-2xl border border-border p-[14px] gap-3">
+          <View className="flex-row items-center gap-[10px]">
+            <View className="w-8 h-8 rounded-[10px] bg-cardSoft border border-borderSoft items-center justify-center shrink-0">
               <MaterialCommunityIcons name="account-outline" size={18} color={T.forest} />
             </View>
-            <Text style={s.recipientLabel}>QUIEN RECIBE</Text>
+            <Text className="text-[9px] tracking-[1.5px] text-inkMute uppercase">QUIEN RECIBE</Text>
           </View>
 
-          {/* Quick-pick chips */}
-          <View style={s.quickRow}>
-            <TouchableOpacity style={s.quickChip} onPress={handleFillMe} activeOpacity={0.78}>
+          <View className="flex-row gap-[6px] flex-wrap">
+            <TouchableOpacity
+              className="flex-row items-center gap-[5px] bg-cardSoft border border-borderSoft rounded-full px-[10px] py-[6px]"
+              onPress={handleFillMe}
+              activeOpacity={0.78}
+            >
               <MaterialCommunityIcons name="account-circle-outline" size={13} color={T.forest} />
-              <Text style={s.quickChipText}>Yo mismo</Text>
+              <Text className="text-xs font-semibold text-ink">Yo mismo</Text>
             </TouchableOpacity>
             {savedContacts.map((c) => (
               <TouchableOpacity
                 key={c.id}
-                style={s.quickChip}
+                className="flex-row items-center gap-[5px] bg-cardSoft border border-borderSoft rounded-full px-[10px] py-[6px]"
                 onPress={() => { setRecipientName(c.name); setRecipientPhone(c.phone); }}
                 activeOpacity={0.78}
               >
-                <Text style={s.quickChipText}>{c.label}</Text>
+                <Text className="text-xs font-semibold text-ink">{c.label}</Text>
               </TouchableOpacity>
             ))}
           </View>
 
-          <View style={{ gap: 10 }}>
+          <View className="gap-[10px]">
             <RNTextInput
-              style={s.recipientInput}
+              className="text-sm text-ink font-medium p-0 border-b border-borderSoft pb-1"
               value={recipientName}
               onChangeText={setRecipientName}
               placeholder="Nombre y apellido"
               placeholderTextColor={T.inkFaint}
             />
-            <View style={s.phoneRow}>
-              <View style={s.flagChip}><Text style={s.flagText}>🇦🇷 +54</Text></View>
+            <View className="flex-row items-center gap-2">
+              <View className="bg-cardSoft rounded-lg px-2 py-[5px]">
+                <Text className="text-xs text-ink font-medium">🇦🇷 +54</Text>
+              </View>
               <RNTextInput
-                style={[s.recipientInput, { flex: 1 }]}
+                className="flex-1 text-sm text-ink font-medium p-0 border-b border-borderSoft pb-1"
                 value={recipientPhone}
                 onChangeText={setRecipientPhone}
                 placeholder="11 4521-8830"
@@ -416,20 +444,23 @@ export function AddressScreen({ initial, onBack, onNext }: Props) {
         </View>
 
         {/* Schedule chip */}
-        <View style={s.scheduleCard}>
+        <View className="bg-card rounded-2xl border border-border p-[14px] flex-row items-center gap-3">
           <MaterialCommunityIcons name="clock-outline" size={18} color={T.forest} />
-          <View style={{ flex: 1 }}>
-            <Text style={s.scheduleLabel}>¿CUÁNDO LO RETIRAMOS?</Text>
-            <Text style={s.scheduleValue}>Hoy · Lo antes posible</Text>
+          <View className="flex-1">
+            <Text className="text-[9px] tracking-[1.5px] text-inkMute uppercase">¿CUÁNDO LO RETIRAMOS?</Text>
+            <Text className="text-[13.5px] text-ink font-medium mt-0.5">Hoy · Lo antes posible</Text>
           </View>
-          <View style={s.scheduleBtn}><Text style={s.scheduleBtnText}>CAMBIAR</Text></View>
+          <View className="bg-bg rounded-lg px-[10px] py-[5px]">
+            <Text className="text-[9px] tracking-[1px] text-ink font-bold uppercase">CAMBIAR</Text>
+          </View>
         </View>
       </ScrollView>
 
       {/* Sticky CTA */}
-      <View style={[s.ctaWrap, { paddingBottom: insets.bottom + 16 }]}>
+      <View className="absolute bottom-0 left-0 right-0 px-4 pt-6" style={{ paddingBottom: insets.bottom + 16 }}>
         <TouchableOpacity
-          style={[s.cta, !canContinue && s.ctaDisabled]}
+          className={`rounded-2xl h-[54px] flex-row items-center justify-center gap-[10px] ${!canContinue ? "bg-inkMute" : ""}`}
+          style={canContinue ? { backgroundColor: T.forest, shadowColor: T.forest, shadowOffset: { width: 0, height: 12 }, shadowOpacity: 0.4, shadowRadius: 20, elevation: 5 } : undefined}
           onPress={() => {
             if (!canContinue) return;
             onNext({ origin, destination, originCoords, destinationCoords: destCoords, recipientName, recipientPhone });
@@ -437,124 +468,12 @@ export function AddressScreen({ initial, onBack, onNext }: Props) {
           activeOpacity={0.88}
           disabled={!canContinue}
         >
-          <Text style={s.ctaText}>{canContinue ? "Continuar · Ver ruta" : "Ingresá las direcciones"}</Text>
+          <Text className="text-[#F4EFE3] font-semibold text-[15px]">
+            {canContinue ? "Continuar · Ver ruta" : "Ingresá las direcciones"}
+          </Text>
           {canContinue && <MaterialCommunityIcons name="arrow-right" size={18} color="#F4EFE3" />}
         </TouchableOpacity>
       </View>
     </View>
   );
 }
-
-const s = StyleSheet.create({
-  container: { flex: 1, backgroundColor: T.bg },
-
-  stepHeader: {
-    flexDirection: "row", alignItems: "center", justifyContent: "space-between",
-    paddingHorizontal: 20, paddingTop: 8, paddingBottom: 4,
-  },
-  headerBtn: {
-    width: 38, height: 38, borderRadius: 12,
-    borderWidth: 1, borderColor: T.border,
-    backgroundColor: T.card, alignItems: "center", justifyContent: "center",
-  },
-  stepTitleBlock: { paddingHorizontal: 20, paddingTop: 4, paddingBottom: 14 },
-  stepSub: { fontSize: 10, letterSpacing: 2.5, color: T.emeraldDeep, textTransform: "uppercase", marginBottom: 4 },
-  stepTitle: { fontSize: 26, fontWeight: "700", color: T.ink, letterSpacing: -0.8, lineHeight: 30 },
-
-  content: { paddingHorizontal: 16, gap: 14 },
-
-  addrCard: {
-    backgroundColor: T.card, borderRadius: 16,
-    borderWidth: 1, borderColor: T.border,
-    overflow: "hidden",
-  },
-  addrCardActive: { borderColor: T.forest },
-  addrRow: {
-    flexDirection: "row", alignItems: "center", gap: 12, padding: 14,
-  },
-  inlineSugg: {
-    borderTopWidth: 1, borderTopColor: T.borderSoft,
-  },
-  addrPin: { width: 20, alignItems: "center" },
-  pinRing: { width: 14, height: 14, borderRadius: 14, borderWidth: 2.5, borderColor: T.forest, backgroundColor: T.card },
-  pinDiamond: { width: 12, height: 12, borderRadius: 3, backgroundColor: T.emerald, transform: [{ rotate: "45deg" }] },
-  addrCardLabel: { fontSize: 9, letterSpacing: 1.5, color: T.inkMute, textTransform: "uppercase", marginBottom: 4 },
-  addrInput: { fontSize: 14, color: T.ink, fontWeight: "500", padding: 0 },
-  gpsBtn: { width: 30, height: 30, borderRadius: 10, alignItems: "center", justifyContent: "center" },
-
-  swapRow: { flexDirection: "row", alignItems: "center", paddingVertical: 4, paddingHorizontal: 8 },
-  swapLine: { flex: 1, height: 1, backgroundColor: T.borderSoft },
-  swapBtn: {
-    width: 32, height: 32, borderRadius: 32,
-    backgroundColor: T.card, borderWidth: 1, borderColor: T.border,
-    alignItems: "center", justifyContent: "center", marginHorizontal: 8,
-  },
-
-  suggRow: {
-    flexDirection: "row", alignItems: "center",
-    paddingHorizontal: 14, paddingVertical: 12, gap: 12,
-  },
-  suggBorder: { borderTopWidth: 1, borderTopColor: T.borderSoft },
-  suggIcon: {
-    width: 30, height: 30, borderRadius: 10,
-    backgroundColor: T.mint, alignItems: "center", justifyContent: "center",
-  },
-  suggLabel: { fontSize: 13.5, fontWeight: "600", color: T.ink },
-  suggSub: { fontSize: 11, color: T.inkMute, marginTop: 1 },
-  suggSearching: { fontSize: 13, color: T.inkMute },
-
-  recipientCard: {
-    backgroundColor: T.card, borderRadius: 16, borderWidth: 1, borderColor: T.border,
-    padding: 14, gap: 12,
-  },
-  recipientHeader: { flexDirection: "row", alignItems: "center", gap: 10 },
-  recipientIconWrap: {
-    width: 32, height: 32, borderRadius: 10,
-    backgroundColor: T.cardSoft, borderWidth: 1, borderColor: T.borderSoft,
-    alignItems: "center", justifyContent: "center", flexShrink: 0,
-  },
-  recipientLabel: { fontSize: 9, letterSpacing: 1.5, color: T.inkMute, textTransform: "uppercase" },
-  quickRow: { flexDirection: "row", gap: 6, flexWrap: "wrap" },
-  quickChip: {
-    flexDirection: "row", alignItems: "center", gap: 5,
-    backgroundColor: T.cardSoft, borderWidth: 1, borderColor: T.borderSoft,
-    borderRadius: 20, paddingHorizontal: 10, paddingVertical: 6,
-  },
-  quickChipText: { fontSize: 12, fontWeight: "600", color: T.ink },
-  recipientInput: { fontSize: 14, color: T.ink, fontWeight: "500", padding: 0, borderBottomWidth: 1, borderColor: T.borderSoft, paddingBottom: 4 },
-  phoneRow: { flexDirection: "row", alignItems: "center", gap: 8 },
-  flagChip: { backgroundColor: T.cardSoft, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 5 },
-  flagText: { fontSize: 12, color: T.ink, fontWeight: "500" },
-
-  savedHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 10 },
-  savedTitle: { fontSize: 14, fontWeight: "600", color: T.ink, letterSpacing: -0.2 },
-  savedAll: { fontSize: 9, letterSpacing: 1.5, color: T.emeraldDeep, textTransform: "uppercase" },
-  savedRow: { flexDirection: "row", gap: 8 },
-  savedChip: { flex: 1, backgroundColor: T.card, borderRadius: 14, borderWidth: 1, borderColor: T.border, padding: 10 },
-  savedChipTop: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 8 },
-  savedTag: { backgroundColor: T.mint, borderRadius: 4, paddingHorizontal: 5, paddingVertical: 2 },
-  savedTagText: { fontSize: 7.5, letterSpacing: 0.6, color: T.forest, fontWeight: "700" },
-  savedLabel: { fontSize: 8.5, letterSpacing: 1.2, color: T.inkMute, textTransform: "uppercase" },
-  savedAddr: { fontSize: 12, color: T.ink, fontWeight: "500", marginTop: 1 },
-
-  scheduleCard: {
-    backgroundColor: T.card, borderRadius: 16, borderWidth: 1, borderColor: T.border,
-    padding: 14, flexDirection: "row", alignItems: "center", gap: 12,
-  },
-  scheduleLabel: { fontSize: 9, letterSpacing: 1.5, color: T.inkMute, textTransform: "uppercase" },
-  scheduleValue: { fontSize: 13.5, color: T.ink, fontWeight: "500", marginTop: 2 },
-  scheduleBtn: { backgroundColor: T.bg, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 5 },
-  scheduleBtnText: { fontSize: 9, letterSpacing: 1, color: T.ink, fontWeight: "700", textTransform: "uppercase" },
-
-  ctaWrap: {
-    position: "absolute", bottom: 0, left: 0, right: 0,
-    paddingHorizontal: 16, paddingTop: 24,
-  },
-  cta: {
-    backgroundColor: T.forest, borderRadius: 16, height: 54,
-    flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10,
-    shadowColor: T.forest, shadowOffset: { width: 0, height: 12 }, shadowOpacity: 0.4, shadowRadius: 20, elevation: 5,
-  },
-  ctaDisabled: { backgroundColor: T.inkMute, shadowOpacity: 0 },
-  ctaText: { color: "#F4EFE3", fontWeight: "600", fontSize: 15 },
-});
