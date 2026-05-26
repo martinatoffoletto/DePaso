@@ -126,6 +126,7 @@ export interface Shipment {
   destination_lon: number;
   weight_kg: number;
   photo_url?: string;
+  description?: string;
   estimated_price?: number;
   co2_savings_kg?: number;
   created_at: string;
@@ -142,6 +143,7 @@ export interface ShipmentCreatePayload {
   destination_lon: number;
   weight_kg: number;
   photo_url?: string;
+  description?: string;
 }
 
 export interface DeliveryOffer {

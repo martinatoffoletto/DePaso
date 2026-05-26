@@ -18,6 +18,7 @@ class ShipmentBase(BaseModel):
     destination_lon: float = Field(..., ge=-180, le=180)
     weight_kg: float = Field(..., gt=0)
     photo_url: str | None = None
+    description: str | None = None
 
 
 class ShipmentCreate(BaseModel):
@@ -32,6 +33,7 @@ class ShipmentCreate(BaseModel):
     destination_lon: float = Field(..., ge=-180, le=180)
     weight_kg: float = Field(..., gt=0)
     photo_url: str | None = None
+    description: str | None = None
 
 
 class ShipmentResponse(ShipmentBase):

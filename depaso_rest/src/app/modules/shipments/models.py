@@ -25,5 +25,6 @@ class Shipment(Base, TimestampMixin):
     destination_lon = Column(Float, nullable=False)
     weight_kg = Column(Float, nullable=False)
     photo_url = Column(String(500), nullable=True)
+    description = Column(String(500), nullable=True)
     estimated_price = Column(Float, nullable=True)
     co2_savings_kg = Column(Float, nullable=True)

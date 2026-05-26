@@ -41,6 +41,8 @@ def _seed_shipments(db, client_user, carriers):
             origin_lat=-34.5972, origin_lon=-58.4297,
             destination_lat=-34.5875, destination_lon=-58.3930,
             weight_kg=0.3, estimated_price=3900.0, co2_savings_kg=1.8,
+            description="Documentos legales, firma urgente",
+            photo_url="https://picsum.photos/seed/shipment-xs-1/400/300",
             created_at=now - timedelta(days=15), updated_at=now - timedelta(days=15),
         ),
         Shipment(
@@ -50,6 +52,8 @@ def _seed_shipments(db, client_user, carriers):
             origin_lat=-34.6083, origin_lon=-58.4375,
             destination_lat=-34.6211, destination_lon=-58.3732,
             weight_kg=6.5, estimated_price=6900.0, co2_savings_kg=0.0,
+            description="Notebook Dell en caja original, frágil",
+            photo_url="https://picsum.photos/seed/shipment-m-1/400/300",
             created_at=now - timedelta(days=10), updated_at=now - timedelta(days=10),
         ),
         Shipment(
@@ -59,6 +63,8 @@ def _seed_shipments(db, client_user, carriers):
             origin_lat=-34.5627, origin_lon=-58.4530,
             destination_lat=-34.6068, destination_lon=-58.4176,
             weight_kg=1.2, estimated_price=3900.0, co2_savings_kg=1.8,
+            description="Ropa doblada en bolsa, sin fragil",
+            photo_url="https://picsum.photos/seed/shipment-s-1/400/300",
             created_at=now - timedelta(days=7), updated_at=now - timedelta(days=7),
         ),
         Shipment(
@@ -68,6 +74,8 @@ def _seed_shipments(db, client_user, carriers):
             origin_lat=-34.5875, origin_lon=-58.3930,
             destination_lat=-34.6280, destination_lon=-58.4631,
             weight_kg=0.2, estimated_price=3900.0, co2_savings_kg=1.8,
+            description="Sobre con contrato de alquiler",
+            photo_url=None,
             created_at=now - timedelta(days=3), updated_at=now - timedelta(days=3),
         ),
         # Activos
@@ -78,6 +86,8 @@ def _seed_shipments(db, client_user, carriers):
             origin_lat=-34.5972, origin_lon=-58.4297,
             destination_lat=-34.6280, destination_lon=-58.4631,
             weight_kg=4.0, estimated_price=3900.0, co2_savings_kg=1.8,
+            description="Auriculares Sony + cargador, caja sellada",
+            photo_url="https://picsum.photos/seed/shipment-m-2/400/300",
             created_at=now - timedelta(hours=2), updated_at=now - timedelta(minutes=30),
         ),
         Shipment(
@@ -87,6 +97,8 @@ def _seed_shipments(db, client_user, carriers):
             origin_lat=-34.5875, origin_lon=-58.3930,
             destination_lat=-34.6083, destination_lon=-58.4375,
             weight_kg=18.0, estimated_price=6900.0, co2_savings_kg=0.0,
+            description="Monitor 27 pulgadas, caja original con esquineros",
+            photo_url="https://picsum.photos/seed/shipment-l-1/400/300",
             created_at=now - timedelta(hours=1), updated_at=now - timedelta(minutes=45),
         ),
         Shipment(
@@ -96,6 +108,8 @@ def _seed_shipments(db, client_user, carriers):
             origin_lat=-34.5972, origin_lon=-58.4297,
             destination_lat=-34.6211, destination_lon=-58.3732,
             weight_kg=0.1, estimated_price=3900.0, co2_savings_kg=1.8,
+            description=None,
+            photo_url=None,
             created_at=now - timedelta(minutes=20), updated_at=now - timedelta(minutes=20),
         ),
     ]

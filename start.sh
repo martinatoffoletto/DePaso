@@ -55,8 +55,11 @@ if [ ! -d "$VENV" ]; then
   err "Abortando."
 fi
 
-log "Ejecutando seed de base de datos..."
+log "Aplicando migraciones de base de datos..."
 cd "$BACKEND_DIR"
+"$VENV/bin/alembic" upgrade head
+
+log "Ejecutando seed de base de datos..."
 "$VENV/bin/python" scripts/seed_db.py
 
 # ── 4. Backend en nueva ventana de Terminal ───────────────────────────────
