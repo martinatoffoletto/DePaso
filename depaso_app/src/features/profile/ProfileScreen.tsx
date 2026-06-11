@@ -8,6 +8,8 @@ import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAuthStore } from "@/src/stores/authStore";
 import { useAddressBookStore, SavedAddress, SavedContact } from "@/src/stores/addressBookStore";
+import { UserType } from "@/src/types";
+import PublishRouteScreen from "@/src/features/carrier/PublishRouteScreen";
 import { T } from "@/constants/tokens";
 
 type IconName = React.ComponentProps<typeof MaterialCommunityIcons>["name"];
@@ -305,6 +307,9 @@ export default function ProfileScreen() {
 
   const [addrModal, setAddrModal]       = useState(false);
   const [contactModal, setContactModal] = useState(false);
+  const [routeModal, setRouteModal]     = useState(false);
+
+  const isCarrier = user?.user_type === UserType.CARRIER;
 
   const handleLogout = async () => { await logout(); };
 
@@ -400,6 +405,19 @@ export default function ProfileScreen() {
           <ProfileRow key="pago"  icon="wallet-outline"     label="Métodos de pago"   value="Mercado Pago ··· 4821" />,
         ]} />
 
+        {isCarrier && (
+          <ProfileSection title="MODO CADETE" rows={[
+            <ProfileRow
+              key="route"
+              icon="map-marker-path"
+              label="Mi trayecto habitual"
+              value="Publicá tu recorrido diario"
+              onPress={() => setRouteModal(true)}
+              accent
+            />,
+          ]} />
+        )}
+
         <ProfileSection title="ACTIVIDAD" rows={[
           <ProfileRow key="hist"  icon="history"      label="Historial de envíos"    value={`${MOCK.shipments} envíos · este año`} />,
           <ProfileRow key="eco"   icon="leaf"         label="Mi impacto eco"         value={`${MOCK.co2} kg CO₂ ahorrados`} accent />,
@@ -427,6 +445,7 @@ export default function ProfileScreen() {
 
       <AddressModal visible={addrModal}   onClose={() => setAddrModal(false)} />
       <ContactModal visible={contactModal} onClose={() => setContactModal(false)} />
+      {routeModal && <PublishRouteScreen onClose={() => setRouteModal(false)} />}
     </>
   );
 }

@@ -2,39 +2,33 @@
 Tracking module schemas.
 """
 from datetime import datetime
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
-class TrackingEventCreate(BaseModel):
-    """Request to create tracking event."""
+class PositionPublish(BaseModel):
+    """Carrier GPS sample (RF-TRK-01)."""
 
-    status: str
-    latitude: float = Field(..., ge=-90, le=90)
-    longitude: float = Field(..., ge=-180, le=180)
-    notes: str | None = None
+    lat: float = Field(..., ge=-90, le=90)
+    lon: float = Field(..., ge=-180, le=180)
 
 
-class TrackingEventResponse(BaseModel):
-    """Response for tracking event."""
+class PositionResponse(BaseModel):
+    """Latest known carrier position for a shipment (RF-TRK-02)."""
 
-    id: int
-    shipment_id: int
-    status: str
-    latitude: float
-    longitude: float
-    notes: str | None
+    model_config = ConfigDict(from_attributes=True)
+
+    shipment_id: int | None
+    lat: float
+    lon: float
     created_at: datetime
 
-    class Config:
-        from_attributes = True
 
+class TraceResponse(BaseModel):
+    """One historical GPS sample (RF-TRK-03)."""
 
-class ShipmentTrackingResponse(BaseModel):
-    """Response for full shipment tracking."""
+    model_config = ConfigDict(from_attributes=True)
 
-    shipment_id: int
-    current_status: str
-    current_latitude: float
-    current_longitude: float
-    last_update: datetime
-    history: list[TrackingEventResponse]
+    id: int
+    lat: float
+    lon: float
+    created_at: datetime

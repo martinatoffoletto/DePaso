@@ -1,37 +1,69 @@
 """
 Shipments module service.
-Business logic for shipment management.
+Business logic: lifecycle state machine, accept/reject, ratings, capacity,
+pricing and CO2 persistence.
 """
-from src.app.shared.enums import ShipmentStatus
+from src.app.shared.enums import ShipmentStatus, ShipmentModality
+from src.app.shared.geo import Point
+from src.app.modules.shipments import pricing
 from src.app.modules.shipments.repository import ShipmentRepository
-from src.app.modules.shipments.models import Shipment
+from src.app.modules.shipments.models import Shipment, ShipmentEvent, Rating
 from src.app.modules.shipments.exceptions import ShipmentNotFoundError, InvalidShipmentStatusError
+from src.app.modules.carriers.repository import CarrierRepository
+from src.app.modules.routes.repository import RouteRepository
+from src.app.modules.co2.service import CO2Service
 
 
-# Valid status transitions (RF-SHP-05)
+# Valid status transitions (RF-SHP-05, RF-CAR-05)
 VALID_TRANSITIONS: dict[str, list[str]] = {
     ShipmentStatus.PENDING: [ShipmentStatus.ASSIGNED, ShipmentStatus.CANCELLED],
-    ShipmentStatus.ASSIGNED: [ShipmentStatus.IN_TRANSIT, ShipmentStatus.CANCELLED],
-    ShipmentStatus.IN_TRANSIT: [ShipmentStatus.DELIVERED, ShipmentStatus.CANCELLED],
+    ShipmentStatus.ASSIGNED: [ShipmentStatus.PICKUP_ARRIVED, ShipmentStatus.CANCELLED],
+    ShipmentStatus.PICKUP_ARRIVED: [ShipmentStatus.IN_TRANSIT, ShipmentStatus.CANCELLED],
+    ShipmentStatus.IN_TRANSIT: [ShipmentStatus.DELIVERED],
     ShipmentStatus.DELIVERED: [],
     ShipmentStatus.CANCELLED: [],
 }
+
+# Statuses the assigned carrier advances through (RF-CAR-05); cancel is client-side.
+CARRIER_STATUSES = {
+    ShipmentStatus.PICKUP_ARRIVED,
+    ShipmentStatus.IN_TRANSIT,
+    ShipmentStatus.DELIVERED,
+}
+
+# Cancelling after accepting penalizes the carrier's reputation (RF-CAR-07).
+CARRIER_CANCEL_PENALTY = 0.3
 
 
 class ShipmentService:
     """Service for shipment business logic."""
 
-    def __init__(self, repository: ShipmentRepository) -> None:
-        """Initialize with repository."""
+    def __init__(
+        self,
+        repository: ShipmentRepository,
+        carrier_repo: CarrierRepository | None = None,
+        route_repo: RouteRepository | None = None,
+    ) -> None:
         self.repository = repository
+        self.carrier_repo = carrier_repo
+        self.route_repo = route_repo
+        self.co2 = CO2Service()
+
+    # -- creation & queries -----------------------------------------------------
 
     def create_shipment(self, client_id: int, package_size: str,
                         modality: str, assignment_mode: str,
                         origin_lat: float, origin_lon: float,
                         destination_lat: float, destination_lon: float,
-                        weight_kg: float, photo_url: str | None = None) -> Shipment:
-        """Create a new shipment."""
-        return self.repository.create(
+                        weight_kg: float, photo_url: str | None = None,
+                        description: str | None = None) -> Shipment:
+        """Create a new shipment with its estimated price (RF-SHP-01)."""
+        estimated_price = pricing.price_for(
+            Point(origin_lat, origin_lon),
+            Point(destination_lat, destination_lon),
+            package_size, modality,
+        )
+        shipment = self.repository.create(
             client_id=client_id,
             package_size=package_size,
             modality=modality,
@@ -42,51 +74,173 @@ class ShipmentService:
             destination_lon=destination_lon,
             weight_kg=weight_kg,
             photo_url=photo_url,
+            description=description,
+            estimated_price=estimated_price,
             status=ShipmentStatus.PENDING,
         )
+        self.repository.add_event(shipment.id, ShipmentStatus.PENDING, actor_user_id=client_id)
+        return shipment
 
     def get_shipment_by_id(self, shipment_id: int) -> Shipment:
-        """Get a shipment by ID."""
         shipment = self.repository.get_by_id(shipment_id)
         if not shipment:
             raise ShipmentNotFoundError()
         return shipment
 
     def list_shipments_by_client(self, client_id: int, skip: int = 0, limit: int = 20) -> tuple[list[Shipment], int]:
-        """List shipments for a client."""
         return self.repository.list_by_client(client_id, skip, limit)
 
     def list_shipments_by_carrier(self, carrier_id: int, skip: int = 0, limit: int = 20) -> tuple[list[Shipment], int]:
-        """List shipments assigned to a carrier."""
         return self.repository.list_by_carrier(carrier_id, skip, limit)
 
-    def update_status(self, shipment_id: int, new_status: str) -> Shipment:
-        """Update shipment status with transition validation."""
+    def list_pending(self) -> list[Shipment]:
+        return self.repository.list_pending()
+
+    def list_events(self, shipment_id: int) -> list[ShipmentEvent]:
+        """Status history (audit trail)."""
+        self.get_shipment_by_id(shipment_id)
+        return self.repository.list_events(shipment_id)
+
+    # -- lifecycle ----------------------------------------------------------------
+
+    def update_status(self, shipment_id: int, new_status: str,
+                      actor_user_id: int | None = None,
+                      lat: float | None = None, lon: float | None = None) -> Shipment:
+        """Advance the state machine, recording the audit event.
+
+        On delivery: releases carrier capacity and persists CO2 savings for
+        collaborative shipments (RF-CO2-01).
+        """
         shipment = self.get_shipment_by_id(shipment_id)
         allowed = VALID_TRANSITIONS.get(shipment.status, [])
         if new_status not in allowed:
             raise InvalidShipmentStatusError(shipment.status, new_status)
 
         updated = self.repository.update_status(shipment_id, new_status)
-        if not updated:
-            raise ShipmentNotFoundError()
+        self.repository.add_event(shipment_id, new_status, actor_user_id=actor_user_id,
+                                  lat=lat, lon=lon)
+
+        if new_status == ShipmentStatus.DELIVERED:
+            self._on_delivered(updated)
+        elif new_status == ShipmentStatus.CANCELLED and shipment.carrier_id is not None:
+            self._release_capacity(shipment)
         return updated
 
-    def cancel_shipment(self, shipment_id: int) -> Shipment:
-        """Cancel a shipment (only from pending or assigned)."""
-        return self.update_status(shipment_id, ShipmentStatus.CANCELLED)
+    def cancel_shipment(self, shipment_id: int, client_id: int) -> Shipment:
+        """Client cancels before pickup (RF-SHP-07)."""
+        shipment = self.get_shipment_by_id(shipment_id)
+        if shipment.client_id != client_id:
+            raise ValueError("Only the shipment owner can cancel it.")
+        return self.update_status(shipment_id, ShipmentStatus.CANCELLED, actor_user_id=client_id)
 
-    def assign_carrier(self, shipment_id: int, carrier_id: int) -> Shipment:
-        """Assign a carrier to a pending shipment."""
+    # -- carrier accept / reject / cancel (RF-CAR-03/04/07) -------------------------
+
+    def accept_shipment(self, shipment_id: int, carrier_id: int,
+                        route_id: int | None = None) -> Shipment:
+        """Carrier accepts a pending shipment: assign + reserve capacity.
+
+        For collaborative shipments matched against a published route, the
+        CO2 savings are computed at accept time (route geometry is known)
+        and persisted on delivery.
+        """
         shipment = self.get_shipment_by_id(shipment_id)
         if shipment.status != ShipmentStatus.PENDING:
             raise InvalidShipmentStatusError(shipment.status, ShipmentStatus.ASSIGNED)
 
+        carrier = self._get_carrier(carrier_id)
+        available = self._available_capacity(carrier)
+        if available < shipment.weight_kg:
+            raise ValueError("Carrier does not have enough available capacity.")
+
         updated = self.repository.assign_carrier(shipment_id, carrier_id)
-        if not updated:
-            raise ShipmentNotFoundError()
+        self.repository.add_event(shipment_id, ShipmentStatus.ASSIGNED,
+                                  actor_user_id=carrier.user_id)
+        self._reserve_capacity(carrier, shipment.weight_kg)
+
+        if shipment.modality == ShipmentModality.COLLABORATIVE and route_id and self.route_repo:
+            route = self.route_repo.get_by_id(route_id)
+            if route and route.destination_lat is not None:
+                savings = self.co2.calculate_shipment_savings(
+                    route_origin=Point(route.origin_lat, route.origin_lon),
+                    route_destination=Point(route.destination_lat, route.destination_lon),
+                    pickup=Point(shipment.origin_lat, shipment.origin_lon),
+                    dropoff=Point(shipment.destination_lat, shipment.destination_lon),
+                    vehicle_type=carrier.vehicle_type,
+                )
+                updated = self.repository.update(
+                    shipment_id, co2_savings_kg=savings["savings_kg"]
+                )
         return updated
 
-    def list_pending(self) -> list[Shipment]:
-        """Get all pending shipments (for matching)."""
-        return self.repository.list_pending()
+    def carrier_cancel(self, shipment_id: int, carrier_id: int) -> Shipment:
+        """Carrier cancels after accepting: reputation penalty (RF-CAR-07)."""
+        shipment = self.get_shipment_by_id(shipment_id)
+        if shipment.carrier_id != carrier_id:
+            raise ValueError("Shipment is not assigned to this carrier.")
+        carrier = self._get_carrier(carrier_id)
+
+        updated = self.update_status(shipment_id, ShipmentStatus.CANCELLED,
+                                     actor_user_id=carrier.user_id)
+        # re-open for other carriers
+        updated = self.repository.update_status(shipment_id, ShipmentStatus.PENDING)
+        self.repository.update(shipment_id, carrier_id=None)
+        if self.carrier_repo:
+            new_rep = max(0.0, (carrier.reputation or 5.0) - CARRIER_CANCEL_PENALTY)
+            self.carrier_repo.update(carrier_id, reputation=new_rep)
+        return updated
+
+    # -- ratings (RF-SHP-08) ----------------------------------------------------------
+
+    def rate_shipment(self, shipment_id: int, client_id: int,
+                      stars: int, comment: str | None = None) -> Rating:
+        """Client rates the carrier after delivery; updates carrier reputation."""
+        shipment = self.get_shipment_by_id(shipment_id)
+        if shipment.client_id != client_id:
+            raise ValueError("Only the shipment owner can rate it.")
+        if shipment.status != ShipmentStatus.DELIVERED:
+            raise ValueError("Only delivered shipments can be rated.")
+        if shipment.carrier_id is None:
+            raise ValueError("Shipment has no assigned carrier.")
+        if self.repository.get_rating_by_shipment(shipment_id):
+            raise ValueError("This shipment was already rated.")
+        if not 1 <= stars <= 5:
+            raise ValueError("Stars must be between 1 and 5.")
+
+        rating = self.repository.add_rating(
+            shipment_id, shipment.carrier_id, client_id, stars, comment
+        )
+        if self.carrier_repo:
+            avg = self.repository.carrier_rating_avg(shipment.carrier_id)
+            if avg is not None:
+                self.carrier_repo.update(shipment.carrier_id, reputation=round(avg, 2))
+        return rating
+
+    # -- capacity (RF-CAP) ------------------------------------------------------------
+
+    def _get_carrier(self, carrier_id: int):
+        if not self.carrier_repo:
+            raise ValueError("Carrier repository not configured.")
+        carrier = self.carrier_repo.get_by_id(carrier_id)
+        if not carrier:
+            raise ValueError("Carrier not found.")
+        return carrier
+
+    def _available_capacity(self, carrier) -> float:
+        reserved = sum(
+            s.weight_kg for s in self.repository.list_active_by_carrier(carrier.id)
+        )
+        return carrier.capacity_kg - reserved
+
+    def _reserve_capacity(self, carrier, weight_kg: float) -> None:
+        # Capacity is derived from active shipments (single source of truth),
+        # so reserving is implicit in the assignment. Hook kept for clarity.
+        pass
+
+    def _release_capacity(self, shipment: Shipment) -> None:
+        # Implicit: delivered/cancelled shipments leave list_active_by_carrier.
+        pass
+
+    def _on_delivered(self, shipment: Shipment) -> None:
+        """Post-delivery side effects: capacity release is implicit; CO2 was
+        computed at accept time for collaborative shipments."""
+        self._release_capacity(shipment)

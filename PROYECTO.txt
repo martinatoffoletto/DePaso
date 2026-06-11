@@ -196,3 +196,77 @@ El proyecto es una POC (Proof of Concept) y está en fase de prototipado
 con datos mock para demostración de funcionalidad y flujo de usuario.
 
 ================================================================================
+
+2. OBJETIVO
+Desarrollar un prototipo funcional de plataforma de logística urbana colaborativa para el AMBA
+para diciembre de 2026 que, mediante IA y matching inteligente, aproveche la capacidad ociosa
+de desplazamientos. Se buscará:
+ Entrenar un modelo de visión computacional para clasificar cargas.
+ Implementar matching por trayectorias reales.
+ Calcular el CO₂ ahorrado por envío.
+ Habilitar modalidades dedicada y colaborativa.
+FACULTAD DE INGENIERÍA Y CIENCIAS EXACTAS
+Proyecto Final de Ingeniería - Propuesta de Tema
+Página 5 de 7
+3. ALCANCE
+Diseño y desarrollo de un prototipo funcional de plataforma digital (PWA/app móvil) para la
+gestión logística de envíos en el AMBA (~15M de habitantes), con alcance potencial superior a
+100.000 usuarios. Incluirá:
+ Registro de usuarios y transportistas multimodales (peatón, bicicleta, auto, utilitario, camión).
+ Carga de solicitudes con imágenes.
+ Clasificación automática de carga mediante modelo de IA entrenado por el equipo, con
+ingreso manual alternativo.
+ Asignación inteligente por trayectorias geoespaciales.
+ Gestión de capacidad en tiempo real.
+ Cálculo de CO₂ ahorrado.
+ Panel de monitoreo operativo.
+4. DESCRIPCION
+DePaso es una plataforma digital de logística urbana colaborativa para el AMBA, orientada a
+PyMEs, comercios y clientes particulares, que gestiona el ciclo completo del envío: solicitud,
+clasificación de la carga, asignación del transportista, seguimiento e impacto ambiental.
+A diferencia de Rappi Favor, PedidosYa Envíos y DiDi Entrega, que operan bajo un modelo
+exclusivo de transporte dedicado, DePaso introduce un modelo híbrido que combina transporte
+dedicado (tipo flete) con transporte colaborativo basado en trayectorias habituales de los
+transportistas, aprovechando la capacidad ociosa de desplazamientos ya existentes mediante
+matching con el mínimo desvío.
+Problemas que se buscan resolver:
+ Costos logísticos elevados para PyMEs y comercios sin flota propia.
+ Vehículos circulando con espacio disponible sin aprovechamiento.
+ Baja eficiencia en la última milla en entornos urbanos densos.
+ Alta emisión de CO₂ por viajes dedicados innecesarios.
+ Falta de ingresos para personas que realizan trayectos cotidianos.
+Se contemplan diferentes tipos de envío: paquetes pequeños y documentos, medianos,
+grandes/voluminosos, y mudanzas/fletes.
+FACULTAD DE INGENIERÍA Y CIENCIAS EXACTAS
+Proyecto Final de Ingeniería - Propuesta de Tema
+Página 6 de 7
+Para los envíos se dispone de dos diferentes modalidades habilitadas:
+ Dedicada: se asigna un transportista completo al envío según el tipo de carga. Fletes y
+mudanzas van a quienes disponen de camioneta o camión.
+ Colaborativa: el transportista registra su ruta habitual y recibe pedidos compatibles sin
+desvíos significativos. Pueden participar con cualquier movilidad (auto, moto, bicicleta o a pie;
+las dos últimas habilitadas solo para paquetes pequeños y documentos en trayectos cortos).
+Componente de Inteligencia Artificial
+El proyecto incorpora IA como componente central mediante un modelo propio entrenado por el
+equipo, documentando dataset, arquitectura, métricas, validación y análisis de sesgos. Por tal
+motivo, se incluyen las siguientes funcionalidades:
+ Clasificador de tamaño de carga (visión computacional): modelo entrenado con dataset
+construido a partir de imágenes públicas seleccionadas y etiquetadas. Admite la selección de
+un objeto de referencia opcional e ingreso manual como alternativa. Se evalúa con accuracy,
+matriz de confusión y análisis de sesgos por iluminación, ángulo y fondo.
+ Asignación inteligente de envíos: algoritmo de scoring multivariable determinístico que
+combina compatibilidad geoespacial, desvío, carga, reputación y ventana horaria.
+ Cálculo de CO₂ ahorrado: compara el escenario real contra el viaje dedicado basándose en
+factores IPCC.
+ Gestión de capacidad disponible: actualiza en tiempo real el volumen libre con el que dispone
+el transportista.
+5. RECURSOS
+Para el desarrollo del proyecto se utilizarán los equipos personales del equipo dedicados al
+proyecto, infraestructura en la nube y herramientas open source. El backend se desarrollará en
+Python con FastAPI, y el frontend con React Native y Expo. Para el entrenamiento del modelo de
+IA se utilizarán plataformas con GPU en la nube, y el despliegue del backend y la base de datos
+se realizará en servicios cloud con planes pagos que aseguren disponibilidad durante todo el
+período de desarrollo y defensa.
+No se requieren laboratorios, equipamiento especializado ni fuentes externas de financiamiento.
+El proyecto se desarrolla con un presupuesto acotado cubierto por el equipo, detallado en la tabla
+a continuación

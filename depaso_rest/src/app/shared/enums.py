@@ -10,6 +10,7 @@ class UserType(str, Enum):
 
     CLIENT = "client"
     CARRIER = "carrier"
+    ADMIN = "admin"
 
 
 class VehicleType(str, Enum):
@@ -34,10 +35,11 @@ class PackageSize(str, Enum):
 
 
 class ShipmentStatus(str, Enum):
-    """Shipment lifecycle states (RF-SHP-05)."""
+    """Shipment lifecycle states (RF-SHP-05, carrier milestones RF-CAR-05)."""
 
     PENDING = "pending"
     ASSIGNED = "assigned"
+    PICKUP_ARRIVED = "pickup_arrived"
     IN_TRANSIT = "in_transit"
     DELIVERED = "delivered"
     CANCELLED = "cancelled"

@@ -1,4 +1,4 @@
-import axios, { AxiosInstance } from "axios";
+import axios, { AxiosError, AxiosInstance } from "axios";
 import * as SecureStore from "expo-secure-store";
 import Constants from "expo-constants";
 
@@ -7,6 +7,41 @@ const localIp = debuggerHost ? debuggerHost.split(":")[0] : "localhost";
 
 const API_BASE_URL =
   process.env.EXPO_PUBLIC_API_URL || `http://${localIp}:8000/api/v1`;
+
+const TOKEN_KEY = "auth_token";
+const REFRESH_KEY = "refresh_token";
+
+export const tokenStorage = {
+  getAccess: () => SecureStore.getItemAsync(TOKEN_KEY),
+  getRefresh: () => SecureStore.getItemAsync(REFRESH_KEY),
+  async save(access: string, refresh: string | null) {
+    await SecureStore.setItemAsync(TOKEN_KEY, access);
+    if (refresh) await SecureStore.setItemAsync(REFRESH_KEY, refresh);
+  },
+  async clear() {
+    await SecureStore.deleteItemAsync(TOKEN_KEY);
+    await SecureStore.deleteItemAsync(REFRESH_KEY);
+  },
+};
+
+// Single in-flight refresh shared by concurrent 401s
+let refreshPromise: Promise<string | null> | null = null;
+
+async function refreshAccessToken(): Promise<string | null> {
+  const refresh = await tokenStorage.getRefresh();
+  if (!refresh) return null;
+  try {
+    // plain axios: must not go through the interceptors
+    const { data } = await axios.post(`${API_BASE_URL}/auth/refresh`, {
+      refresh_token: refresh,
+    });
+    await tokenStorage.save(data.access_token, data.refresh_token);
+    return data.access_token as string;
+  } catch {
+    await tokenStorage.clear();
+    return null;
+  }
+}
 
 class ApiClient {
   private instance: AxiosInstance;
@@ -17,29 +52,27 @@ class ApiClient {
       timeout: 10000,
     });
 
-    // Request interceptor: agregar JWT al header
-    this.instance.interceptors.request.use(
-      async (config) => {
-        try {
-          const token = await SecureStore.getItemAsync("auth_token");
-          if (token) {
-            config.headers.Authorization = `Bearer ${token}`;
-          }
-        } catch (error) {
-          console.error("Error retrieving auth token:", error);
-        }
-        return config;
-      },
-      (error) => Promise.reject(error),
-    );
+    this.instance.interceptors.request.use(async (config) => {
+      const token = await tokenStorage.getAccess();
+      if (token) config.headers.Authorization = `Bearer ${token}`;
+      return config;
+    });
 
-    // Response interceptor: manejar errores globales
     this.instance.interceptors.response.use(
       (response) => response,
-      async (error) => {
-        if (error.response?.status === 401) {
-          await SecureStore.deleteItemAsync("auth_token");
-          // Importación dinámica para evitar dependencia circular
+      async (error: AxiosError) => {
+        const original = error.config as any;
+        if (error.response?.status === 401 && original && !original._retried) {
+          original._retried = true;
+          refreshPromise = refreshPromise ?? refreshAccessToken();
+          const newToken = await refreshPromise;
+          refreshPromise = null;
+
+          if (newToken) {
+            original.headers.Authorization = `Bearer ${newToken}`;
+            return this.instance.request(original);
+          }
+          // refresh failed -> log out
           const { useAuthStore } = await import("../stores/authStore");
           useAuthStore.getState().logout();
         }

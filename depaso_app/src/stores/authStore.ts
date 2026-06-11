@@ -1,7 +1,7 @@
 import { create } from "zustand";
-import * as SecureStore from "expo-secure-store";
 import { User, UserType } from "../types";
 import { authService } from "../services/auth";
+import { tokenStorage } from "../services/api";
 
 interface AuthState {
   user: User | null;
@@ -35,7 +35,7 @@ export const useAuthStore = create<AuthState>((set) => ({
     set({ isLoading: true });
     try {
       const response = await authService.login({ email, password });
-      await SecureStore.setItemAsync("auth_token", response.access_token);
+      await tokenStorage.save(response.access_token, response.refresh_token);
 
       // Fetch full user profile after login
       const fullUser = await authService.getCurrentUser();
@@ -56,7 +56,7 @@ export const useAuthStore = create<AuthState>((set) => ({
     set({ isLoading: true });
     try {
       const response = await authService.register(data);
-      await SecureStore.setItemAsync("auth_token", response.access_token);
+      await tokenStorage.save(response.access_token, response.refresh_token);
 
       // Fetch full user profile after register
       const fullUser = await authService.getCurrentUser();
@@ -74,7 +74,7 @@ export const useAuthStore = create<AuthState>((set) => ({
   },
 
   logout: async () => {
-    await SecureStore.deleteItemAsync("auth_token");
+    await tokenStorage.clear();
     set({
       user: null,
       token: null,
@@ -86,7 +86,7 @@ export const useAuthStore = create<AuthState>((set) => ({
   restoreToken: async () => {
     set({ isLoading: true });
     try {
-      const token = await SecureStore.getItemAsync("auth_token");
+      const token = await tokenStorage.getAccess();
       if (token) {
         const user = await authService.getCurrentUser();
         set({
@@ -97,7 +97,7 @@ export const useAuthStore = create<AuthState>((set) => ({
       }
     } catch {
       // Token inválido o expirado — limpiar y redirigir al login
-      await SecureStore.deleteItemAsync("auth_token");
+      await tokenStorage.clear();
       set({ isAuthenticated: false, user: null, token: null });
     } finally {
       set({ isLoading: false });

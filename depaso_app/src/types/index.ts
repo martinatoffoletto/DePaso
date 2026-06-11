@@ -1,10 +1,11 @@
 /**
- * Shared TypeScript types for DePaso frontend
+ * Shared TypeScript types for DePaso frontend — mirrors backend Pydantic schemas.
  */
 
 export enum UserType {
   CLIENT = "client",
   CARRIER = "carrier",
+  ADMIN = "admin",
 }
 
 export enum TransportType {
@@ -37,6 +38,7 @@ export enum AssignmentMode {
 export enum ShipmentStatus {
   PENDING = "pending",
   ASSIGNED = "assigned",
+  PICKUP_ARRIVED = "pickup_arrived",
   IN_TRANSIT = "in_transit",
   DELIVERED = "delivered",
   CANCELLED = "cancelled",
@@ -112,6 +114,24 @@ export interface Carrier {
   updated_at: string;
 }
 
+export interface CarrierCreatePayload {
+  user_id: number;
+  company_name: string;
+  vehicle_type: TransportType;
+  license_plate: string;
+  capacity_kg: number;
+  capacity_volume_m3?: number;
+}
+
+export interface CarrierSummary {
+  carrier_id: number;
+  reputation: number;
+  deliveries_completed: number;
+  active_shipments: number;
+  total_earnings: number;
+  total_co2_saved_kg: number;
+}
+
 export interface Shipment {
   id: number;
   client_id: number;
@@ -146,13 +166,90 @@ export interface ShipmentCreatePayload {
   description?: string;
 }
 
-export interface DeliveryOffer {
-  id: DeliveryMode;
-  title: string;
-  subtitle: string;
-  price_ars: number;
-  eta_minutes: number;
-  co2_saved_kg: number;
+export interface Quote {
+  distance_km: number;
+  price_dedicated: number;
+  price_collaborative: number;
+  eta_dedicated_min: number;
+  eta_collaborative_min: number;
+  co2_savings_estimate_kg: number;
+}
+
+export interface ShipmentEvent {
+  id: number;
+  shipment_id: number;
+  status: ShipmentStatus;
+  lat: number | null;
+  lon: number | null;
+  notes: string | null;
+  created_at: string;
+}
+
+export interface Rating {
+  id: number;
+  shipment_id: number;
+  carrier_id: number;
+  stars: number;
+  comment: string | null;
+  created_at: string;
+}
+
+export interface FeedItem {
+  shipment_id: number;
+  modality: DeliveryMode;
+  package_size: PackageCategory;
+  weight_kg: number;
+  origin_lat: number;
+  origin_lon: number;
+  destination_lat: number;
+  destination_lon: number;
+  estimated_price: number | null;
+  score: number;
+  detour_km: number | null;
+  detour_ratio: number | null;
+  distance_to_pickup_km: number | null;
+  route_id: number | null;
+  explanation: string[];
+}
+
+export interface CarrierRoute {
+  id: number;
+  carrier_id: number;
+  kind: "collaborative_route" | "dedicated_window";
+  origin_lat: number;
+  origin_lon: number;
+  destination_lat: number | null;
+  destination_lon: number | null;
+  window_start: string;
+  window_end: string;
+  recurrence_days: string | null;
+  is_active: boolean;
+}
+
+export interface RouteCreatePayload {
+  kind: "collaborative_route" | "dedicated_window";
+  origin_lat: number;
+  origin_lon: number;
+  destination_lat?: number;
+  destination_lon?: number;
+  window_start: string;
+  window_end: string;
+  recurrence_days?: string;
+}
+
+export interface TrackedPosition {
+  shipment_id: number | null;
+  lat: number;
+  lon: number;
+  created_at: string;
+}
+
+export interface ClassificationResult {
+  classification_id: number;
+  category: PackageCategory;
+  confidence: number;
+  needs_manual: boolean;
+  model_loaded: boolean;
 }
 
 export interface Location {
@@ -161,21 +258,31 @@ export interface Location {
   address?: string;
 }
 
+export interface ScoreBreakdown {
+  geo: number;
+  detour: number;
+  cargo: number;
+  reputation: number;
+  time_window: number;
+}
+
 export interface CarrierScoreResponse {
   carrier_id: number;
   company_name: string;
   vehicle_type: TransportType;
   license_plate: string;
   total_score: number;
-  distance_score: number;
-  detour_score: number;
-  capacity_score: number;
-  reputation_score: number;
-  time_window_score: number;
+  breakdown: ScoreBreakdown;
+  detour_km: number | null;
+  detour_ratio: number | null;
+  eta_to_pickup_min: number | null;
+  route_id: number | null;
+  explanation: string[];
 }
 
 export interface MatchingResponse {
   shipment_id: number;
+  modality: DeliveryMode;
   matched_carrier_id: number;
   total_score: number;
   ranked_carriers: CarrierScoreResponse[];

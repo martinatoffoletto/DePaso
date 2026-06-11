@@ -9,6 +9,7 @@ from src.app.modules.matching.service import MatchingService
 from src.app.modules.matching.schemas import CarrierScoreResponse, MatchingResponse
 from src.app.modules.shipments.repository import ShipmentRepository
 from src.app.modules.carriers.repository import CarrierRepository
+from src.app.modules.routes.repository import RouteRepository
 from src.app.modules.shipments.exceptions import ShipmentNotFoundError
 
 router = APIRouter(prefix="/matching", tags=["matching"])
@@ -18,6 +19,7 @@ def get_matching_service(db: Session = Depends(get_db)) -> MatchingService:
     return MatchingService(
         shipment_repo=ShipmentRepository(db),
         carrier_repo=CarrierRepository(db),
+        route_repo=RouteRepository(db),
     )
 
 

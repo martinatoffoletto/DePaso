@@ -1,66 +1,108 @@
 """
-CO2 module - Carbon footprint calculation.
-Deterministic CO2 savings calculation per IPCC 2019 factors (section 5.3 of spec).
+CO2 module - Carbon savings calculation (spec 5.3). Deterministic, no ML.
+
+Methodology (RF-CO2-01):
+- Real scenario: the shipment rides along an existing carrier trip; the only
+  attributable emission is the additional detour x vehicle emission factor.
+- Counterfactual scenario: the same shipment done as a dedicated trip
+  (carrier position -> pickup -> dropoff) x dedicated vehicle factor.
+- Savings = counterfactual - real.
+
+This per-shipment quantification, fed back to the user on completion, is one
+of the five differentiators identified in the state-of-the-art review: no
+local platform nor reviewed academic work reports it.
 """
 from src.app.shared.enums import VehicleType
+from src.app.shared.geo import Point, insertion_detour, road_km
+
+# Emission factors (kg CO2/km), IPCC 2019 Refinement + Argentine factors (spec 5.3).
+EMISSION_FACTORS: dict[str, float] = {
+    VehicleType.PEDESTRIAN: 0.00,
+    VehicleType.BIKE: 0.00,
+    VehicleType.MOTORCYCLE: 0.09,
+    VehicleType.CAR: 0.18,
+    VehicleType.VAN: 0.25,
+    VehicleType.TRUCK: 0.60,
+}
+
+# When the collaborative carrier is zero-emission (bike/pedestrian), the
+# counterfactual dedicated trip would still need a motor vehicle. The most
+# common dedicated courier vehicle in AMBA is the motorcycle.
+COUNTERFACTUAL_FALLBACK_VEHICLE = VehicleType.MOTORCYCLE
 
 
 class CO2Service:
-    """Service for CO2 calculation.
-
-    Emission factors (kg CO2/km) based on IPCC 2019 + Argentine factors:
-    - Pedestrian: 0.00
-    - Bike: 0.00
-    - Motorcycle: 0.09
-    - Car: 0.18
-    - Van: 0.25
-    - Truck: 0.60
-    """
-
-    EMISSION_FACTORS: dict[str, float] = {
-        VehicleType.PEDESTRIAN: 0.00,
-        VehicleType.BIKE: 0.00,
-        VehicleType.MOTORCYCLE: 0.09,
-        VehicleType.CAR: 0.18,
-        VehicleType.VAN: 0.25,
-        VehicleType.TRUCK: 0.60,
-    }
+    """Deterministic CO2 savings calculation."""
 
     def get_emission_factor(self, vehicle_type: str) -> float:
-        """Get emission factor for a vehicle type (kg CO2/km)."""
-        return self.EMISSION_FACTORS.get(vehicle_type, 0.20)
+        """Emission factor for a vehicle type (kg CO2/km)."""
+        return EMISSION_FACTORS.get(vehicle_type, 0.20)
 
     def calculate_direct_emissions(self, distance_km: float, vehicle_type: str) -> float:
-        """Calculate emissions for a direct delivery (kg CO2)."""
-        factor = self.get_emission_factor(vehicle_type)
-        return distance_km * factor
+        """Emissions of a direct trip (kg CO2)."""
+        return distance_km * self.get_emission_factor(vehicle_type)
 
-    def calculate_savings(self, detour_km: float, dedicated_distance_km: float,
-                          vehicle_type: str) -> dict[str, float]:
-        """Calculate CO2 savings for a collaborative shipment.
+    def calculate_savings(
+        self,
+        detour_km: float,
+        dedicated_distance_km: float,
+        vehicle_type: str,
+        dedicated_vehicle_type: str | None = None,
+    ) -> dict[str, float]:
+        """CO2 savings of a collaborative shipment given precomputed distances.
 
         Args:
-            detour_km: Additional distance the carrier travels for this shipment.
-            dedicated_distance_km: Distance if the shipment were sent via dedicated carrier.
-            vehicle_type: Type of vehicle used.
-
-        Returns:
-            dict with real_emissions, counterfactual_emissions, savings_kg, savings_percent.
+            detour_km: additional km the collaborative carrier travels.
+            dedicated_distance_km: km of the counterfactual dedicated trip.
+            vehicle_type: collaborative carrier's vehicle.
+            dedicated_vehicle_type: vehicle assumed for the counterfactual;
+                defaults to the same vehicle, or a motorcycle when the
+                collaborative vehicle is zero-emission (bike/pedestrian).
         """
-        factor = self.get_emission_factor(vehicle_type)
+        real_factor = self.get_emission_factor(vehicle_type)
+        if dedicated_vehicle_type is None:
+            dedicated_vehicle_type = (
+                COUNTERFACTUAL_FALLBACK_VEHICLE if real_factor == 0.0 else vehicle_type
+            )
+        counterfactual_factor = self.get_emission_factor(dedicated_vehicle_type)
 
-        # Real: only the additional detour contributes emissions
-        real_emissions = detour_km * factor
+        real_emissions = detour_km * real_factor
+        counterfactual_emissions = dedicated_distance_km * counterfactual_factor
 
-        # Counterfactual: full dedicated trip
-        counterfactual_emissions = dedicated_distance_km * factor
-
-        savings_kg = counterfactual_emissions - real_emissions
-        savings_percent = (savings_kg / counterfactual_emissions * 100) if counterfactual_emissions > 0 else 0.0
-
+        savings_kg = max(0.0, counterfactual_emissions - real_emissions)
+        savings_percent = (
+            savings_kg / counterfactual_emissions * 100
+            if counterfactual_emissions > 0 else 0.0
+        )
         return {
             "real_emissions_kg": round(real_emissions, 4),
             "counterfactual_emissions_kg": round(counterfactual_emissions, 4),
             "savings_kg": round(savings_kg, 4),
             "savings_percent": round(savings_percent, 2),
         }
+
+    def calculate_shipment_savings(
+        self,
+        route_origin: Point,
+        route_destination: Point,
+        pickup: Point,
+        dropoff: Point,
+        vehicle_type: str,
+        dedicated_vehicle_type: str | None = None,
+    ) -> dict[str, float]:
+        """Full spec-5.3 calculation from coordinates (RF-CO2-01).
+
+        Real: detour from inserting pickup+dropoff into the carrier's route.
+        Counterfactual: dedicated round trip route_origin -> pickup -> dropoff.
+        """
+        detour = insertion_detour(route_origin, route_destination, pickup, dropoff)
+        dedicated_km = road_km(route_origin, pickup) + road_km(pickup, dropoff)
+        result = self.calculate_savings(
+            detour_km=detour.detour_km,
+            dedicated_distance_km=dedicated_km,
+            vehicle_type=vehicle_type,
+            dedicated_vehicle_type=dedicated_vehicle_type,
+        )
+        result["detour_km"] = detour.detour_km
+        result["dedicated_distance_km"] = round(dedicated_km, 3)
+        return result

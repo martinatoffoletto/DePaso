@@ -6,6 +6,7 @@ import { PackageScreen }     from "./PackageScreen";
 import { AddressScreen }     from "./AddressScreen";
 import { RouteOfferScreen }  from "./RouteOfferScreen";
 import { SummaryScreen }     from "./SummaryScreen";
+import type { Quote } from "@/src/types";
 
 type Step = "home" | "package" | "address" | "route_offer" | "summary";
 type DeliveryMode = "dedicada" | "colaborativa";
@@ -34,6 +35,7 @@ export function FlowNavigator() {
 
   // Offer state
   const [mode, setMode] = useState<DeliveryMode>("colaborativa");
+  const [quote, setQuote] = useState<Quote | null>(null);
 
   function resetAll() {
     setStep("home");
@@ -48,6 +50,7 @@ export function FlowNavigator() {
     setRecipientName("");
     setRecipientPhone("");
     setMode("colaborativa");
+    setQuote(null);
   }
 
   const screen = useMemo(() => {
@@ -99,10 +102,12 @@ export function FlowNavigator() {
           destination={destination}
           originCoords={originCoords}
           destinationCoords={destinationCoords}
+          categoryId={categoryId}
           initialMode={mode}
           onBack={() => setStep("address")}
-          onNext={(selectedMode) => {
+          onNext={(selectedMode, q) => {
             setMode(selectedMode);
+            setQuote(q);
             setStep("summary");
           }}
         />
@@ -121,6 +126,7 @@ export function FlowNavigator() {
         description={description}
         photoUri={photoUri}
         mode={mode}
+        quote={quote}
         recipientName={recipientName}
         recipientPhone={recipientPhone}
         onBack={() => setStep("route_offer")}

@@ -44,3 +44,14 @@ class CarrierResponse(CarrierBase):
 
     class Config:
         from_attributes = True
+
+
+class CarrierSummaryResponse(BaseModel):
+    """Carrier history and earnings (RF-CAR-06)."""
+
+    carrier_id: int
+    reputation: float
+    deliveries_completed: int
+    active_shipments: int
+    total_earnings: float
+    total_co2_saved_kg: float

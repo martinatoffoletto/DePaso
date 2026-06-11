@@ -11,6 +11,7 @@ from src.app.shared.exceptions import DomainException
 from src.app.modules.auth.schemas import (
     RegisterRequest,
     LoginRequest,
+    RefreshRequest,
     TokenResponse,
     UserSummary,
     CurrentUserResponse,
@@ -50,9 +51,10 @@ async def register(
             phone_number=request.phone_number,
             user_type=request.user_type,
         )
-        access_token, expires_in = service.create_tokens(user.id)
+        access_token, refresh_token, expires_in = service.create_tokens(user.id)
         return TokenResponse(
             access_token=access_token,
+            refresh_token=refresh_token,
             expires_in=expires_in,
             user=UserSummary.model_validate(user),
         )
@@ -70,9 +72,10 @@ async def login(
     """Authenticate a user and return tokens."""
     try:
         user = service.authenticate(email=request.email, password=request.password)
-        access_token, expires_in = service.create_tokens(user.id)
+        access_token, refresh_token, expires_in = service.create_tokens(user.id)
         return TokenResponse(
             access_token=access_token,
+            refresh_token=refresh_token,
             expires_in=expires_in,
             user=UserSummary.model_validate(user),
         )
@@ -80,6 +83,32 @@ async def login(
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid credentials",
+        )
+
+
+@router.post("/refresh", response_model=TokenResponse)
+async def refresh(
+    request: RefreshRequest,
+    service: AuthService = Depends(get_auth_service),
+    user_service: UserService = Depends(get_user_service),
+) -> TokenResponse:
+    """Exchange a refresh token for a new token pair (RNF-SEC-03)."""
+    try:
+        access_token, refresh_token, expires_in = service.refresh_tokens(request.refresh_token)
+        from src.app.core.security import decode_access_token
+
+        user_id = int(decode_access_token(access_token)["sub"])
+        user = user_service.get_user_by_id(user_id)
+        return TokenResponse(
+            access_token=access_token,
+            refresh_token=refresh_token,
+            expires_in=expires_in,
+            user=UserSummary.model_validate(user),
+        )
+    except (ValueError, DomainException):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid refresh token",
         )
 
 

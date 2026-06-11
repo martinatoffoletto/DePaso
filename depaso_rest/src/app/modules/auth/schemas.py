@@ -22,6 +22,12 @@ class LoginRequest(BaseModel):
     password: str = Field(..., max_length=72)
 
 
+class RefreshRequest(BaseModel):
+    """Schema for token refresh."""
+
+    refresh_token: str
+
+
 class TokenResponse(BaseModel):
     """Schema for token response."""
 

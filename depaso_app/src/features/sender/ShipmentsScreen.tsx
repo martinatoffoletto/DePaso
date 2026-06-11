@@ -6,7 +6,8 @@ import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useFocusEffect } from "@react-navigation/native";
 import { shipmentsService } from "@/src/services/shipments";
-import { Shipment, ShipmentStatus, PackageCategory, DeliveryMode } from "@/src/types";
+import { trackingService } from "@/src/services/carriers";
+import { Shipment, ShipmentStatus, PackageCategory, DeliveryMode, TrackedPosition } from "@/src/types";
 import { T } from "@/constants/tokens";
 import { reverseGeocode } from "@/src/utils/geocoding";
 
@@ -23,7 +24,30 @@ function useAddress(lat: number, lon: number): string {
 type IconName = React.ComponentProps<typeof MaterialCommunityIcons>["name"];
 type Tab = "active" | "delivered" | "cancelled";
 
-const ACTIVE_STATUSES = [ShipmentStatus.PENDING, ShipmentStatus.ASSIGNED, ShipmentStatus.IN_TRANSIT];
+const ACTIVE_STATUSES = [
+  ShipmentStatus.PENDING,
+  ShipmentStatus.ASSIGNED,
+  ShipmentStatus.PICKUP_ARRIVED,
+  ShipmentStatus.IN_TRANSIT,
+];
+
+// Timeline driven by the real shipment status
+const STATUS_ORDER = [
+  ShipmentStatus.ASSIGNED,
+  ShipmentStatus.PICKUP_ARRIVED,
+  ShipmentStatus.IN_TRANSIT,
+  ShipmentStatus.DELIVERED,
+];
+const STEP_LABELS = ["Asignado", "Retiro", "En viaje", "Entrega"];
+
+function timelineSteps(status: ShipmentStatus) {
+  const idx = STATUS_ORDER.indexOf(status);
+  return STEP_LABELS.map((label, i) => ({
+    label,
+    done: idx > i || status === ShipmentStatus.DELIVERED,
+    active: idx === i && status !== ShipmentStatus.DELIVERED,
+  }));
+}
 
 const SIZE_LABEL: Record<PackageCategory, string> = {
   [PackageCategory.XS]: "Sobre",
@@ -88,13 +112,6 @@ function MiniRouteLine({ origin, destination }: { origin: string; destination: s
 
 const MOCK_PHONE = "+541156789012";
 
-const TIMELINE_STEPS = [
-  { label: "Retiro",   done: true,  active: false },
-  { label: "En viaje", done: true,  active: false },
-  { label: "Cerca",    done: false, active: true  },
-  { label: "Entrega",  done: false, active: false },
-];
-
 function liveMapRegion(s: Shipment) {
   const lat1 = s.origin_lat, lat2 = s.destination_lat;
   const lon1 = s.origin_lon, lon2 = s.destination_lon;
@@ -109,6 +126,7 @@ function liveMapRegion(s: Shipment) {
 function LiveShipmentCard({ shipment, onPress }: { shipment: Shipment; onPress: () => void }) {
   const isCollab = shipment.modality === DeliveryMode.COLLABORATIVE;
   const sizeLabel = SIZE_LABEL[shipment.package_size] ?? "Paquete";
+  const steps = timelineSteps(shipment.status);
   const origAddr = useAddress(shipment.origin_lat, shipment.origin_lon);
   const destAddr = useAddress(shipment.destination_lat, shipment.destination_lon);
   const originCoord = { latitude: shipment.origin_lat, longitude: shipment.origin_lon };
@@ -153,8 +171,8 @@ function LiveShipmentCard({ shipment, onPress }: { shipment: Shipment; onPress: 
       <View style={{ paddingHorizontal: 16, paddingTop: 14, paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: T.borderSoft }}>
         <View style={{ flexDirection: "row", alignItems: "flex-start", position: "relative" }}>
           <View style={{ position: "absolute", top: 6, left: 22, right: 22, height: 2, backgroundColor: T.border, borderRadius: 2 }} />
-          <View style={{ position: "absolute", top: 6, left: 22, width: "40%", height: 2, backgroundColor: T.emerald, borderRadius: 2 }} />
-          {TIMELINE_STEPS.map((step, i) => (
+          <View style={{ position: "absolute", top: 6, left: 22, width: `${Math.max(0, steps.filter(st => st.done).length * 30)}%`, height: 2, backgroundColor: T.emerald, borderRadius: 2 }} />
+          {steps.map((step, i) => (
             <View key={i} style={{ flex: 1, alignItems: "center", gap: 4 }}>
               <View style={{ width: step.active ? 14 : 10, height: step.active ? 14 : 10, borderRadius: 7, backgroundColor: step.done ? T.emerald : step.active ? T.card : T.bg, borderWidth: step.active ? 2.5 : step.done ? 0 : 2, borderColor: step.active ? T.emerald : T.border, alignItems: "center", justifyContent: "center" }}>
                 {step.done && <MaterialCommunityIcons name="check" size={6} color="#F4EFE3" />}
@@ -208,8 +226,25 @@ function ShipmentDetailModal({ shipment, onClose, onCancel }: { shipment: Shipme
   const sizeLabel = SIZE_LABEL[shipment.package_size] ?? "Paquete";
   const originCoord = { latitude: shipment.origin_lat, longitude: shipment.origin_lon };
   const destCoord   = { latitude: shipment.destination_lat, longitude: shipment.destination_lon };
-  const canCancel = ACTIVE_STATUSES.includes(shipment.status);
+  // Cancelling is only allowed before pickup (RF-SHP-07)
+  const canCancel = [ShipmentStatus.PENDING, ShipmentStatus.ASSIGNED, ShipmentStatus.PICKUP_ARRIVED].includes(shipment.status);
   const [cancelLoading, setCancelLoading] = useState(false);
+  const steps = timelineSteps(shipment.status);
+
+  // Live carrier position — polling every 15 s while the shipment is trackable (RF-TRK-02)
+  const [carrierPos, setCarrierPos] = useState<TrackedPosition | null>(null);
+  const trackable = shipment.carrier_id != null && ACTIVE_STATUSES.includes(shipment.status);
+  useEffect(() => {
+    if (!trackable) return;
+    let alive = true;
+    const poll = () =>
+      trackingService.getShipmentLocation(shipment.id)
+        .then(p => { if (alive && p) setCarrierPos(p); })
+        .catch(() => {});
+    poll();
+    const interval = setInterval(poll, 15_000);
+    return () => { alive = false; clearInterval(interval); };
+  }, [shipment.id, trackable]);
 
   function callCarrier() { Linking.openURL(`tel:${MOCK_PHONE}`); }
   function messageCarrier() {
@@ -234,7 +269,7 @@ function ShipmentDetailModal({ shipment, onClose, onCancel }: { shipment: Shipme
           onPress: async () => {
             setCancelLoading(true);
             try {
-              await shipmentsService.updateStatus(shipment.id, ShipmentStatus.CANCELLED);
+              await shipmentsService.cancelShipment(shipment.id);
               onCancel();
             } catch {
               Alert.alert("Error", "No se pudo cancelar el envío. Intentá de nuevo.");
@@ -255,6 +290,13 @@ function ShipmentDetailModal({ shipment, onClose, onCancel }: { shipment: Shipme
           <Marker coordinate={originCoord} pinColor={T.forest} />
           <Marker coordinate={destCoord} pinColor={T.emerald} />
           <Polyline coordinates={[originCoord, destCoord]} strokeColor={T.forest} strokeWidth={3} lineDashPattern={[8, 5]} />
+          {carrierPos && (
+            <Marker coordinate={{ latitude: carrierPos.lat, longitude: carrierPos.lon }}>
+              <View style={{ width: 30, height: 30, borderRadius: 15, backgroundColor: T.forest, borderWidth: 2.5, borderColor: T.lime, alignItems: "center", justifyContent: "center" }}>
+                <MaterialCommunityIcons name="moped" size={15} color={T.lime} />
+              </View>
+            </Marker>
+          )}
         </MapView>
 
         {/* Map overlays */}
@@ -424,8 +466,8 @@ function ShipmentDetailModal({ shipment, onClose, onCancel }: { shipment: Shipme
             <Text style={dm.cardTitle}>ESTADO DEL ENVÍO</Text>
             <View style={{ flexDirection: "row", alignItems: "flex-start", position: "relative" }}>
               <View style={{ position: "absolute", top: 7, left: 22, right: 22, height: 2, backgroundColor: T.border, borderRadius: 2 }} />
-              <View style={{ position: "absolute", top: 7, left: 22, width: "40%", height: 2, backgroundColor: T.emerald, borderRadius: 2 }} />
-              {TIMELINE_STEPS.map((step, i) => (
+              <View style={{ position: "absolute", top: 7, left: 22, width: `${Math.max(0, steps.filter(st => st.done).length * 30)}%`, height: 2, backgroundColor: T.emerald, borderRadius: 2 }} />
+              {steps.map((step, i) => (
                 <View key={i} style={{ flex: 1, alignItems: "center", gap: 6 }}>
                   <View style={{ width: step.active ? 16 : 12, height: step.active ? 16 : 12, borderRadius: 8, backgroundColor: step.done ? T.emerald : step.active ? T.card : T.bg, borderWidth: step.active ? 2.5 : step.done ? 0 : 2, borderColor: step.active ? T.emerald : T.border, alignItems: "center", justifyContent: "center" }}>
                     {step.done && <MaterialCommunityIcons name="check" size={7} color="#F4EFE3" />}
@@ -469,7 +511,60 @@ const dm = StyleSheet.create({
   cancelBtnText: { fontSize: 14, fontWeight: "600", color: T.red },
 });
 
-function PastShipmentCard({ item, onPress }: { item: Shipment; onPress: () => void }) {
+function RatingModal({ shipment, onClose, onRated }: { shipment: Shipment; onClose: () => void; onRated: () => void }) {
+  const insets = useSafeAreaInsets();
+  const [stars, setStars] = useState(5);
+  const [sending, setSending] = useState(false);
+
+  async function submit() {
+    setSending(true);
+    try {
+      await shipmentsService.rateShipment(shipment.id, stars);
+      onRated();
+    } catch (err: any) {
+      const detail = err?.response?.data?.detail;
+      Alert.alert("No se pudo calificar", typeof detail === "string" ? detail : "Intentá de nuevo.");
+    } finally {
+      setSending(false);
+    }
+  }
+
+  return (
+    <Modal visible transparent animationType="fade" onRequestClose={onClose}>
+      <View style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.45)", justifyContent: "flex-end" }}>
+        <View style={{ backgroundColor: T.bg, borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: 24, paddingBottom: insets.bottom + 24, gap: 16 }}>
+          <View style={{ width: 38, height: 4, backgroundColor: T.border, borderRadius: 3, alignSelf: "center" }} />
+          <View>
+            <Text style={{ fontSize: 10, letterSpacing: 2.5, color: T.emeraldDeep, textTransform: "uppercase" }}>ENVÍO DP-{String(shipment.id).padStart(4, "0")}</Text>
+            <Text style={{ fontSize: 22, fontWeight: "700", color: T.ink, letterSpacing: -0.7, marginTop: 4 }}>¿Cómo estuvo la entrega?</Text>
+          </View>
+          <View style={{ flexDirection: "row", justifyContent: "center", gap: 10, paddingVertical: 8 }}>
+            {[1, 2, 3, 4, 5].map(n => (
+              <TouchableOpacity key={n} onPress={() => setStars(n)} hitSlop={6}>
+                <MaterialCommunityIcons name={n <= stars ? "star" : "star-outline"} size={38} color={n <= stars ? T.amber : T.border} />
+              </TouchableOpacity>
+            ))}
+          </View>
+          <TouchableOpacity
+            style={{ backgroundColor: T.forest, borderRadius: 16, height: 52, alignItems: "center", justifyContent: "center" }}
+            onPress={submit}
+            disabled={sending}
+            activeOpacity={0.88}
+          >
+            {sending
+              ? <ActivityIndicator color={T.lime} />
+              : <Text style={{ color: "#F4EFE3", fontWeight: "600", fontSize: 15 }}>Enviar calificación</Text>}
+          </TouchableOpacity>
+          <TouchableOpacity onPress={onClose} style={{ alignItems: "center", paddingVertical: 4 }}>
+            <Text style={{ color: T.inkMute, fontSize: 13 }}>Ahora no</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
+function PastShipmentCard({ item, onPress, onRate }: { item: Shipment; onPress: () => void; onRate: () => void }) {
   const isDelivered = item.status === ShipmentStatus.DELIVERED;
   const isCancelled = item.status === ShipmentStatus.CANCELLED;
   const isCollab = item.modality === DeliveryMode.COLLABORATIVE;
@@ -541,7 +636,7 @@ function PastShipmentCard({ item, onPress }: { item: Shipment; onPress: () => vo
           <Text style={{ fontSize: 9, letterSpacing: 1, color: T.inkMute, textTransform: "uppercase", marginTop: 1 }}>1 VIAJE JUNTOS</Text>
         </View>
         {isDelivered && (
-          <TouchableOpacity style={s.rateBtn} activeOpacity={0.85}>
+          <TouchableOpacity style={s.rateBtn} activeOpacity={0.85} onPress={onRate}>
             <MaterialCommunityIcons name="star-outline" size={11} color={T.lime} />
             <Text style={{ fontSize: 11.5, fontWeight: "600", color: "#F4EFE3" }}>Calificar</Text>
           </TouchableOpacity>
@@ -563,6 +658,7 @@ export default function MisEnviosScreen() {
   const [error, setError] = useState(false);
   const [tab, setTab] = useState<Tab>("active");
   const [selectedShipment, setSelectedShipment] = useState<Shipment | null>(null);
+  const [ratingShipment, setRatingShipment] = useState<Shipment | null>(null);
 
   async function load() {
     setLoading(true);
@@ -677,7 +773,12 @@ export default function MisEnviosScreen() {
             ))
           ) : (
             tabList.map(item => (
-              <PastShipmentCard key={item.id} item={item} onPress={() => setSelectedShipment(item)} />
+              <PastShipmentCard
+                key={item.id}
+                item={item}
+                onPress={() => setSelectedShipment(item)}
+                onRate={() => setRatingShipment(item)}
+              />
             ))
           )}
 
@@ -706,6 +807,14 @@ export default function MisEnviosScreen() {
           shipment={selectedShipment}
           onClose={() => setSelectedShipment(null)}
           onCancel={() => { setSelectedShipment(null); load(); }}
+        />
+      )}
+
+      {ratingShipment && (
+        <RatingModal
+          shipment={ratingShipment}
+          onClose={() => setRatingShipment(null)}
+          onRated={() => { setRatingShipment(null); load(); }}
         />
       )}
     </View>

@@ -7,8 +7,18 @@ import { useRouter } from "expo-router";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAuthStore } from "@/src/stores/authStore";
-import { UserType } from "@/src/types";
+import { carriersService } from "@/src/services/carriers";
+import { TransportType, UserType } from "@/src/types";
 import { T } from "@/constants/tokens";
+
+const VEHICLES: { type: TransportType; label: string; icon: any; capacityKg: number }[] = [
+  { type: TransportType.PEDESTRIAN, label: "A pie",     icon: "walk",          capacityKg: 5 },
+  { type: TransportType.BIKE,       label: "Bici",      icon: "bike",          capacityKg: 8 },
+  { type: TransportType.MOTORCYCLE, label: "Moto",      icon: "motorbike",     capacityKg: 15 },
+  { type: TransportType.CAR,        label: "Auto",      icon: "car",           capacityKg: 80 },
+  { type: TransportType.VAN,        label: "Camioneta", icon: "van-utility",   capacityKg: 600 },
+  { type: TransportType.TRUCK,      label: "Camión",    icon: "truck",         capacityKg: 2000 },
+];
 
 function pwdStrength(pwd: string): number {
   if (!pwd) return 0;
@@ -43,6 +53,11 @@ export default function RegisterScreen() {
   const [errors, setErrors]     = useState<Record<string, string>>({});
   const [serverError, setServerError] = useState<string | null>(null);
   const [accepted, setAccepted] = useState(false);
+  const [vehicleType, setVehicleType] = useState<TransportType>(TransportType.MOTORCYCLE);
+  const [licensePlate, setLicensePlate] = useState("");
+
+  const isCarrier = form.user_type === UserType.CARRIER;
+  const needsPlate = ![TransportType.PEDESTRIAN, TransportType.BIKE].includes(vehicleType);
 
   const update = (field: string, value: string) => {
     setForm(p => ({ ...p, [field]: value }));
@@ -58,6 +73,7 @@ export default function RegisterScreen() {
     if (!form.password)                         e.password = "Obligatorio";
     else if (form.password.length < 8)          e.password = "Mínimo 8 caracteres";
     if (form.password !== form.confirmPassword) e.confirmPassword = "No coinciden";
+    if (isCarrier && needsPlate && !licensePlate.trim()) e.license_plate = "Obligatorio";
     setErrors(e);
     return Object.keys(e).length === 0;
   };
@@ -74,6 +90,21 @@ export default function RegisterScreen() {
         phone_number: form.phone_number.trim() || undefined,
         user_type:  form.user_type,
       });
+      if (isCarrier) {
+        const me = useAuthStore.getState().user;
+        const vehicle = VEHICLES.find(v => v.type === vehicleType)!;
+        if (me) {
+          await carriersService.createProfile({
+            user_id: me.id,
+            company_name: `${form.first_name.trim()} ${form.last_name.trim()}`,
+            vehicle_type: vehicleType,
+            license_plate: needsPlate
+              ? licensePlate.trim().toUpperCase()
+              : `NP-${me.id}-${Date.now() % 10000}`,
+            capacity_kg: vehicle.capacityKg,
+          });
+        }
+      }
     } catch (error: any) {
       setServerError(error?.response?.data?.detail ?? "Error al crear la cuenta");
     }
@@ -145,6 +176,56 @@ export default function RegisterScreen() {
             );
           })}
         </View>
+
+        {isCarrier && (
+          <View className="mb-[18px]">
+            <FieldLabel label="TU VEHÍCULO" />
+            <View className="flex-row flex-wrap gap-2 mb-3">
+              {VEHICLES.map(v => {
+                const active = vehicleType === v.type;
+                return (
+                  <TouchableOpacity
+                    key={v.type}
+                    className="flex-row items-center gap-[6px] rounded-xl px-3 py-[9px]"
+                    style={{ backgroundColor: active ? T.forest : T.card, borderWidth: 1.2, borderColor: active ? T.forest : T.border }}
+                    onPress={() => setVehicleType(v.type)}
+                    activeOpacity={0.8}
+                  >
+                    <MaterialCommunityIcons name={v.icon} size={15} color={active ? T.lime : T.inkSoft} />
+                    <Text className="text-[12px] font-semibold" style={{ color: active ? "#F4EFE3" : T.inkSoft }}>{v.label}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+            {needsPlate && (
+              <>
+                <FieldLabel label="PATENTE" />
+                <View
+                  className="flex-row items-center gap-[10px] bg-card rounded-[14px] px-[14px] h-[52px] mb-1"
+                  style={{ borderWidth: 1.2, borderColor: errors.license_plate ? T.red : licensePlate ? T.forest : T.border }}
+                >
+                  <MaterialCommunityIcons name="card-text-outline" size={18} color={T.inkMute} />
+                  <TextInput
+                    className="flex-1 text-[15px] text-ink font-medium"
+                    placeholder="AB123CD"
+                    placeholderTextColor={T.inkFaint}
+                    autoCapitalize="characters"
+                    autoCorrect={false}
+                    value={licensePlate}
+                    onChangeText={t => { setLicensePlate(t); if (errors.license_plate) setErrors(p => ({ ...p, license_plate: "" })); }}
+                  />
+                </View>
+                {errors.license_plate ? <Text className="text-[11px] text-red mb-[6px] pl-1">{errors.license_plate}</Text> : null}
+              </>
+            )}
+            <View className="flex-row items-center gap-2 bg-cardSoft rounded-[10px] border border-borderSoft p-[10px] mt-1">
+              <MaterialCommunityIcons name="shield-check-outline" size={14} color={T.inkMute} />
+              <Text className="flex-1 text-[11px] text-inkSoft leading-4">
+                Tu cuenta de cadete queda pendiente de verificación por el equipo antes de poder aceptar pedidos.
+              </Text>
+            </View>
+          </View>
+        )}
 
         <View className="flex-row gap-[10px] mb-0">
           <View className="flex-1">

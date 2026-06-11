@@ -6,6 +6,8 @@ import {
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as ImagePicker from "expo-image-picker";
+import * as ImageManipulator from "expo-image-manipulator";
+import { visionService } from "@/src/services/vision";
 import { T } from "@/constants/tokens";
 
 type IconName = React.ComponentProps<typeof MaterialCommunityIcons>["name"];
@@ -19,7 +21,10 @@ const CATEGORIES: Category[] = [
   { id: "xl", label: "Flete",   sub: "> 30 kg",  icon: "wardrobe-outline" },
 ];
 
-const AI_MOCK = { categoryId: "m", confidence: 0.94, label: "Paquete mediano", dim: { l: "24", w: "18", h: "12", kg: "1.4" } };
+const CATEGORY_AI_LABEL: Record<string, string> = {
+  xs: "un sobre o documento", s: "un paquete chico", m: "un paquete mediano",
+  l: "un paquete grande", xl: "una carga voluminosa",
+};
 
 function StepDots({ current, total }: { current: number; total: number }) {
   return (
@@ -79,6 +84,8 @@ export function PackageScreen({ initial, onBack, onNext }: Props) {
   const [photoUri, setPhotoUri] = useState<string | null>(initial?.photoUri ?? null);
   const [aiActive, setAiActive] = useState(false);
   const [classifying, setClassifying] = useState(false);
+  const [classificationId, setClassificationId] = useState<number | null>(null);
+  const [aiConfidence, setAiConfidence] = useState<number | null>(null);
   const [selected, setSelected] = useState<string>(initial?.categoryId ?? "m");
   const [dimL, setDimL] = useState("24");
   const [dimW, setDimW] = useState("18");
@@ -111,18 +118,36 @@ export function PackageScreen({ initial, onBack, onNext }: Props) {
     applyPhoto(result.assets[0].uri);
   }
 
-  function applyPhoto(uri: string) {
+  async function applyPhoto(uri: string) {
     setPhotoUri(uri);
     setClassifying(true);
-    setTimeout(() => {
-      setAiActive(true);
-      setSelected(AI_MOCK.categoryId);
-      setDimL(AI_MOCK.dim.l);
-      setDimW(AI_MOCK.dim.w);
-      setDimH(AI_MOCK.dim.h);
-      setDimKg(AI_MOCK.dim.kg);
+    try {
+      // resize client-side: faster upload, the model only needs 224x224
+      const resized = await ImageManipulator.manipulateAsync(
+        uri,
+        [{ resize: { width: 640 } }],
+        { compress: 0.8, format: ImageManipulator.SaveFormat.JPEG },
+      );
+      const result = await visionService.classifyPackage(resized.uri);
+      setClassificationId(result.classification_id);
+      setAiConfidence(result.confidence);
+      if (!result.needs_manual) {
+        setAiActive(true);
+        setSelected(result.category);
+      } else {
+        // low confidence (RF-VIS-02): keep manual selection, inform the user
+        setAiActive(false);
+        Alert.alert(
+          "No estamos seguros",
+          "La IA no pudo clasificar el paquete con confianza. Elegí la categoría manualmente.",
+        );
+      }
+    } catch {
+      setAiActive(false);
+      Alert.alert("Error", "No se pudo clasificar la imagen. Elegí la categoría manualmente.");
+    } finally {
       setClassifying(false);
-    }, 1400);
+    }
   }
 
   function handlePhoto() {
@@ -134,6 +159,13 @@ export function PackageScreen({ initial, onBack, onNext }: Props) {
   }
 
   function handleNext() {
+    if (classificationId !== null) {
+      // RF-VIS-04: record whether the user kept the AI suggestion or corrected it
+      const accepted = aiActive && selected === selectedCat.id;
+      visionService
+        .sendFeedback(classificationId, accepted, accepted ? undefined : selected)
+        .catch(() => {});
+    }
     const kg = parseFloat(dimKg);
     onNext({ categoryId: selected, weightKg: isNaN(kg) ? 1 : kg, description, photoUri });
   }
@@ -221,15 +253,15 @@ export function PackageScreen({ initial, onBack, onNext }: Props) {
                 <MaterialCommunityIcons name="creation" size={14} color={T.lime} />
               </View>
               <View className="flex-1">
-                <Text className="text-[9px] tracking-[1.5px] text-inkMute uppercase">ANÁLISIS DE VISIÓN · 1.4s</Text>
+                <Text className="text-[9px] tracking-[1.5px] text-inkMute uppercase">ANÁLISIS DE VISIÓN</Text>
                 <Text className="text-[12.5px] text-ink font-medium mt-px">
-                  {aiActive ? `Detectamos ${AI_MOCK.label.toLowerCase()}` : "Analizando imagen..."}
+                  {aiActive ? `Detectamos ${CATEGORY_AI_LABEL[selected] ?? "un paquete"}` : "Analizando imagen..."}
                 </Text>
               </View>
-              {aiActive && (
+              {aiActive && aiConfidence !== null && (
                 <View className="flex-row items-center gap-1 bg-mint px-2 py-1 rounded-lg">
                   <View className="w-[5px] h-[5px] rounded-full bg-emeraldDeep" />
-                  <Text className="text-[10px] tracking-[0.5px] text-forest font-bold">{AI_MOCK.confidence * 100}%</Text>
+                  <Text className="text-[10px] tracking-[0.5px] text-forest font-bold">{Math.round(aiConfidence * 100)}%</Text>
                 </View>
               )}
             </View>

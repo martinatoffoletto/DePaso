@@ -7,7 +7,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { T } from "@/constants/tokens";
 import type { Coords } from "./FlowNavigator";
 import { shipmentsService } from "@/src/services/shipments";
-import { DeliveryMode, AssignmentMode, PackageCategory } from "@/src/types";
+import { DeliveryMode, AssignmentMode, PackageCategory, Quote } from "@/src/types";
 
 type IconName = React.ComponentProps<typeof MaterialCommunityIcons>["name"];
 
@@ -15,7 +15,6 @@ const SIZE_LABEL: Record<string, string> = {
   xs: "Sobre / Documento", s: "Caja chica", m: "Caja mediana",
   l: "Caja grande", xl: "Voluminoso / Flete",
 };
-const PRICE = { dedicada: 6900, colaborativa: 3900 };
 
 function StepDots({ current, total }: { current: number; total: number }) {
   return (
@@ -46,6 +45,7 @@ type SummaryScreenProps = {
   description?: string;
   photoUri?: string | null;
   mode: "dedicada" | "colaborativa";
+  quote: Quote | null;
   recipientName?: string;
   recipientPhone?: string;
   onBack: () => void;
@@ -69,13 +69,15 @@ const rowStyles = StyleSheet.create({
 
 export function SummaryScreen({
   origin, destination, originCoords, destinationCoords,
-  categoryId, weightKg, description, photoUri, mode, recipientName, recipientPhone,
+  categoryId, weightKg, description, photoUri, mode, quote, recipientName, recipientPhone,
   onBack, onConfirm,
 }: SummaryScreenProps) {
   const insets = useSafeAreaInsets();
   const [loading, setLoading] = useState(false);
   const isCollaborative = mode === "colaborativa";
-  const price = PRICE[mode];
+  const price = quote
+    ? (isCollaborative ? quote.price_collaborative : quote.price_dedicated)
+    : null;
 
   const handleConfirm = async () => {
     if (!originCoords || !destinationCoords) return;
@@ -200,7 +202,7 @@ export function SummaryScreen({
             value={isCollaborative ? "Colaborativa" : "Dedicada"}
           />
           <View style={styles.divider} />
-          <Row icon="cash" label="Precio est." value={`$${price.toLocaleString("es-AR")} ARS`} />
+          <Row icon="cash" label="Precio est." value={price != null ? `$${price.toLocaleString("es-AR")} ARS` : "A confirmar"} />
         </View>
 
         {/* CO₂ hero card */}

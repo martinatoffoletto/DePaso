@@ -48,14 +48,34 @@ class AuthService:
 
         return user
 
-    def create_tokens(self, user_id: int) -> tuple[str, int]:
-        """Create access token for a user."""
-        expires_delta = timedelta(minutes=settings.jwt_expire_minutes)
+    def create_tokens(self, user_id: int) -> tuple[str, str, int]:
+        """Create access + refresh token pair (RNF-SEC-03)."""
         access_token = create_access_token(
             data={"sub": str(user_id)},
-            expires_delta=expires_delta,
+            expires_delta=timedelta(minutes=settings.jwt_expire_minutes),
         )
-        return access_token, settings.jwt_expire_minutes * 60
+        refresh_token = create_access_token(
+            data={"sub": str(user_id), "type": "refresh"},
+            expires_delta=timedelta(days=settings.refresh_token_expire_days),
+        )
+        return access_token, refresh_token, settings.jwt_expire_minutes * 60
+
+    def refresh_tokens(self, refresh_token: str) -> tuple[str, str, int]:
+        """Issue a new token pair from a valid refresh token."""
+        from jose import JWTError
+        from src.app.core.security import decode_access_token
+
+        try:
+            payload = decode_access_token(refresh_token)
+        except JWTError:
+            raise InvalidCredentialsError()
+        if payload.get("type") != "refresh" or "sub" not in payload:
+            raise InvalidCredentialsError()
+
+        user = self.user_repository.get_by_id(int(payload["sub"]))
+        if not user or not user.is_active:
+            raise InvalidCredentialsError()
+        return self.create_tokens(user.id)
 
     def change_password(self, user_id: int, current_password: str, new_password: str) -> bool:
         """Change password for an authenticated user."""

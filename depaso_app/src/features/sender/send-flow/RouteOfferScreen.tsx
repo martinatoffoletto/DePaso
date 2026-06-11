@@ -1,11 +1,17 @@
-import { useState } from "react";
-import { View, StyleSheet, TouchableOpacity, ScrollView } from "react-native";
+import { useEffect, useState } from "react";
+import { View, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator } from "react-native";
 import MapView, { Marker, Polyline } from "react-native-maps";
 import { Text } from "react-native-paper";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { T } from "@/constants/tokens";
+import { shipmentsService } from "@/src/services/shipments";
+import type { Quote } from "@/src/types";
 import type { Coords } from "./FlowNavigator";
+
+function fmtPrice(v: number | undefined): string {
+  return v != null ? `$${v.toLocaleString("es-AR")}` : "—";
+}
 
 type DeliveryMode = "dedicada" | "colaborativa";
 
@@ -35,16 +41,37 @@ type Props = {
   destination: string;
   originCoords: Coords | null;
   destinationCoords: Coords | null;
+  categoryId: string;
   initialMode?: DeliveryMode;
   onBack: () => void;
-  onNext: (mode: DeliveryMode) => void;
+  onNext: (mode: DeliveryMode, quote: Quote | null) => void;
 };
 
-export function RouteOfferScreen({ origin, destination, originCoords, destinationCoords, initialMode, onBack, onNext }: Props) {
+export function RouteOfferScreen({ origin, destination, originCoords, destinationCoords, categoryId, initialMode, onBack, onNext }: Props) {
   const insets = useSafeAreaInsets();
   const [mode, setMode] = useState<DeliveryMode>(initialMode ?? "colaborativa");
+  const [quote, setQuote] = useState<Quote | null>(null);
+  const [quoteLoading, setQuoteLoading] = useState(true);
 
   const hasCoords = !!originCoords && !!destinationCoords;
+
+  useEffect(() => {
+    if (!hasCoords) { setQuoteLoading(false); return; }
+    let alive = true;
+    setQuoteLoading(true);
+    shipmentsService
+      .getQuote({
+        origin_lat: originCoords!.latitude,
+        origin_lon: originCoords!.longitude,
+        destination_lat: destinationCoords!.latitude,
+        destination_lon: destinationCoords!.longitude,
+        package_size: categoryId,
+      })
+      .then(q => { if (alive) setQuote(q); })
+      .catch(() => {})
+      .finally(() => { if (alive) setQuoteLoading(false); });
+    return () => { alive = false; };
+  }, [hasCoords, originCoords, destinationCoords, categoryId]);
 
   const mapRegion = hasCoords ? {
     latitude: (originCoords!.latitude + destinationCoords!.latitude) / 2,
@@ -117,13 +144,7 @@ export function RouteOfferScreen({ origin, destination, originCoords, destinatio
           <View style={s.mapInfoBlock}>
             <Text style={s.mapInfoLabel}>DISTANCIA</Text>
             <Text style={s.mapInfoValue}>
-              {hasCoords
-                ? `${(Math.hypot(
-                    (originCoords!.latitude - destinationCoords!.latitude) * 111,
-                    (originCoords!.longitude - destinationCoords!.longitude) * 85
-                  )).toFixed(1)} km`
-                : "— km"
-              }
+              {quote ? `${quote.distance_km.toFixed(1)} km` : "— km"}
             </Text>
           </View>
           <View style={s.mapInfoDivider} />
@@ -170,11 +191,13 @@ export function RouteOfferScreen({ origin, destination, originCoords, destinatio
                   <View style={s.dedicadaTag}><Text style={s.dedicadaTagText}>DEDICADA</Text></View>
                 </View>
                 <View style={s.offerMeta}>
-                  <Text style={s.offerMetaText}>28 min</Text>
+                  <Text style={s.offerMetaText}>{quote ? `${quote.eta_dedicated_min} min` : "—"}</Text>
                   <Text style={s.offerMetaText}>· Directo</Text>
                 </View>
               </View>
-              <Text style={s.offerPrice}>$6.900</Text>
+              {quoteLoading
+                ? <ActivityIndicator size="small" color={T.forest} />
+                : <Text style={s.offerPrice}>{fmtPrice(quote?.price_dedicated)}</Text>}
             </TouchableOpacity>
 
             {/* Colaborativa card */}
@@ -195,13 +218,21 @@ export function RouteOfferScreen({ origin, destination, originCoords, destinatio
                   <View style={s.ecoTag}><Text style={s.ecoTagText}>ECO −43%</Text></View>
                 </View>
                 <View style={s.offerMeta}>
-                  <Text style={[s.offerMetaText, mode === "colaborativa" && { color: "rgba(244,239,227,0.65)" }]}>54 min</Text>
-                  <Text style={[s.offerCo2, mode === "colaborativa" && { color: T.lime }]}>−1.8 kg CO₂</Text>
+                  <Text style={[s.offerMetaText, mode === "colaborativa" && { color: "rgba(244,239,227,0.65)" }]}>
+                    {quote ? `${quote.eta_collaborative_min} min` : "—"}
+                  </Text>
+                  <Text style={[s.offerCo2, mode === "colaborativa" && { color: T.lime }]}>
+                    {quote ? `−${quote.co2_savings_estimate_kg.toFixed(1)} kg CO₂` : ""}
+                  </Text>
                 </View>
               </View>
               <View style={{ alignItems: "flex-end", position: "relative" }}>
-                <Text style={[s.offerPrice, mode === "colaborativa" && { color: "#F4EFE3" }]}>$3.900</Text>
-                <Text style={[s.offerPriceStrike, mode === "colaborativa" && { color: "rgba(244,239,227,0.4)" }]}>$6.900</Text>
+                {quoteLoading
+                  ? <ActivityIndicator size="small" color={mode === "colaborativa" ? T.lime : T.forest} />
+                  : <>
+                      <Text style={[s.offerPrice, mode === "colaborativa" && { color: "#F4EFE3" }]}>{fmtPrice(quote?.price_collaborative)}</Text>
+                      <Text style={[s.offerPriceStrike, mode === "colaborativa" && { color: "rgba(244,239,227,0.4)" }]}>{fmtPrice(quote?.price_dedicated)}</Text>
+                    </>}
               </View>
             </TouchableOpacity>
 
@@ -229,7 +260,7 @@ export function RouteOfferScreen({ origin, destination, originCoords, destinatio
 
       {/* Sticky footer CTA */}
       <View style={[s.footerCTA, { paddingBottom: insets.bottom + 12 }]}>
-        <TouchableOpacity style={s.ctaBtn} onPress={() => onNext(mode)} activeOpacity={0.88}>
+        <TouchableOpacity style={s.ctaBtn} onPress={() => onNext(mode, quote)} activeOpacity={0.88}>
           <Text style={s.ctaBtnText}>Continuar · Resumen</Text>
           <MaterialCommunityIcons name="arrow-right" size={18} color="#F4EFE3" />
         </TouchableOpacity>

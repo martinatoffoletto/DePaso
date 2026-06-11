@@ -23,6 +23,8 @@ from src.app.modules.co2.router import router as co2_router
 from src.app.modules.vision.router import router as vision_router
 from src.app.modules.tracking.router import router as tracking_router
 from src.app.modules.freight.router import router as freight_router
+from src.app.modules.routes.router import router as routes_router
+from src.app.modules.admin.router import router as admin_router
 
 logger = logging.getLogger(__name__)
 
@@ -53,15 +55,18 @@ async def lifespan(app: FastAPI):
     from src.app.modules.users.models import User  # noqa: F401
     from src.app.modules.carriers.models import Carrier  # noqa: F401
     from src.app.modules.packages.models import Package  # noqa: F401
-    from src.app.modules.shipments.models import Shipment  # noqa: F401
+    from src.app.modules.shipments.models import Shipment, ShipmentEvent, Rating  # noqa: F401
+    from src.app.modules.routes.models import CarrierRoute  # noqa: F401
+    from src.app.modules.tracking.models import GpsTrace  # noqa: F401
+    from src.app.modules.vision.models import Classification  # noqa: F401
     Base.metadata.create_all(bind=engine)
     logger.info("✅ Database tables initialized")
-    
-    # TODO: Load ML model for vision module
-    # from src.app.modules.vision.service import VisionService
-    # vision_service = VisionService(settings.model_path)
-    # vision_service.load_model()
-    # app.state.classifier = vision_service
+
+    # Load the cargo classifier (falls back to a stub when TF/model missing)
+    from src.app.modules.vision.service import VisionService
+    vision_service = VisionService(settings.vision_model_path)
+    vision_service.load_model()
+    app.state.classifier = vision_service
     
     yield
     
@@ -127,6 +132,8 @@ def create_app() -> FastAPI:
     app.include_router(vision_router, prefix=api_prefix)
     app.include_router(tracking_router, prefix=api_prefix)
     app.include_router(freight_router, prefix=api_prefix)
+    app.include_router(routes_router, prefix=api_prefix)
+    app.include_router(admin_router, prefix=api_prefix)
 
     logger.info("✅ FastAPI application configured")
     return app

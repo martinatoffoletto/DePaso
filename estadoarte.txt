@@ -1,0 +1,1056 @@
+PROYECTO FINAL DE INGENIERÍA
+DePaso
+Toffoletto, Martina Ornella– LU 1139965
+Ingeniería en Informática
+Basaez, Candela Pilar– LU 1134260
+Ingeniería en Informática
+Tutor:
+Dos Santos, Maximiliano Luis,
+(UADE) Universidad Argentina de la Empresa Lima 757, Cdad. Autónoma de
+Buenos Aires, Argentina.
+2026
+UNIVERSIDAD ARGENTINA DE LA EMPRESA
+FACULTAD DE INGENIERÍA Y CIENCIAS EXACTAS
+DEPASO — PLATAFORMA DE
+LOGÍSTICA URBANA
+COLABORATIVA
+Toffoletto, Martina O.
+Basaez, Candela P.
+Índice
+1 Introducción 3
+1.1 Modalidades de envío . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 3
+1.2 Objetivos . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 4
+1.2.1 Objetivo general . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 4
+1.2.2 Objetivos específicos . . . . . . . . . . . . . . . . . . . . . . . . . . . 4
+1.3 Alcance . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 5
+2 Antecedentes 6
+2.1 Marco Teórico . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 6
+2.1.1 Crowdsourced delivery y logística de última milla . . . . . . . . . . . . 6
+2.1.2 Flotas híbridas: ventajas del modelo y el problema del desvío . . . . . . 7
+2.1.3 Perfiles de conductores: gig-workers y conductores ocasionales . . . . . 7
+2.1.4 Diseño de mercados de matching y asignación . . . . . . . . . . . . . . 8
+2.1.5 Visión computacional y aprendizaje por transferencia . . . . . . . . . . 9
+2.2 Estado del Arte . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 10
+2.2.1 Plataformas de logística urbana en el AMBA . . . . . . . . . . . . . . 10
+2.2.2 Investigación académica reciente . . . . . . . . . . . . . . . . . . . . . 11
+2.2.3 Matriz de antecedentes . . . . . . . . . . . . . . . . . . . . . . . . . . 13
+2.2.4 Conclusiones del relevamiento . . . . . . . . . . . . . . . . . . . . . . 13
+2.2.5 Brecha que justifica DePaso . . . . . . . . . . . . . . . . . . . . . . . 14
+3 Descripción 16
+3.1 Contexto y Necesidades Detectadas . . . . . . . . . . . . . . . . . . . . . . . 16
+3.2 Investigación de Usuarios . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 17
+3.3 Metodología . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 17
+3.4 Encuesta: muestra y resultados clave . . . . . . . . . . . . . . . . . . . . . . . 17
+3.5 Hallazgos accionables . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 18
+3.6 User Personas . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 19
+3.7 Próximas etapas . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 21
+4 Conclusión parcial 22
+4.1 Resumen de aportes al 25% . . . . . . . . . . . . . . . . . . . . . . . . . . . . 22
+4.2 Trabajo futuro . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 22
+Página 1 de 30
+DEPASO — PLATAFORMA DE
+LOGÍSTICA URBANA
+COLABORATIVA
+Toffoletto, Martina O.
+Basaez, Candela P.
+Bibliografía 22
+Anexo 23
+Anexo A: Cronograma de Actividades . . . . . . . . . . . . . . . . . . . . . . . . . 24
+Anexo B: Resultados de la Encuesta . . . . . . . . . . . . . . . . . . . . . . . . . . 26
+Anexo C: Transcripción de Entrevistas . . . . . . . . . . . . . . . . . . . . . . . . . 28
+Página 2 de 30
+DEPASO — PLATAFORMA DE
+LOGÍSTICA URBANA
+COLABORATIVA
+Toffoletto, Martina O.
+Basaez, Candela P.
+1 Introducción
+DePaso es una plataforma digital de logística urbana colaborativa orientada a PyMEs,
+comercios y clientes particulares del Área Metropolitana de Buenos Aires (AMBA). Su propósito
+es facilitar la gestión integral de envíos urbanos mediante una solución que permita solicitar,
+asignar, monitorear y completar entregas de manera eficiente, incorporando además herramientas
+para estimar el impacto ambiental asociado a cada operación.
+A diferencia de las plataformas de envíos bajo demanda actualmente disponibles, que
+se basan principalmente en transportistas dedicados, DePaso propone un modelo híbrido que
+combina transporte exclusivo con transporte colaborativo. Este último aprovecha trayectos que
+los transportistas ya realizan por motivos propios, permitiendo utilizar capacidad disponible en
+desplazamientos existentes y reduciendo viajes adicionales mediante mecanismos de asignación
+que minimizan los desvíos.
+La propuesta surge ante una serie de problemáticas presentes en la logística urbana actual:
+Costos logísticos elevados para PyMEs y comercios que no cuentan con flota propia.
+Existencia de vehículos que realizan trayectos con capacidad disponible sin ser aprovechada.
+Ineficiencias en la distribución de última milla dentro de entornos urbanos densamente
+poblados.
+Emisiones de CO2 asociadas a viajes dedicados que podrían evitarse mediante esquemas
+colaborativos.
+Escasas oportunidades para que personas que realizan desplazamientos cotidianos obtengan
+ingresos adicionales aprovechando sus recorridos habituales.
+1.1 Modalidades de envío
+DePaso organiza sus servicios a partir de dos dimensiones: la forma en que se inicia la
+operación y el tipo de trayecto realizado por el transportista. La combinación de ambas da lugar
+a cuatro modalidades de servicio:
+Dedicado por demanda: el remitente solicita un envío y el sistema identifica transportistas
+disponibles cercanos al punto de origen.
+Dedicado por espacio: el transportista informa disponibilidad en una zona y franja horaria
+determinadas, permitiendo la asignación de pedidos compatibles con la capacidad de su
+vehículo.
+Página 3 de 30
+DEPASO — PLATAFORMA DE
+LOGÍSTICA URBANA
+COLABORATIVA
+Toffoletto, Martina O.
+Basaez, Candela P.
+Colaborativo por demanda: el remitente solicita un envío con cierta flexibilidad temporal
+y el sistema busca trayectos existentes compatibles con el recorrido requerido, procurando
+minimizar el desvío adicional.
+Colaborativo por espacio: el transportista registra trayectos habituales recurrentes y recibe
+sugerencias de envíos compatibles con dichos recorridos.
+Para la operación del sistema se contemplan cuatro categorías generales de carga: paquetes
+pequeños y documentos, cargas medianas, cargas grandes o voluminosas y mudanzas o fletes.
+Las restricciones según el tipo de movilidad disponible se presentan en la Tabla 1.I.
+TABLA 1.I: Restricciones de carga por tipo de movilidad
+Categoría Peatón/Bici Moto Auto Camioneta Camión
+Pequeños / documentos Sí* Sí Sí Sí Sí
+Medianos No Sí Sí Sí Sí
+Grandes / voluminosos No No Sí Sí Sí
+Mudanzas / fletes No No No Sí Sí
+* Solo trayectos cortos (< 5 km).
+Las mudanzas y fletes se asignan siempre en modalidad dedicada; nunca colaborativa.
+1.2 Objetivos
+1.2.1 Objetivo general
+Desarrollar un prototipo funcional de plataforma digital de logística urbana colaborativa
+para el AMBA que permita gestionar el ciclo completo de los envíos mediante mecanismos
+inteligentes de clasificación y asignación, aprovechando la capacidad disponible en los desplazamientos de los transportistas.
+1.2.2 Objetivos específicos
+Desarrollar e implementar un sistema de visión computacional capaz de clasificar automáticamente el tamaño y volumen de las cargas a partir de imágenes.
+Implementar un mecanismo de asignación inteligente que evalúe la compatibilidad entre
+pedidos y transportistas considerando características de la carga, trayectorias, ventanas
+horarias y reputación.
+Incorporar un modelo híbrido de operación que contemple tanto envíos dedicados como
+envíos colaborativos.
+Página 4 de 30
+DEPASO — PLATAFORMA DE
+LOGÍSTICA URBANA
+COLABORATIVA
+Toffoletto, Martina O.
+Basaez, Candela P.
+Desarrollar un mecanismo de estimación del impacto ambiental que permita calcular el
+ahorro de CO2 generado por cada envío colaborativo respecto de un escenario equivalente
+de transporte dedicado.
+Diseñar e implementar una plataforma digital escalable que integre los distintos componentes funcionales necesarios para la gestión de envíos urbanos.
+1.3 Alcance
+El proyecto comprende el diseño y desarrollo de un prototipo funcional de plataforma
+digital para la gestión logística de envíos dentro del AMBA. El sistema incluirá:
+Registro y autenticación de clientes y transportistas con distintos medios de movilidad.
+Creación, asignación y seguimiento de pedidos en las diferentes modalidades de servicio
+definidas.
+Clasificación automática de cargas mediante inteligencia artificial, con posibilidad de
+ingreso manual alternativo.
+Asignación inteligente basada en trayectorias geográficas compatibles.
+Gestión de capacidad disponible de los vehículos.
+Estimación del ahorro de CO2 asociado a envíos colaborativos.
+Herramientas básicas de monitoreo operativo para administradores.
+Página 5 de 30
+DEPASO — PLATAFORMA DE
+LOGÍSTICA URBANA
+COLABORATIVA
+Toffoletto, Martina O.
+Basaez, Candela P.
+2 Antecedentes
+2.1 Marco Teórico
+El desarrollo de una plataforma de logística urbana colaborativa requiere integrar conceptos provenientes de distintas áreas: logística de última milla, modelos de transporte colaborativo,
+mecanismos de asignación entre oferta y demanda e inteligencia artificial.
+El objetivo de este marco teórico es presentar los conceptos que fundamentan las principales decisiones de diseño adoptadas en DePaso. En primer lugar se analizan los modelos
+de crowdsourced delivery y las flotas híbridas como alternativa a los sistemas tradicionales
+de reparto. Luego se estudian los distintos perfiles de transportistas y los mecanismos de matching utilizados para asignar envíos de forma eficiente. Finalmente se abordan las técnicas de
+inteligencia artificial aplicadas a la clasificación automática de cargas.
+Estos conceptos constituyen la base teórica sobre la cual se construye la propuesta
+desarrollada en este trabajo.
+2.1.1 Crowdsourced delivery y logística de última milla
+El crowdsourced delivery (CSD) es un modelo logístico que delega la entrega de última
+milla a personas no profesionales que integran pedidos en sus propios desplazamientos, a cambio
+de una compensación económica, en lugar de recurrir a una flota dedicada. A diferencia de los
+sistemas tradicionales de reparto, no genera viajes nuevos: aprovecha los desplazamientos que
+ya existen en la ciudad.
+Este modelo surge como respuesta a una ineficiencia estructural de la logística urbana.
+La entrega al destinatario final concentra una fracción desproporcionada del costo logístico total
+y genera congestión vehicular y emisiones en ciudades densas (1). En el AMBA, esa ineficiencia
+se agrava: una PyME o un particular que necesita enviar algo enfrenta pocas opciones reales,
+pagar una tarifa alta por un flete dedicado, resignarse a los tiempos de un courier masivo pensado
+para e-commerce de gran volumen, o directamente no enviarlo. Al mismo tiempo, hay vehículos
+circulando por la ciudad con espacio disponible todos los días y personas que necesitan mandar
+cosas, y los dos grupos rara vez se cruzan.
+Yang et al. formalizan la lógica del CSD distinguiendo entre vehículos dedicados (DVs),
+que viajan exclusivamente para hacer entregas, y vehículos personales compartidos (SPVs),
+cuyos conductores integran pedidos en viajes que ya tenían planificados (1). La diferencia no es
+solo operativa: define dos modelos logísticos con costos, emisiones y dinámicas de participación
+completamente distintos, y es la base sobre la que se construye cualquier comparación rigurosa
+entre el modelo colaborativo y el dedicado.
+Página 6 de 30
+DEPASO — PLATAFORMA DE
+LOGÍSTICA URBANA
+COLABORATIVA
+Toffoletto, Martina O.
+Basaez, Candela P.
+DePaso se apoya en ese modelo para dar respuesta al problema logístico del AMBA. No
+opera flota propia ni subcontrata couriers: conecta a remitentes con personas que ya se desplazan
+por la ciudad. Los subtemas que siguen desarrollan los conceptos que hacen viable esa conexión
+—qué tipo de conductor la sostiene, cómo se asignan pedidos a rutas preexistentes y qué rol
+cumple la inteligencia artificial en el proceso.
+2.1.2 Flotas híbridas: ventajas del modelo y el problema del desvío
+El resultado central de Yang et al. establece que los SPVs reducen el costo unitario
+de entrega respecto a los DVs, pero que esa ventaja puede revertirse cuando el conductor se
+aleja demasiado de su ruta habitual para retirar o entregar un paquete: si el desvío supera cierto
+umbral, los kilómetros adicionales recorridos eliminan el beneficio ambiental e incluso pueden
+incrementar las emisiones por encima del escenario dedicado que se supone reemplazar (1). Este
+hallazgo no es un detalle técnico: define una restricción estructural para cualquier plataforma
+que combine DVs y SPVs.
+La implicación de diseño es que el desvío de los conductores debe ser una variable
+explícita del algoritmo de asignación, no un parámetro secundario. Una plataforma que asigna
+pedidos sin acotar el desvío puede estar generando más emisiones que el modelo dedicado que
+dice reemplazar, sin que ni el remitente ni el transportista lo sepan. Yang et al. identifican además
+que este efecto escala con el tamaño del sistema, lo que vuelve al problema especialmente
+relevante para una plataforma con vocación de alcance masivo.
+DePaso traduce este resultado en una restricción de diseño explícita: la modalidad
+colaborativa solo asigna pedidos cuando el desvío del transportista se mantiene por debajo de
+un umbral calculado sobre rutas geoespaciales reales. El valor concreto de ese umbral y el
+mecanismo de cálculo se especifican en la sección de Metodología.
+2.1.3 Perfiles de conductores: gig-workers y conductores ocasionales
+La literatura en CSD distingue dos perfiles de conductores según su relación con la
+plataforma. Luy et al. los formalizan en el contexto de flotas híbridas (2):
+Gig-workers (GW): conductores con disponibilidad continua que aceptan cualquier pedido
+dentro de su zona operativa, independientemente de si tienen un destino previo. Maximizan
+la previsibilidad de la oferta, pero requieren una remuneración constante que se traslada al
+costo del servicio.
+Conductores ocasionales (OD, Occasional Drivers): personas que solo participan cuando
+un pedido coincide con un desplazamiento que ya tienen planificado —ir al trabajo, a otro
+barrio, al médico. No son repartidores; son viajeros habituales que ofrecen su capacidad
+ociosa de forma intermitente.
+Página 7 de 30
+DEPASO — PLATAFORMA DE
+LOGÍSTICA URBANA
+COLABORATIVA
+Toffoletto, Martina O.
+Basaez, Candela P.
+La diferencia entre ambos perfiles no es de grado sino de naturaleza: un OD no es un
+GW con menos disponibilidad. Su lógica de participación es distinta, su motivación es distinta y
+—como demuestran Luy et al.— el valor que generan depende de que la plataforma reconozca esa
+diferencia en su diseño. Los autores señalan que la mayoría de las plataformas existentes asumen
+que todos sus conductores son GWs y descuidan el potencial de sincronizar la demanda con
+los ODs (2). Aprovechar trayectos ya planificados en lugar de generar viajes dedicados reduce
+el tráfico urbano, las emisiones y el costo del servicio. Una limitación relevante del trabajo,
+señalada por los propios autores, es que opera sobre modelos matemáticos teóricos sin llegar a un
+prototipo funcional ni contemplar la experiencia de usuario que haría viable esa sincronización
+en la práctica.
+El concepto de OD es el fundamento teórico de la modalidad colaborativa de DePaso:
+una propuesta diferenciada, con su propio flujo de registro de trayecto habitual y su propia lógica
+de matching geoespacial, que no puede tratarse como una variante reducida de la modalidad
+dedicada.
+2.1.4 Diseño de mercados de matching y asignación
+Asignar pedidos a transportistas con trayectos preexistentes es, en su forma general,
+un problema de optimización combinatoria: dada una demanda de envíos y una oferta de
+transportistas con rutas definidas, encontrar la asignación que maximiza el bienestar global
+—minimizando desvíos, respetando capacidades y ventanas horarias— no admite solución exacta
+en tiempo razonable cuando el número de actores escala.
+Akamatsu y Oyama proponen abordar este problema mediante una descomposición
+fluido-partícula: a nivel agregado, el sistema distribuye flujos de pedidos entre zonas como si
+fueran fluidos; a nivel individual, un mecanismo de subasta obliga a cada conductor a revelar su
+costo real de desvío —su información privada— para que la asignación resultante sea eficiente y
+maximice el bienestar social (3). La innovación central es precisamente que el mecanismo no
+asume que la plataforma conoce las preferencias de los conductores: las subastas las extraen. La
+limitación para un prototipo no es de información, sino de implementación: ejecutar subastas en
+tiempo real y calcular probabilidades de fluidos requiere grandes volúmenes de datos históricos
+que no existen en el arranque de una plataforma nueva. Los propios autores señalan además la
+ausencia de elasticidades de oferta y demanda como trabajo pendiente.
+Oyama y Akamatsu extienden el trabajo incorporando elasticidades de oferta y demanda:
+el precio de la plataforma se ajusta dinámicamente según la disponibilidad de transportistas por
+zona y horario, y se permite que un conductor agrupe múltiples pedidos en un mismo viaje (4).
+El resultado es un mecanismo 700 veces más rápido que la optimización combinatoria directa
+con precio de equilibrio estable. Su limitación para el contexto de DePaso es la misma que el
+anterior: el modelo requiere datos históricos extensos para calibrar las elasticidades y ejecutar
+Página 8 de 30
+DEPASO — PLATAFORMA DE
+LOGÍSTICA URBANA
+COLABORATIVA
+Toffoletto, Martina O.
+Basaez, Candela P.
+las subastas, condición que no se cumple en el arranque de una plataforma nueva. Los autores
+señalan además que no contempla cargas heterogéneas como trabajo futuro.
+Ambos enfoques orientan la arquitectura conceptual del matching en DePaso: la idea
+de separar la compatibilidad geoespacial de la compatibilidad de carga y de incorporar la
+calificación acumulada como factor de selección proviene directamente de este marco. Sin
+embargo, implementar el mecanismo completo requiere un sistema de subastas en tiempo real y
+datos históricos de demanda que no existen en el arranque de la plataforma. DePaso adopta un
+algoritmo determinístico de scoring multivariable que no requiere subastas ni ese volumen de
+datos; su especificación se desarrolla en la sección de Metodología.
+2.1.5 Visión computacional y aprendizaje por transferencia
+La visión computacional es un área de la inteligencia artificial orientada a la extracción
+automática de información a partir de imágenes. Aplicada a problemas de clasificación, permite
+asignar una imagen a una categoría determinada a partir de patrones visuales aprendidos durante
+el proceso de entrenamiento.
+Una de las técnicas más utilizadas en este campo es el aprendizaje por transferencia
+(transfer learning), que consiste en reutilizar arquitecturas de redes neuronales previamente
+entrenadas sobre grandes volúmenes de datos y adaptarlas a un nuevo dominio específico.
+Este enfoque permite reducir significativamente la cantidad de imágenes necesarias para el
+entrenamiento y mejorar el desempeño en contextos donde los datos disponibles son limitados,
+resultando ideal para implementaciones algorítmicas en dispositivos móviles.
+En el ámbito de la logística colaborativa, diversos trabajos han explorado la aplicación de
+técnicas de inteligencia artificial para optimizar decisiones operativas. Saleh et al. analizan el
+uso de aprendizaje por refuerzo profundo (Deep Reinforcement Learning) para la programación
+online y la extensión dinámica de turnos de los conductores en sistemas de crowdsourced delivery,
+obteniendo mejores resultados que las heurísticas tradicionales en escenarios simulados (5). Sin
+embargo, los autores señalan como limitación la necesidad de disponer de grandes volúmenes de
+datos históricos para entrenar los modelos, así como la dificultad de interpretar las decisiones
+generadas por el sistema.
+La literatura revisada se concentra principalmente en optimizar la asignación de pedidos
+una vez que las características de la carga ya son conocidas. En contraste, la clasificación
+automática de la carga a partir de imágenes constituye un problema complementario que ha
+recibido menor atención dentro de los sistemas de logística colaborativa.
+Los cinco conceptos desarrollados en este marco forman un sistema de fundamentación
+coherente: cada uno responde a una de las preguntas de diseño que enfrenta DePaso. El modelo
+CSD y la lógica de flotas híbridas justifican por qué tiene sentido aprovechar desplazamientos
+existentes en lugar de operar flota propia; la distinción OD/GW explica por qué ese modelo
+Página 9 de 30
+DEPASO — PLATAFORMA DE
+LOGÍSTICA URBANA
+COLABORATIVA
+Toffoletto, Martina O.
+Basaez, Candela P.
+requiere dos modalidades con flujos de registro distintos y no puede reducirse a una sola. El
+diseño de mercados de matching delimita el problema de asignación y justifica el alcance del
+prototipo; la visión computacional y el aprendizaje por transferencia fundamentan la decisión
+de inferir la categoría de carga desde una imagen. El Estado del Arte que sigue evalúa en qué
+medida las soluciones existentes abordan este conjunto de dimensiones.
+2.2 Estado del Arte
+Este capítulo sistematiza las soluciones comerciales y la investigación académica relevantes para DePaso, adoptando lineamientos de revisión sistemática de la literatura (6). La
+búsqueda se realizó en bases de datos como Google Scholar, IEEE Xplore, Scopus y arXiv,
+combinando términos en inglés y español con operadores booleanos. Se aplicó un filtro temporal
+de 2022–2024 para la literatura académica, con la excepción del informe técnico de la OIT
+de 2020 (7), incluido fuera de ese rango por ser el principal trabajo con foco específico en el
+mercado de plataformas en Argentina. No se aplicó restricción temporal para el análisis de los
+competidores comerciales.
+Se priorizaron trabajos que cumplieran al menos uno de los siguientes criterios de
+inclusión: que propongan un modelo o algoritmo para crowdsourced delivery, que analicen
+plataformas de logística urbana en América Latina, o que apliquen inteligencia artificial a la
+clasificación de carga o al scheduling logístico.
+La revisión se articuló en torno a cinco preguntas de investigación:
+1. ¿Qué plataformas de logística urbana bajo demanda operan en el AMBA y qué limitaciones
+presentan para PyMEs y cargas no estándar?
+2. ¿Qué modelos académicos abordan el matching entre pedidos y transportistas ocasionales
+minimizando desvíos?
+3. ¿Cómo se han implementado modelos híbridos que combinen flota dedicada y transportistas
+colaborativos (GW y OD)?
+4. ¿Qué técnicas de IA se aplican a la clasificación automática de carga o al scheduling
+dinámico en sistemas logísticos?
+5. ¿Qué brecha existe entre las soluciones actuales y un sistema que combine modelo colaborativo, clasificación por IA y cálculo de impacto ambiental para el contexto argentino?
+2.2.1 Plataformas de logística urbana en el AMBA
+En el AMBA coexisten dos grandes categorías de soluciones, analizadas a continuación.
+Plataformas de envíos bajo demanda. Rappi Favor, PedidosYa Envíos, Uber Flash y
+DiDi Entrega conectan remitentes con repartidores para envíos puntuales de objetos pequeños
+Página 10 de 30
+DEPASO — PLATAFORMA DE
+LOGÍSTICA URBANA
+COLABORATIVA
+Toffoletto, Martina O.
+Basaez, Candela P.
+(documentos, bolsas, paquetes livianos). Operan bajo un modelo rígidamente dedicado de gigworkers, gestionado algorítmicamente mediante sistemas de puntaje que penalizan el rechazo de
+pedidos o la desconexión (7). Además de las limitaciones que este modelo impone al trabajador,
+desde el punto de vista logístico no contemplan cargas medianas, grandes ni mudanzas, no
+calculan el impacto ambiental y no ofrecen una modalidad colaborativa basada en aprovechar los
+trayectos habituales preexistentes del conductor.
+Servicios de courier y agregadores B2B. OCA y Andreani ofrecen logística tradicional
+con tarifas fijas por peso y zona, orientadas al e-commerce y envíos masivos; no tienen matching
+inteligente ni clasificación asistida por IA. Por otro lado, empresas como Moova y Treggo
+apuntan al segmento B2B con flota propia o tercerizada y cobertura en el AMBA, pero requieren
+un volumen mínimo de envíos, excluyendo a usuarios particulares y no habilitando modalidades colaborativas ocasionales. Shipit funciona como un agregador que cotiza entre múltiples
+operadores, pero tampoco implementa trayectos compartidos ni clasificación automática de la
+carga.
+Ninguna de las soluciones relevadas combina un modelo colaborativo basado en trayectorias, clasificación de carga por visión computacional y cálculo de ahorro de CO2. La Tabla 2.I
+sintetiza el posicionamiento de DePaso frente a las plataformas existentes.
+TABLA 2.I: Posicionamiento de DePaso frente a plataformas existentes en el AMBA
+Plataforma Modelo Colaborativo IA carga CO2 PyMEs
+Rappi / Uber / DiDi GWs dedicados No No No No
+OCA / Andreani Courier No No No Sí
+Moova / Treggo B2B flota No No No Sí
+DePaso Híbrido Sí Sí Sí Sí
+2.2.2 Investigación académica reciente
+Flotas híbridas y matching. Yang et al. modelan el ruteo de flota híbrida (DVs y SPVs) a
+gran escala y demuestran que los SPVs reducen el costo unitario, pero que los desvíos excesivos
+incrementan las emisiones totales (1). Las limitaciones reconocidas por los autores son relevantes
+para este proyecto: el modelo asume cargas homogéneas, no incorpora clasificación automática
+de paquetes heterogéneos y no incluye un modelo de precios. Por su parte, Luy et al. señalan que
+las plataformas actuales asumen que todos sus conductores son GWs y descuidan el potencial
+de sincronizar la demanda con los ODs; sincronizar la demanda con trayectos preexistentes
+reduce el tráfico, las emisiones y el costo del servicio (2). Sin embargo, los propios autores
+reconocen que su trabajo es un modelo teórico sin prototipo funcional y sin consideración de
+la experiencia de usuario necesaria para hacer viable esa sincronización en la práctica. A nivel
+Página 11 de 30
+DEPASO — PLATAFORMA DE
+LOGÍSTICA URBANA
+COLABORATIVA
+Toffoletto, Martina O.
+Basaez, Candela P.
+algorítmico, Akamatsu y Oyama formulan el problema de matching como un mercado de dos
+lados y proponen resolverlo mediante descomposición fluido-partícula con subastas que extraen
+el costo real de desvío de cada conductor (3). Su limitación principal para un Producto Mínimo
+Viable (MVP) es que ejecutar esas subastas en tiempo real requiere grandes volúmenes de datos
+históricos, inexistentes al inicio de la plataforma; además, los autores señalan la ausencia de
+elasticidades como trabajo pendiente. Oyama y Akamatsu extienden ese resultado incorporando
+elasticidades y agrupamiento de pedidos (task-bundling) (4). Su limitación operativa es similar:
+calibrar las elasticidades requiere datos históricos extensos, y el modelo matemático no contempla
+la clasificación volumétrica de cargas heterogéneas.
+IA para scheduling. Saleh et al. aplican aprendizaje por refuerzo profundo (Deep
+Reinforcement Learning - DQN) al scheduling dinámico de conductores en sistemas colaborativos,
+logrando mayor ganancia que las heurísticas estáticas (5). Las limitaciones reconocidas por los
+autores son dos: el agente requiere un dataset histórico extenso para entrenarse, lo que lo hace
+inaplicable al inicio de una plataforma nueva (“arranque en frío”), y las decisiones del agente
+no son explicables al usuario final, lo que genera problemas de transparencia en contextos
+donde la asignación debe ser auditable. De manera transversal, el campo de la IA aplicada a la
+logística colaborativa asume en general que el tipo y volumen de la carga son datos precisos
+y ya disponibles al momento de la asignación. Ninguno de los trabajos revisados aborda la
+clasificación automática de la carga como parte integral del sistema logístico.
+Visión computacional en logística. Naumann et al. sistematizan el estado del arte de
+la visión computacional aplicada a la cadena de suministro (8). Su revisión evidencia que,
+si bien la inteligencia artificial es crucial para automatizar procesos logísticos, la estimación
+de volumen precisa depende en la actualidad de costosos sensores 3D (RGB-D) en entornos
+controlados. Los autores identifican como principales limitaciones actuales la escasez de datasets
+públicos logísticos y la alta complejidad de calcular volúmenes exactos utilizando únicamente
+cámaras de teléfonos móviles (RGB en 2D). Estos hallazgos justifican la decisión técnica de
+DePaso: al ser inviable la reconstrucción 3D exacta desde un móvil para un prototipo, el sistema
+opta por clasificar la carga en categorías volumétricas predefinidas mediante redes neuronales
+convolucionales, una solución que sortea las limitaciones de la literatura actual.
+Tendencias emergentes. Dos tendencias marcan la evolución reciente del campo. La
+primera es la incorporación de modelos de mercado con elasticidad dinámica: en lugar de tarifas
+fijas, los sistemas ajustan el precio en tiempo real según la disponibilidad de transportistas por
+zona y horario (4). La segunda es la aplicación creciente de IA —en particular el aprendizaje
+por refuerzo— a decisiones logísticas adaptativas: scheduling de turnos, aceptación de pedidos y
+gestión de picos de demanda no anticipados (5). Ambas tendencias presuponen una plataforma
+madura con datos históricos acumulados y no abordan la clasificación predictiva de la carga ni la
+cuantificación determinística del impacto ambiental por envío, aspectos que permanecen como
+Página 12 de 30
+DEPASO — PLATAFORMA DE
+LOGÍSTICA URBANA
+COLABORATIVA
+Toffoletto, Martina O.
+Basaez, Candela P.
+áreas no exploradas en la literatura revisada.
+Contexto del mercado. En el AMBA, la OIT documentó en 2020 que las plataformas
+de reparto vigentes operan bajo modelos algorítmicos punitivos que imponen disponibilidad
+continua sin protección social ni de riesgos de trabajo (7). Ningún trabajo académico revisado
+consolida sus hallazgos proponiendo un producto funcional o un modelo de software alternativo,
+no punitivo e híbrido, específicamente adaptado al contexto y las regulaciones del mercado
+argentino.
+2.2.3 Matriz de antecedentes
+La Tabla 2.II sintetiza los trabajos seleccionados: para cada uno se registran objetivo,
+enfoque metodológico, tecnologías empleadas, resultados principales, limitaciones reconocidas
+por los propios autores y aporte concreto para DePaso.
+TABLA 2.II: Matriz de antecedentes — trabajos seleccionados
+Autor/año — Título Objetivo Enfoque o metodología
+Tecnologías utilizadas
+Resultados principales Limitaciones reconocidas
+Aporte para el proyecto
+Yang et al. (2022)
+Crowdsourced
+Shared-Trip Delivery
+Resolver ruteo de flota híbrida DVs+SPVs a
+gran escala
+Heurística de descomposición; simulación computacional
+Algoritmos de ruteo;
+simulación de instancias a gran escala
+SPVs reducen costo unitario; desvíos excesivos aumentan millas totales y
+emisiones CO2
+Cargas homogéneas;
+sin clasificación automática de paquetes;
+sin modelo de precios
+Fundamenta la restricción
+de desvío máximo como
+condición previa al matching colaborativo
+Luy et al. (2023)
+Workforce Planning
+CSD Hybrid Fleets
+Planificación estratégica de fuerza laboral
+GW/OD en CSD
+Optimización matemática; comparación
+de escenarios GW vs.
+OD
+Modelos de programación matemática; análisis de escenarios
+Las plataformas actuales
+descuidan el potencial de
+los ODs; sincronizar demanda con trayectos preexistentes reduce tráfico,
+emisiones y costos
+Modelo teórico sin
+prototipo; no contempla experiencia
+de usuario para el
+registro de rutas
+Valida la distinción
+OD/GW y la necesidad de
+una modalidad colaborativa con registro de trayecto
+Akamatsu y Oyama
+(2023)
+Fluid-particle matching market
+Diseñar mecanismo de
+mercado para matching
+CSD minimizando desvío real
+Teoría de diseño de mercados;
+descomposición
+fluido-partícula
+Algoritmo de matching con descomposición fluido-partícula;
+análisis matemático
+formal
+Maximiza bienestar social; superior computacionalmente a la optimización
+directa
+Sin elasticidades
+de oferta/demanda;
+implementar subastas
+en tiempo real requiere datos históricos
+extensos, inviables en
+un MVP
+Marco conceptual del matching; justifica una alternativa determinística para el
+prototipo
+Oyama y Akamatsu
+(2024)
+Market-based matching CSD
+Modelar mercado CSD
+de dos lados con elasticidad y agrupamiento
+de pedidos
+Teoría de equilibrio
+de mercado; algoritmo de asignación de
+tráfico
+Modelo de equilibrio
+bidireccional; algoritmo de asignación
+de tráfico; análisis de
+elasticidad
+700× más rápido que optimización combinatoria directa; precio de equilibrio
+estable
+Calibrar elasticidades
+requiere datos históricos extensos; no contempla cargas heterogéneas
+Orienta la política de precios y la gestión de capacidad; justifica simplificación en el prototipo
+Saleh et al. (2024)
+Courier Scheduling
+via Deep RL
+Maximizar ganancia de
+plataforma CSD mediante scheduling dinámico
+Deep Reinforcement
+Learning (DQN); simulación con datos
+sintéticos
+DQN; entorno de simulación; dataset sintético de demanda
+DQN supera heurísticas estáticas en ganancia neta durante picos de demanda
+Requiere dataset histórico extenso; decisiones no explicables al
+usuario final
+Identifica IA como línea de
+mejora del matching una
+vez que la plataforma acumule datos reales
+Naumann et al.
+(2023)
+CV in Transportation Logistics
+Sistematizar el estado
+del arte de la Visión
+Computacional aplicada a logística y almacenamiento
+Revisión sistemática
+de la literatura (SLR)
+sobre monitoreo y
+automatización
+Redes Neuronales
+Convolucionales
+(CNN); estimación
+volumétrica; procesamiento RGB y
+RGB-D
+La IA es crucial para automatizar logística, pero la
+estimación de volumen depende de costosos sensores
+3D en entornos controlados
+Escasez de datasets
+públicos logísticos; alta complejidad para estimar volúmenes exactos con cámaras móviles 2D (RGB)
+Justifica el uso de IA en
+móviles para clasificar carga en categorías como alternativa viable frente al escaneo 3D exacto
+OIT (2020)
+Trabajo en plataformas digitales, Argentina
+Analizar condiciones
+laborales de repartidores en plataformas del
+AMBA
+Investigación
+empírica mixta
+(cuali-cuantitativa);
+encuestas y grupos
+focales
+Encuestas estructuradas; entrevistas semiestructuradas; análisis
+documental
+Algoritmos punitivos imponen disponibilidad continua disfrazada de flexibilidad; ausencia de protección social
+Foco en diagnóstico;
+no propone modelo
+técnico alternativo ni
+solución de diseño
+Único trabajo con foco específico en el AMBA; contextualiza el mercado local
+y justifica el modelo no punitivo de DePaso
+2.2.4 Conclusiones del relevamiento
+Del análisis de soluciones comerciales y trabajos académicos se extraen dos conclusiones.
+Primero, qué se sabe y qué existe: el mercado local resuelve la logística urbana imponiendo costos
+Página 13 de 30
+DEPASO — PLATAFORMA DE
+LOGÍSTICA URBANA
+COLABORATIVA
+Toffoletto, Martina O.
+Basaez, Candela P.
+elevados para PyMEs mediante fletes dedicados, generando ineficiencia y emisiones innecesarias
+por vehículos que circulan con espacio ocioso. A nivel académico, la optimización matemática del
+problema CSD está ampliamente estudiada, pero rara vez se consolida en productos funcionales
+y accesibles para el usuario final; los modelos teóricos asumen condiciones —información
+perfecta, datos históricos, cargas homogéneas— que no se cumplen en la etapa de lanzamiento
+de una plataforma nueva. Segundo, qué falta: existe un claro vacío entre las teorías de asignación
+colaborativa de la academia y las aplicaciones rígidas del mercado local, vacío que DePaso busca
+cubrir materializando un modelo híbrido en un prototipo funcional adaptado a las particularidades
+del AMBA.
+2.2.5 Brecha que justifica DePaso
+Del análisis precedente emergen cinco características que ninguna solución existente
+—ni comercial ni académica— combina simultáneamente en el contexto argentino:
+1. Modelo híbrido GW+OD en una única plataforma: si bien la literatura académica
+modela la eficiencia de combinar ambos perfiles, las plataformas comerciales locales solo
+implementan GWs. DePaso materializa esta integración teórica en una sola aplicación con
+flujos de registro, matching y tarifas diferenciados por modalidad, sin requerir que el usuario
+comprenda la distinción conceptual subyacente.
+2. Clasificador automático de carga heterogénea por IA propia: toda la literatura de
+matching asume el tipo de carga como dato previo. DePaso lo infiere a partir de una imagen
+capturada por el remitente, eliminando la necesidad de que el usuario conozca las categorías
+volumétricas del sistema y reduciendo la fricción en el proceso de solicitud.
+3. Control del desvío como restricción explícita del algoritmo: Yang et al. documentan
+que la ventaja ambiental del CSD desaparece con desvíos excesivos (1), pero ninguna
+plataforma comercial relevada incorpora ese control como variable de matching. DePaso lo
+trata como filtro duro previo a la asignación, garantizando que cada envío colaborativo sea
+genuinamente más eficiente que su alternativa dedicada.
+4. Cálculo en tiempo real de CO2 ahorrado por envío: la cuantificación del impacto ambiental a nivel de cada envío individual —comparando el escenario colaborativo contra
+el dedicado equivalente— no aparece en ninguna de las plataformas ni en los trabajos
+académicos revisados. DePaso lo presenta como feedback al usuario al completar cada
+operación, convirtiendo el impacto ambiental en un valor visible y acumulable.
+5. Adaptación al contexto del AMBA: los modelos académicos se prueban con datos de
+ciudades de alta renta o en escenarios sintéticos; las plataformas comerciales del AMBA
+Página 14 de 30
+DEPASO — PLATAFORMA DE
+LOGÍSTICA URBANA
+COLABORATIVA
+Toffoletto, Martina O.
+Basaez, Candela P.
+ignoran el segmento colaborativo. DePaso diseña sus restricciones —tipos de vehículo
+habilitados por categoría de carga, cobertura geográfica, perfil de usuario target— para
+reflejar las condiciones reales del mercado local, incluyendo la realidad laboral documentada
+por la OIT (7).
+La combinación de estos cinco elementos en un prototipo funcional representa la contribución diferencial de DePaso: materializar en software la convergencia de un modelo logístico
+colaborativo, IA para clasificación de carga y transparencia ambiental, adaptados a la realidad
+del mercado argentino.
+Página 15 de 30
+DEPASO — PLATAFORMA DE
+LOGÍSTICA URBANA
+COLABORATIVA
+Toffoletto, Martina O.
+Basaez, Candela P.
+3 Descripción
+3.1 Contexto y Necesidades Detectadas
+DePaso se define como una plataforma digital (PWA/app móvil) de logística urbana
+colaborativa diseñada para conectar clientes con transportistas y mitigar las ineficiencias de la
+última milla en el AMBA. El proyecto aborda de forma directa las necesidades de los actores
+clave afectados por el escenario logístico urbano actual:
+Clientes particulares: enfrentan costos elevados y falta de opciones para envíos pequeños
+o medianos dentro del AMBA. El modelo de transporte dedicado existente presenta varios
+factores desalentadores, como la falta de flexibilidad, el alto costo y la falta de seguimiento
+en tiempo real que genera incertidumbre sobre la llegada de sus pedidos.
+PyMEs y comercios: enfrentan costos de logística elevados al no disponer de una flota
+propia. El modelo de transporte dedicado existente les exige pagar un vehículo completo
+para realizar envíos pequeños o medianos, limitando los márgenes en cada operación. Por
+otra parte, poder contar con un sistema de envíos de rango más amplio tiene un impacto
+positivo al permitirles llegar a clientes que no pueden retirar en el local por cuestiones de
+tiempo o movilidad.
+Transportistas ocasionales: miles de personas realizan trayectos cotidianos (al trabajo, por
+trámites, por estudio) los cuales representan un gran costo para la economia diaria. Estas
+personas cuentan con espacio disponible en sus vehículos, el cual puede resignificarse en
+una oportunidad de ingreso. Las plataformas actuales exigen exclusividad y disponibilidad
+de tiempo completo, lo que es incompatible con un empleo de oficina o una rutina personal.
+Personas que se dedican al transporte de carga: el modelo de transporte dedicado
+tradicional les genera una demanda irregular, con picos de trabajo seguidos de períodos
+sin ingresos. La falta de una plataforma estructurada para conectar con clientes limita su
+capacidad de crecimiento y profesionalización. Poder contar con una plataforma que conecte
+a clientes con transportistas les permitiría acceder a nuevas oportunidades de negocio y
+mantener la demanda de forma constante.
+Entorno urbano: el modelo de viajes dedicados incrementa considerablemente los vehículos en circulación, lo que genera congestión y emisiones de CO2 que podrían evitarse
+mediante la reducción del número de vehículos utilizados para logística.
+La propuesta de DePaso es conectar a estos actores en una plataforma híbrida: el remitente
+publica el envío que desea realizar, el algoritmo de matching identifica a aquellos transportistas
+Página 16 de 30
+DEPASO — PLATAFORMA DE
+LOGÍSTICA URBANA
+COLABORATIVA
+Toffoletto, Martina O.
+Basaez, Candela P.
+cuya ruta preestablecida sea compatible con el origen y destino del envío, y el mismo se realiza
+utilizando un trayecto que ya iba a ocurrir. Si la carga requiere un vehículo especializado por
+distintas cuestiones, como gran volumen, mudanza o flete, el sistema se encarga de asignar un
+transportista dedicado. Para ambos casos, la carga se clasifica automáticamente utilizando el
+modelo de visión computacional y el impacto ambiental se calcula en tiempo real.
+3.2 Investigación de Usuarios
+La investigación de usuarios se basa en un análisis de las opiniones recolectadas de una
+muestra personas pertenecientes al público objetivo de la plataforma para conocer sus necesidades
+y preferencias. El ciclo de investigación actual consiste en una encuesta cuantitativa, la cual fue
+lanzada el día 22 de mayo de 2026 y continuará disponible durante el desarrollo del proyecto
+para fomentar un contacto continuo con los requerimientos de los usuarios. Los resultados de la
+encuesta se presentan en el Anexo B. Posteriormente, se realizarán entrevistas semiestructuradas
+a una muestra de usuarios potenciales para profundizar sobre los resultados de la encuesta y
+valorar los aspectos cualitativos que guíen el diseño de la plataforma.
+3.3 Metodología
+El enfoque se basa en una metodología cuantitativa (encuesta) para establecer la adhesión
+de los encuestados a la propuesta. Se definieron preguntas de investigación predefinidas de
+forma clara y específica, vinculadas a variables medibles que permiten validar las hipótesis sobre
+las necesidades y preferencias de los usuarios. Además, se realizó una prueba piloto con un
+grupo reducido de participantes para asegurar la claridad y relevancia de las preguntas antes de
+proceder con su distribución general. Teniendo en cuenta que la encuesta fue orientada a los
+usuarios residentes o trabajadores del AMBA, las preguntas de investigación seleccionadas para
+orientar la encuesta fueron: (1) ¿con qué frecuencia y qué tipos de servicios logísticos utilizan?
+(2) ¿cuáles son los problemas más frecuentes que surgen durante el uso de estos servicios?
+(3) ¿ se encuentran dispuestos a adoptar el modelo colaborativo? (4) ¿qué valor perciben en la
+clasificación por foto y el cálculo de CO2? (5) ¿a qué precio mínimo y con qué vehículo estarían
+dispuestos a participar como transportistas?
+3.4 Encuesta: muestra y resultados clave
+La encuesta se estructuró y distribuyó mediante la plataforma Microsoft Forms y obtuvo
+145 respuestas completas, de las cuales el 91,7% corresponde a residentes o trabajadores del
+AMBA. El 76,6% se identifica como particular o consumidor final y el 11,7% como PyME,
+comercio o emprendedor.
+De acuerdo con los datos obtenidos, definimos aquellos hallazgos relevantes para el
+diseño de la plataforma y plasmamos los mismos en la tabla que se muestra a continuación 3.I.
+Página 17 de 30
+DEPASO — PLATAFORMA DE
+LOGÍSTICA URBANA
+COLABORATIVA
+Toffoletto, Martina O.
+Basaez, Candela P.
+TABLA 3.I: Hallazgos cuantitativos clave de la encuesta (n = 145)
+Indicador Resultado Implicancia de diseño
+Usa servicios de logística 73,1% Indica la existencia de un
+mercado activo
+Criterio principal: precio 82,1% Muestra la importancia de
+mantener la transparencia
+de las tarifas
+Problema principal: demoras 63 menciones Relevancia del tracking en
+tiempo real
+Problema principal: falta de seguimiento 50 menciones Relevancia del tracking en
+tiempo real
+Predisposición al modelo colaborativo 71,0% Demanda validada
+Usaría clasificación por foto 80,7% Modelo de visión computacional viable
+Interés en ser transportista 67,6% Oferta potencial de transportistas
+Precio que el remitente está dispuesto a
+pagar (paquete chico)
+$3.000–$6.000 (68%) Precio colaborativo:
+$3.900
+Precio mínimo que el transportista está dispuesto a aceptar
+$2.500–$5.000 (51%) Margen viable
+Preocupación principal: responsabilidad 59% Representa la necesidad
+de contar con un seguro
+básico
+3.5 Hallazgos accionables
+1. El precio es el factor determinante: El 82% lo menciona como criterio de selección.
+Valida la hipótesis de que el precio debe mostrarse antes de confirmar el pedido, sin cargos
+ocultos.
+2. La principal motivación para participar como transportista está estrictamente ligada
+a la utilidad y la conveniencia: Pudimos ver que el 62% de los encuestados busca generar
+un ingreso extra solo bajo la condición de no desviarse de su trayectoria diaria. Podemos
+concluir que el algoritmo de scoring geoespacial no debe basarse en proximidad lineal, sino
+priorizar la compatibilidad absoluta de trayectorias preexistentes para evitar el rechazo de la
+oferta.
+3. El tracking como funcionalidad obligatoria: Las demoras y la falta de seguimiento son
+los dos problemas más mencionados por los usuarios encuestados.
+4. La clasificación por foto tiene una alta aceptación: El 80,7% está interesado en dicha
+funcionalidad, pero el 4,1% desconfía de la precisión al momento de calcular el costo.
+Como habíamos definido previamente, el clasificador debe mostrar la categoría asignada y
+permitir corrección manual de la misma y de las medidas.
+Página 18 de 30
+DEPASO — PLATAFORMA DE
+LOGÍSTICA URBANA
+COLABORATIVA
+Toffoletto, Martina O.
+Basaez, Candela P.
+5. El rango de precios aceptados por los usuarios es viable: La superposición de rangos
+deja margen para la plataforma, pero no tolera comisiones altas en etapas tempranas.
+6. El seguro es la herramienta clave para la aceptación por parte del público: La preocupación por quién asume la responsabilidad en caso de que ocurran daños es el obstáculo
+principal entre la plataforma y los usuarios potenciales. Por ejemplo, sin un mecanismo
+claro de cobertura, el 59% de los transportistas potenciales no estaría interesado en la
+plataforma.
+7. La modalidad de auto particular es preferida: El 54,4% de los transportistas potenciales
+optaría por utilizar su vehículo (auto o camioneta) propio para realizar las entregas. Sin
+embargo, la plataforma debe contemplar otras opciones de desplazamiento, dado que un
+32,4% consolidado se inclina por desplazarse a pie o en bicicleta, los cuales son medios
+ideales para mitigar la saturación vehicular y reducir las emisiones de CO2.
+3.6 User Personas
+A partir de los datos obtenidos en la encuesta, se construyeron tres user personas preliminares que representan los perfiles de usuario más relevantes para DePaso:
+Juan García
+34 años - Dueño de PyME - Lanús, Buenos Aires
+Contexto y rol respecto al producto o sistema
+Administra un local de venta de repuestos en Lanús. Necesita enviar mercadería mediana y
+voluminosa dos o tres veces por semana hacia clientes en diferentes partes del AMBA.
+Objetivos al usar el producto
+Busca una forma de obtener el servicio a un precio razonable y predecible, además de poder
+rastrear el envío y que el sistema maneje la logística sin que él tenga que coordinar por
+WhatsApp personalmente con cada uno de los clientes durante todo el día.
+Frustraciones y obstáculos actuales
+El costo de un flete exclusivo por cada envío es su principal costo, ya que el costo del
+servicio afecta el margen de ganancia y aumentar los precios resultaría en una baja en la
+competitividad.
+Comportamientos y hábitos relevantes
+Actualmente coordina los envíos a través de WhatsApp con cada cliente, lo que le demanda
+tiempo y genera incertidumbre sobre la llegada de los pedidos.
+Página 19 de 30
+DEPASO — PLATAFORMA DE
+LOGÍSTICA URBANA
+COLABORATIVA
+Toffoletto, Martina O.
+Basaez, Candela P.
+Cita representativa
+"Necesito una forma de enviar mis productos sin tener que pagar un flete completo cada
+vez, y sin tener que estar pendiente de coordinar con cada cliente todo el tiempo."
+María Alvarez
+40 años - Trabaja en Recursos Humanos en una oficina en Microcentro - Caballito, CABA
+Contexto y rol respecto al producto o sistema
+Trabaja en recursos humanos en el microcentro y hace todos los días el trayecto de Caballito
+a Microcentro en auto.
+Objetivos al usar el producto
+Le Interésa aceptar uno o dos pedidos que le queden de paso, cobrar en el momento y
+desconectarse sin penalización cuando no quiere o no precisa de hacerlo.
+Frustraciones y obstáculos actuales
+No quiere ser repartidora de tiempo completo y rechaza los sistemas de puntaje punitivos
+de aplicaciones como Rappi.
+Comportamientos y hábitos relevantes
+Usa el auto y tiene espacio en el baúl. El precio mínimo que espera cobrar es de $3.000–
+$4.000 por llevar un paquete chico.
+Cita representativa
+"Me gustaría poder ganar un dinero extra llevando paquetes que me queden de paso, pero
+no quiero tener que ser una repartidora de tiempo completo ni preocuparme por mantener
+un buen puntaje en una app que evalúa el mismo por la frecuencia de uso."
+Carlos Gómez
+55 años - Se dedica a hacer fletes - Quilmes, Buenos Aires
+Contexto y rol respecto al producto o sistema
+Tiene un camión de mudanzas y actualmente consigue sus clientes a través de conocidos o
+por grupos de Facebook. No tiene app propia ni referencias visibles.
+Objetivos al usar el producto
+Quiere recibir alertas estructuradas de cargas grandes y mudanzas, con información clara
+del origen, destino y pago antes de confirmar.
+Frustraciones y obstáculos actuales
+Al depender de referencias personales, su demanda es irregular y no puede mantener un flujo
+Página 20 de 30
+DEPASO — PLATAFORMA DE
+LOGÍSTICA URBANA
+COLABORATIVA
+Toffoletto, Martina O.
+Basaez, Candela P.
+constante de trabajo. Otro factor es que suele encontrarse limitado a su zona de influencia,
+lo que restringe su capacidad de ampliar la clientela.
+Comportamientos y hábitos relevantes
+No le importa el desvío porque se desplaza específicamente para cada pedido a demanda
+del cliente.
+Cita representativa
+"Quisiera tener una forma más estructurada de conseguir clientes para mis fletes y al mismo
+tiempo generar un espacio con refrencias que otros potenciales clientes puedan consultar
+para confiar en mi servicio."
+3.7 Próximas etapas
+En la próxima entrega se verán reflejadas las entrevistas semiestructuradas, las cuales
+profundizarán sobre los aspectos cualitativos que la encuesta no logra capturar a detalle, como
+por ejemplo: ¿por qué los no usuarios desconfían de las plataformas existentes? y ¿cuál es el
+flujo real que utilizan hoy para resolver sus necesidades de envío?.
+Página 21 de 30
+DEPASO — PLATAFORMA DE
+LOGÍSTICA URBANA
+COLABORATIVA
+Toffoletto, Martina O.
+Basaez, Candela P.
+4 Conclusión parcial
+4.1 Resumen de aportes al 25%
+El presente avance establece los fundamentos conceptuales y empíricos del proyecto
+DePaso. El Capítulo 2 construyó un marco teórico organizado en cinco subtemas vinculados a
+decisiones concretas de diseño: el modelo de crowdsourced delivery y su contexto en la logística
+de última milla, la lógica de flotas híbridas y el problema del desvío, la taxonomía de perfiles
+de conductores (gig-workers y conductores ocasionales), el diseño de mercados de matching y
+asignación, y la visión computacional y el aprendizaje por transferencia. El análisis del estado
+del arte —con estrategia de búsqueda documentada, matriz de siete antecedentes y análisis de
+tendencias emergentes— confirmó que ningún actor del mercado argentino combina los cinco
+atributos diferenciadores de DePaso: modelo híbrido dedicado–colaborativo, clasificador de carga
+por IA propio, control del desvío como variable ambiental explícita, cálculo de CO2 ahorrado
+por envío y adaptación específica al contexto del AMBA.
+El Capítulo 3 presentó los resultados de la encuesta con 145 respondentes del AMBA,
+que valida tres hipótesis centrales: (1) disposición suficiente al modelo colaborativo (71% del
+lado remitente); (2) masa crítica potencial de transportistas (67% con disposición condicional o
+definitiva); y (3) gap WTP/WTA con margen operativo positivo para la plataforma.
+4.2 Trabajo futuro
+Las actividades previstas para el período junio–diciembre de 2026 incluyen:
+Realización de entrevistas semiestructuradas y construcción de User Personas (junio–julio).
+Definición de la metodología de desarrollo, arquitectura del sistema y plan de validación
+(julio–agosto).
+Entrenamiento y evaluación del clasificador de carga por visión computacional (agosto–
+octubre).
+Desarrollo del prototipo funcional: backend, frontend y algoritmo de matching (agosto–
+octubre).
+Integración, pruebas de sistema y validación con usuarios reales (octubre–noviembre).
+Redacción del informe final y preparación de la defensa (noviembre–diciembre).
+Página 22 de 30
+DEPASO — PLATAFORMA DE
+LOGÍSTICA URBANA
+COLABORATIVA
+Toffoletto, Martina O.
+Basaez, Candela P.
+Bibliografía
+1. YANG, Dingtong; HYLAND, Michael F. y JAYAKRISHNAN, R. Tackling the Crowdsourced Shared-Trip Delivery Problem at Scale with a Novel Decomposition Heuristic. 2022.
+Disponible en: arXiv: 2203.14719. [en línea][Consulta: junio de 2026].
+2. LUY, Julius; HIERMANN, Gerhard y SCHIFFER, Maximilian. Strategic Workforce Planning in Crowdsourced Delivery with Hybrid Driver Fleets. 2023. Disponible en: arXiv:
+2311.17935. [en línea][Consulta: junio de 2026].
+3. AKAMATSU, Takashi y OYAMA, Yuki. A fluid-particle decomposition approach to matching market design for crowdsourced delivery systems. 2023. Disponible en: arXiv: 2312.
+01641. [en línea][Consulta: junio de 2026].
+4. OYAMA, Yuki y AKAMATSU, Takashi. A market-based efficient matching mechanism for
+crowdsourced delivery systems with demand/supply elasticities. 2024. Disponible en: arXiv:
+2412.20395. [en línea][Consulta: junio de 2026].
+5. SALEH, Zead; AL HANBALI, Ahmad y BAUBAID, Ahmad. Enhancing Courier Scheduling
+in Crowdsourced Last-Mile Delivery through Dynamic Shift Extensions: A Deep Reinforcement Learning Approach. 2024. Disponible en: arXiv: 2402.09961. [en línea][Consulta:
+junio de 2026].
+6. KITCHENHAM, Barbara y CHARTERS, Stuart. Guidelines for Performing Systematic
+Literature Reviews in Software Engineering. 2007. Technical Report, EBSE-2007-01. Keele
+University.
+7. ORGANIZACIÓN INTERNACIONAL DEL TRABAJO. El trabajo en las plataformas
+digitales de reparto en Argentina: Análisis y recomendaciones de política. 2020. Informe
+técnico. Oficina de País de la OIT para Argentina. [en línea][Consulta: junio de 2026].
+8. NAUMANN, Alexander; HERTLEIN, Felix; DÖRR, Laura; THOMA, Steffen y FURMANS,
+Kai. Computer Vision Applications in Transportation Logistics and Warehousing. 2023.
+Disponible en: arXiv: 2304.06009. [en línea][Consulta: junio de 2026].
+Página 23 de 30
+DEPASO — PLATAFORMA DE
+LOGÍSTICA URBANA
+COLABORATIVA
+Toffoletto, Martina O.
+Basaez, Candela P.
+Anexo A: Cronograma de Actividades
+El desarrollo del proyecto ha avanzado conforme a lo planificado. A la fecha de esta
+entrega (13 de junio de 2026), se encuentran completadas las etapas de definición del tema,
+revisión bibliográfica, redacción del Marco Teórico y Estado del Arte, y recolección y análisis de
+datos de la encuesta. Las etapas de entrevistas, diseño de arquitectura y desarrollo del prototipo
+se encuentran planificadas para el segundo semestre.
+Página 24 de 30
+COLABORATIVA
+LOGÍSTICA URBANA
+DEPASO — PLATAFORMA DE
+Toffoletto, Martina O.
+Basaez, Candela P.
+2026
+Mar Abr May Jun Jul Ago Sep Oct Nov Dic
+Investigación y documentación
+Definición del tema y propuesta
+Revisión bibliográfica
+Marco Teórico
+Estado del Arte
+User Research
+Diseño de la encuesta
+Recolección de datos
+Análisis de resultados
+Entrega 25%
+Entrevistas semiestructuradas
+Construcción de User Personas
+Diseño
+Arquitectura del sistema
+Modelo económico y de negocio
+Presentación 50%
+Desarrollo
+Backend (FastAPI + PostgreSQL)
+Frontend (React Native + Expo)
+Clasificador de carga (IA/ML)
+Integración y pruebas
+Informe 75%
+Cierre
+Documentación final
+Defensa final
+Figura A.1: Cronograma de actividades del proyecto DePaso (marzo–diciembre 2026). Columnas 1–10 corresponden a los meses marzo–
+diciembre de 2026.
+Página 25 de 30
+DEPASO — PLATAFORMA DE
+LOGÍSTICA URBANA
+COLABORATIVA
+Toffoletto, Martina O.
+Basaez, Candela P.
+Anexo B: Resultados de la Encuesta
+Encuesta “Uso de servicios de logística para envío y recepción de encomiendas en el
+área del AMBA”, distribuida en Google Forms durante mayo de 2026. Total: 145 respuestas
+completas; 91,7% del AMBA. Se presentan las tablas correspondientes a las preguntas con
+mayor impacto en las decisiones de diseño.
+¿Cuál de estos perfiles te representa?
+Perfil n %
+Particular / consumidor final 111 76,6
+Trabajo en una PyME o comercio 7 4,8
+Tengo un emprendimiento o vendo por redes 4 2,8
+Otro 13 9,0
+¿Qué aspectos tenés en cuenta al elegir un servicio de logística? (múltiple)
+Aspecto n % sobre usuarios
+Costos del servicio 87 82,1
+Seguridad y confianza 75 70,8
+Velocidad de entrega 74 69,8
+Zonas de entrega cubiertas 40 37,7
+Facilidad de uso / experiencia digital 35 33,0
+¿Qué problemas tuviste al enviar o recibir encomiendas? (múltiple)
+Problema n
+Demoras 63
+Falta de seguimiento en tiempo real 50
+Dificultad para coordinar horarios 50
+Precio alto 40
+Daños o pérdidas 19
+No tuve problemas 16
+¿Qué tan predispuesto/a estarías a usar una plataforma de viajes compartidos?
+Página 26 de 30
+DEPASO — PLATAFORMA DE
+LOGÍSTICA URBANA
+COLABORATIVA
+Toffoletto, Martina O.
+Basaez, Candela P.
+Opción n %
+Muy dispuesto/a 38 32,8
+Algo dispuesto/a 43 37,1
+Indiferente 24 20,7
+Poco dispuesto/a 9 7,8
+Nada dispuesto/a 2 1,7
+¿Estarías dispuesto/a a transportar encomiendas en tu ruta habitual?
+Opción n %
+Sí, me interesaría 48 33,1
+Tal vez, depende de las condiciones 50 34,5
+No, no me interesa 18 12,4
+Como transportista, ¿cuánto tendrían que pagarte por un paquete chico?
+Rango (WTA) n %
+Menos de $1.000 2 2,1
+$1.000 – $2.500 19 19,8
+$2.500 – $5.000 49 51,0
+Más de $5.000 26 27,1
+¿Tenés alguna preocupación sobre participar como transportista? (múltiple)
+Preocupación n
+Responsabilidad por daños 69
+Pago / comisión 42
+Confianza en el cliente 32
+Interferencia con mi rutina 32
+Ninguna 5
+Página 27 de 30
+DEPASO — PLATAFORMA DE
+LOGÍSTICA URBANA
+COLABORATIVA
+Toffoletto, Martina O.
+Basaez, Candela P.
+Anexo C: Transcripción de Entrevistas
+Las entrevistas semiestructuradas previstas en el plan de investigación de usuarios se
+realizarán durante junio y julio de 2026, una vez finalizado el análisis cuantitativo de la encuesta.
+Se planifican aproximadamente cuatro entrevistas individuales de 30 minutos, con al menos dos
+perfiles de remitente y dos perfiles de transportista potencial.
+Las transcripciones completas de cada entrevista se incorporarán en este anexo en la
+entrega del avance al 50%. En el cuerpo del documento (Capítulo 3) se presentarán únicamente
+los hallazgos cualitativos sintetizados, sin identificar a los entrevistados.
+Página 28 de 30
+DEPASO — PLATAFORMA DE
+LOGÍSTICA URBANA
+COLABORATIVA
+Toffoletto, Martina O.
+Basaez, Candela P.
+Lista de Figuras
+A.1 Cronograma de actividades del proyecto DePaso (marzo–diciembre 2026). Columnas 1–10 corresponden a los meses marzo–diciembre de 2026. . . . . . . . 25
+Página 29 de 30
+DEPASO — PLATAFORMA DE
+LOGÍSTICA URBANA
+COLABORATIVA
+Toffoletto, Martina O.
+Basaez, Candela P.
+Lista de Tablas
+1.I Restricciones de carga por tipo de movilidad . . . . . . . . . . . . . . . . . . 4
+2.I Posicionamiento de DePaso frente a plataformas existentes en el AMBA . . . . 11
+2.II Matriz de antecedentes — trabajos seleccionados . . . . . . . . . . . . . . . . 13
+3.I Hallazgos cuantitativos clave de la encuesta (n = 145) . . . . . . . . . . . . . . 18

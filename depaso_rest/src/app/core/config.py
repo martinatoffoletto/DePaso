@@ -30,7 +30,7 @@ class Settings(BaseSettings):
     ]
 
     # AI Models
-    model_path: str = "./models/mobilenet_v2.tflite"
+    vision_model_path: str = "./ml/models/cargo_classifier_v1.keras"
     confidence_threshold: float = 0.7
 
     # External APIs

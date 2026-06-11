@@ -1,7 +1,7 @@
 """
 Shipments module - Core shipment management.
 """
-from sqlalchemy import Column, Integer, String, Float, ForeignKey
+from sqlalchemy import Column, Integer, String, Float, ForeignKey, UniqueConstraint
 
 from src.app.shared.base_model import Base, TimestampMixin
 from src.app.shared.enums import ShipmentStatus, ShipmentModality, AssignmentMode
@@ -28,3 +28,31 @@ class Shipment(Base, TimestampMixin):
     description = Column(String(500), nullable=True)
     estimated_price = Column(Float, nullable=True)
     co2_savings_kg = Column(Float, nullable=True)
+
+
+class ShipmentEvent(Base, TimestampMixin):
+    """Audit trail of shipment status transitions (RF-SHP-05, RF-TRK-03)."""
+
+    __tablename__ = "shipment_events"
+
+    id = Column(Integer, primary_key=True, index=True)
+    shipment_id = Column(Integer, ForeignKey("shipments.id"), nullable=False, index=True)
+    status = Column(String(20), nullable=False)
+    actor_user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    lat = Column(Float, nullable=True)
+    lon = Column(Float, nullable=True)
+    notes = Column(String(500), nullable=True)
+
+
+class Rating(Base, TimestampMixin):
+    """Client rating of the carrier after delivery (RF-SHP-08)."""
+
+    __tablename__ = "ratings"
+    __table_args__ = (UniqueConstraint("shipment_id", name="uq_rating_shipment"),)
+
+    id = Column(Integer, primary_key=True, index=True)
+    shipment_id = Column(Integer, ForeignKey("shipments.id"), nullable=False)
+    carrier_id = Column(Integer, ForeignKey("carriers.id"), nullable=False, index=True)
+    client_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    stars = Column(Integer, nullable=False)  # 1-5
+    comment = Column(String(500), nullable=True)
