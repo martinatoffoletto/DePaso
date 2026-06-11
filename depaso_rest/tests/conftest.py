@@ -1,6 +1,12 @@
 """
 Pytest configuration and fixtures.
 """
+import os
+
+# Must be set before importing the app: disables slowapi on auth endpoints
+# so tests can hit /auth/login y /auth/register freely.
+os.environ.setdefault("RATE_LIMIT_ENABLED", "false")
+
 import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker

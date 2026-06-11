@@ -152,7 +152,7 @@ export default function FeedScreen() {
         <View style={s.center}><ActivityIndicator size="large" color={T.forest} /></View>
       ) : carrier && !carrier.is_verified ? (
         <View style={s.center}>
-          <MaterialCommunityIcons name="shield-clock-outline" size={56} color={T.border} />
+          <MaterialCommunityIcons name="shield-account-outline" size={56} color={T.border} />
           <Text style={s.emptyTitle}>Cuenta en verificación</Text>
           <Text style={s.emptySub}>
             El equipo está revisando tu perfil de cadete. Cuando esté aprobado vas a poder aceptar pedidos.

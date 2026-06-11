@@ -37,10 +37,13 @@ export default function ForgotPasswordScreen() {
         </Text>
         <TouchableOpacity
           className="bg-[#3B82F6] rounded-xl py-4 px-8 items-center"
-          onPress={() => router.push("/(auth)/login")}
+          onPress={() => router.push("/(auth)/reset-password" as any)}
           activeOpacity={0.8}
         >
-          <Text className="text-white font-bold text-base">Volver al login</Text>
+          <Text className="text-white font-bold text-base">Ya tengo el código</Text>
+        </TouchableOpacity>
+        <TouchableOpacity className="mt-4" onPress={() => router.push("/(auth)/login")} activeOpacity={0.8}>
+          <Text className="text-[#60A5FA] text-base font-medium">Volver al login</Text>
         </TouchableOpacity>
       </View>
     );

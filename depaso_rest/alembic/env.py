@@ -4,16 +4,23 @@ Provides database connectivity and migration environment.
 """
 from logging.config import fileConfig
 
-from sqlalchemy import engine_from_config
-from sqlalchemy import pool
+from sqlalchemy import engine_from_config, pool
 
 from alembic import context
-
 from src.app.core.config import settings
-from src.app.modules.users.models import User, Base as UsersBase
-from src.app.modules.carriers.models import Carrier, Base as CarriersBase
-from src.app.modules.packages.models import Package, Base as PackagesBase
-from src.app.modules.shipments.models import Shipment, Base as ShipmentsBase
+from src.app.modules.auth.models import PasswordResetToken  # noqa: F401
+from src.app.modules.carriers.models import Carrier  # noqa: F401
+from src.app.modules.matching.models import MatchingWeight  # noqa: F401
+from src.app.modules.packages.models import Package  # noqa: F401
+from src.app.modules.routes.models import CarrierRoute  # noqa: F401
+from src.app.modules.shipments.models import Rating, Shipment, ShipmentEvent  # noqa: F401
+from src.app.modules.tracking.models import GpsTrace  # noqa: F401
+from src.app.modules.users.models import User  # noqa: F401
+from src.app.modules.vision.models import Classification  # noqa: F401
+
+# Single shared Base: importing every models module registers all tables
+# on Base.metadata so autogenerate sees the complete schema.
+from src.app.shared.base_model import Base
 
 # This is the Alembic Config object, which provides the values of the [alembic] section
 config = context.config
@@ -25,8 +32,8 @@ if config.config_file_name is not None:
 # Set sqlalchemy.url from environment
 config.set_main_option("sqlalchemy.url", settings.database_url)
 
-# Combine all metadata objects
-target_metadata = UsersBase.metadata
+target_metadata = Base.metadata
+
 
 def run_migrations_offline() -> None:
     """Run migrations in 'offline' mode."""

@@ -46,6 +46,7 @@ type Suggestion = {
   place_id: number; display_name: string;
   lat: string; lon: string; address?: NominatimAddress;
 };
+type ResultRow = { type: "recent"; place: Place } | { type: "suggestion"; s: Suggestion };
 
 async function searchNominatim(query: string): Promise<Suggestion[]> {
   if (query.length < 3) return [];
@@ -345,8 +346,8 @@ export function AddressScreen({
         keyboardShouldPersistTaps="handled"
         data={
           showRecents
-            ? RECENT_PLACES.map(p => ({ type: "recent" as const, place: p }))
-            : suggestions.map(s => ({ type: "suggestion" as const, s }))
+            ? RECENT_PLACES.map(p => ({ type: "recent" as const, place: p }) as ResultRow)
+            : suggestions.map(s => ({ type: "suggestion" as const, s }) as ResultRow)
         }
         keyExtractor={(_, i) => String(i)}
         ListHeaderComponent={

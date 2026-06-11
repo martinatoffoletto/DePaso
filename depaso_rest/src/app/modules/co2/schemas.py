@@ -30,3 +30,20 @@ class CO2EstimateResponse(BaseModel):
     savings_percent: float
     detour_km: float
     dedicated_distance_km: float
+
+
+class ImpactEquivalences(BaseModel):
+    """Everyday equivalences of the saved CO2 (for the impact screen)."""
+
+    car_km: float            # km in an average car (0.18 kg/km)
+    tree_months: float       # months of absorption of one urban tree (~21 kg/yr)
+    smartphone_charges: int  # full phone charges (~8 g each)
+
+
+class ClientImpactResponse(BaseModel):
+    """Accumulated environmental impact of a client (RF-CO2-02)."""
+
+    total_co2_saved_kg: float
+    shipments_delivered: int
+    shipments_collaborative: int
+    equivalences: ImpactEquivalences

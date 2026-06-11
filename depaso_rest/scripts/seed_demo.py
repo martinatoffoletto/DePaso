@@ -19,6 +19,7 @@ from src.app.core.security import get_password_hash
 from src.app.shared.base_model import Base
 from src.app.modules.users.models import User
 from src.app.modules.carriers.models import Carrier
+from src.app.modules.packages.models import Package
 from src.app.modules.routes.models import CarrierRoute
 from src.app.modules.shipments.models import Shipment, ShipmentEvent, Rating  # noqa: F401
 from src.app.modules.tracking.models import GpsTrace  # noqa: F401
@@ -67,6 +68,20 @@ def seed() -> None:
                          current_lat=QUILMES[0], current_lon=QUILMES[1])
         db.add_all([lucia, carlos])
         db.flush()
+
+        # Package size catalog (spec 3.3) — límites y precio base por categoría
+        db.add_all([
+            Package(size="xs", description="Sobre / documento", max_weight_kg=1,
+                    max_length_cm=35, max_width_cm=25, max_height_cm=5, base_price=900),
+            Package(size="s", description="Caja chica (zapatos)", max_weight_kg=5,
+                    max_length_cm=40, max_width_cm=30, max_height_cm=20, base_price=1300),
+            Package(size="m", description="Caja mediana", max_weight_kg=15,
+                    max_length_cm=60, max_width_cm=40, max_height_cm=40, base_price=1800),
+            Package(size="l", description="Caja grande / electrodoméstico chico", max_weight_kg=30,
+                    max_length_cm=100, max_width_cm=60, max_height_cm=60, base_price=2600),
+            Package(size="xl", description="Mudanza / flete", max_weight_kg=500,
+                    max_length_cm=300, max_width_cm=200, max_height_cm=200, base_price=6000),
+        ])
 
         now = datetime.utcnow()
         db.add(CarrierRoute(

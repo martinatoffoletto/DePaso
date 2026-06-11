@@ -1,7 +1,7 @@
 """
 Auth module Pydantic schemas for request/response DTOs.
 """
-from pydantic import BaseModel, Field, EmailStr
+from pydantic import BaseModel, EmailStr, Field
 
 
 class RegisterRequest(BaseModel):
@@ -91,6 +91,9 @@ class ForgotPasswordResponse(BaseModel):
     """Response for forgot password - always succeeds to prevent email enumeration."""
 
     message: str = "If the email exists, a reset link will be sent"
+    # Debug-only convenience: the reset token, returned because the prototype
+    # has no email service. Always None outside debug mode.
+    debug_token: str | None = None
 
 
 # Update forward reference

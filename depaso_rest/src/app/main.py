@@ -1,30 +1,33 @@
 """
 DePaso REST API - Main FastAPI application.
 """
-from contextlib import asynccontextmanager
 import logging
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
 
 from src.app.core.config import settings
-from src.app.shared.exceptions import DomainException
-from src.app.shared.responses import ErrorResponse
+from src.app.core.limiter import limiter
+from src.app.modules.admin.router import router as admin_router
 
 # Import all module routers directly (no api/ aggregator needed)
 from src.app.modules.auth.router import router as auth_router
-from src.app.modules.users.router import router as users_router
 from src.app.modules.carriers.router import router as carriers_router
-from src.app.modules.packages.router import router as packages_router
-from src.app.modules.shipments.router import router as shipments_router
-from src.app.modules.matching.router import router as matching_router
 from src.app.modules.co2.router import router as co2_router
-from src.app.modules.vision.router import router as vision_router
-from src.app.modules.tracking.router import router as tracking_router
 from src.app.modules.freight.router import router as freight_router
+from src.app.modules.matching.router import router as matching_router
+from src.app.modules.packages.router import router as packages_router
 from src.app.modules.routes.router import router as routes_router
-from src.app.modules.admin.router import router as admin_router
+from src.app.modules.shipments.router import router as shipments_router
+from src.app.modules.tracking.router import router as tracking_router
+from src.app.modules.users.router import router as users_router
+from src.app.modules.vision.router import router as vision_router
+from src.app.shared.exceptions import DomainException
+from src.app.shared.responses import ErrorResponse
 
 logger = logging.getLogger(__name__)
 
@@ -47,18 +50,21 @@ async def lifespan(app: FastAPI):
     logger.info("🚀 Starting DePaso REST API")
     logger.info(f"Environment: {settings.environment}")
     logger.info(f"Debug: {settings.debug}")
-    
+
     # Initialize database tables
     from src.app.core.database import engine
-    from src.app.shared.base_model import Base
+    from src.app.modules.auth.models import PasswordResetToken  # noqa: F401
+    from src.app.modules.carriers.models import Carrier  # noqa: F401
+    from src.app.modules.matching.models import MatchingWeight  # noqa: F401
+    from src.app.modules.packages.models import Package  # noqa: F401
+    from src.app.modules.routes.models import CarrierRoute  # noqa: F401
+    from src.app.modules.shipments.models import Rating, Shipment, ShipmentEvent  # noqa: F401
+    from src.app.modules.tracking.models import GpsTrace  # noqa: F401
+
     # Ensure all models are imported before creating tables
     from src.app.modules.users.models import User  # noqa: F401
-    from src.app.modules.carriers.models import Carrier  # noqa: F401
-    from src.app.modules.packages.models import Package  # noqa: F401
-    from src.app.modules.shipments.models import Shipment, ShipmentEvent, Rating  # noqa: F401
-    from src.app.modules.routes.models import CarrierRoute  # noqa: F401
-    from src.app.modules.tracking.models import GpsTrace  # noqa: F401
     from src.app.modules.vision.models import Classification  # noqa: F401
+    from src.app.shared.base_model import Base
     Base.metadata.create_all(bind=engine)
     logger.info("✅ Database tables initialized")
 
@@ -67,9 +73,9 @@ async def lifespan(app: FastAPI):
     vision_service = VisionService(settings.vision_model_path)
     vision_service.load_model()
     app.state.classifier = vision_service
-    
+
     yield
-    
+
     # Shutdown
     logger.info("🛑 Shutting down DePaso REST API")
     # TODO: Cleanup model and database connections
@@ -86,6 +92,10 @@ def create_app() -> FastAPI:
         openapi_url="/api/v1/openapi.json",
         lifespan=lifespan,
     )
+
+    # Rate limiting (RNF-SEC-06): 5 req/min on /auth/login y /auth/register
+    app.state.limiter = limiter
+    app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
     # CORS middleware
     app.add_middleware(

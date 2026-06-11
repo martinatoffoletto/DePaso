@@ -12,6 +12,7 @@
       "supportsTablet": true
     },
     "android": {
+      "package": "com.depaso.app",
       "adaptiveIcon": {
         "backgroundColor": "#2A7A4B",
         "foregroundImage": "./assets/images/DePaso_icon.png"
@@ -36,7 +37,8 @@
             "backgroundColor": "#2A7A4B"
           }
         }
-      ]
+      ],
+      "expo-font"
     ],
     "experiments": {
       "typedRoutes": true,

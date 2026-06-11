@@ -57,7 +57,9 @@ fi
 
 log "Aplicando migraciones de base de datos..."
 cd "$BACKEND_DIR"
-"$VENV/bin/alembic" upgrade head
+# python -m: los shims de .venv/bin (alembic, pip) tienen shebangs rotos
+# desde que el repo se movió fuera de iCloud Drive.
+"$VENV/bin/python" -m alembic upgrade head
 
 log "Ejecutando seed de base de datos..."
 "$VENV/bin/python" scripts/seed_db.py

@@ -22,18 +22,17 @@ from datetime import datetime
 
 from src.app.modules.carriers.models import Carrier
 from src.app.modules.carriers.repository import CarrierRepository
-from src.app.modules.routes.models import CarrierRoute
-from src.app.modules.routes.repository import RouteRepository
-from src.app.modules.shipments.models import Shipment
-from src.app.modules.shipments.repository import ShipmentRepository
-from src.app.modules.shipments.exceptions import ShipmentNotFoundError
 from src.app.modules.matching.schemas import (
     CarrierScoreResponse,
     FeedItemResponse,
     MatchingResponse,
     ScoreBreakdown,
 )
-from src.app.shared.enums import VehicleType, PackageSize, ShipmentModality
+from src.app.modules.routes.repository import RouteRepository
+from src.app.modules.shipments.exceptions import ShipmentNotFoundError
+from src.app.modules.shipments.models import Shipment
+from src.app.modules.shipments.repository import ShipmentRepository
+from src.app.shared.enums import PackageSize, ShipmentModality, VehicleType
 from src.app.shared.geo import (
     Point,
     eta_minutes,

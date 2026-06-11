@@ -1,7 +1,30 @@
 """
 Matching module schemas.
 """
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
+
+
+class WeightsResponse(BaseModel):
+    """Current scoring weights (spec 5.2). Must sum to 1."""
+
+    geo: float
+    detour: float
+    cargo: float
+    reputation: float
+    time_window: float
+
+
+class WeightsUpdateRequest(BaseModel):
+    """Partial update of scoring weights — admin only (no redeploy needed).
+
+    Omitted components keep their current value; the resulting set must sum to 1.
+    """
+
+    geo: float | None = Field(None, ge=0.0, le=1.0)
+    detour: float | None = Field(None, ge=0.0, le=1.0)
+    cargo: float | None = Field(None, ge=0.0, le=1.0)
+    reputation: float | None = Field(None, ge=0.0, le=1.0)
+    time_window: float | None = Field(None, ge=0.0, le=1.0)
 
 
 class ScoreBreakdown(BaseModel):

@@ -5,9 +5,10 @@ import {
 } from "react-native";
 import { Text } from "react-native-paper";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
+import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAuthStore } from "@/src/stores/authStore";
-import { useAddressBookStore, SavedAddress, SavedContact } from "@/src/stores/addressBookStore";
+import { useAddressBookStore } from "@/src/stores/addressBookStore";
 import { UserType } from "@/src/types";
 import PublishRouteScreen from "@/src/features/carrier/PublishRouteScreen";
 import { T } from "@/constants/tokens";
@@ -302,6 +303,7 @@ function ContactModal({ visible, onClose }: { visible: boolean; onClose: () => v
 
 export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
+  const router = useRouter();
   const { user, logout } = useAuthStore();
   const { addresses, contacts } = useAddressBookStore();
 
@@ -420,7 +422,7 @@ export default function ProfileScreen() {
 
         <ProfileSection title="ACTIVIDAD" rows={[
           <ProfileRow key="hist"  icon="history"      label="Historial de envíos"    value={`${MOCK.shipments} envíos · este año`} />,
-          <ProfileRow key="eco"   icon="leaf"         label="Mi impacto eco"         value={`${MOCK.co2} kg CO₂ ahorrados`} accent />,
+          <ProfileRow key="eco"   icon="leaf"         label="Mi impacto eco"         value="CO₂ ahorrado y equivalencias" accent onPress={() => router.push("/(main)/impacto" as any)} />,
           <ProfileRow key="stars" icon="star-outline" label="Reseñas y calificación" value={`${reputation.toFixed(1)} · 11 reseñas`} />,
         ]} />
 

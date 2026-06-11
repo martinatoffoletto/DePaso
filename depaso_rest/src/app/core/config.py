@@ -22,6 +22,10 @@ class Settings(BaseSettings):
     environment: str = "development"
     api_prefix: str = "/api/v1"
 
+    # Rate limiting (RNF-SEC-06) — disabled in tests via RATE_LIMIT_ENABLED=false
+    rate_limit_enabled: bool = True
+    rate_limit_auth: str = "5/minute"
+
     # CORS
     cors_origins: list[str] = [
         "http://localhost:3000",

@@ -1,14 +1,18 @@
 """
 Auth module service for business logic.
 """
-from datetime import timedelta
-import secrets
+import hashlib
 import logging
+import secrets
+from datetime import datetime, timedelta
 
-from src.app.core.security import create_access_token, verify_password, get_password_hash
 from src.app.core.config import settings
-from src.app.modules.users import UserRepository, User
+from src.app.core.security import create_access_token, get_password_hash, verify_password
 from src.app.modules.auth.exceptions import InvalidCredentialsError
+from src.app.modules.auth.models import PasswordResetToken
+from src.app.modules.users import User, UserRepository
+
+RESET_TOKEN_TTL_HOURS = 1
 
 logger = logging.getLogger(__name__)
 
@@ -63,6 +67,7 @@ class AuthService:
     def refresh_tokens(self, refresh_token: str) -> tuple[str, str, int]:
         """Issue a new token pair from a valid refresh token."""
         from jose import JWTError
+
         from src.app.core.security import decode_access_token
 
         try:
@@ -91,25 +96,43 @@ class AuthService:
         return True
 
     def request_password_reset(self, email: str) -> str | None:
-        """Generate a password reset token. Returns None if user not found (security)."""
+        """Generate and persist a password reset token. Returns None if user not found.
+
+        Email delivery is out of scope for the prototype: the token is logged
+        (and surfaced in the API response only in debug mode) so the demo can
+        complete the flow without an SMTP service.
+        """
         user = self.user_repository.get_by_email(email)
         if not user:
             # Don't reveal if the email exists
             logger.info(f"Password reset requested for non-existent email: {email}")
             return None
 
-        # Generate a reset token (in production, store this with expiry in DB)
         reset_token = secrets.token_urlsafe(32)
-        # TODO: Store reset_token with expiry in a password_reset_tokens table
-        # TODO: Send email with reset link
-        logger.info(f"Password reset token generated for user {user.id}")
+        db = self.user_repository.db
+        db.add(PasswordResetToken(
+            user_id=user.id,
+            token_hash=hashlib.sha256(reset_token.encode()).hexdigest(),
+            expires_at=datetime.utcnow() + timedelta(hours=RESET_TOKEN_TTL_HOURS),
+        ))
+        db.commit()
+        logger.info(f"Password reset token for user {user.id}: {reset_token}")
         return reset_token
 
     def reset_password(self, token: str, new_password: str) -> bool:
-        """Reset password using a reset token."""
-        # TODO: Look up token in password_reset_tokens table
-        # TODO: Verify token hasn't expired
-        # TODO: Get user_id from token
-        # TODO: Update password
-        # For now, this is a placeholder
-        raise ValueError("Password reset not yet implemented - requires email service")
+        """Reset password using a single-use, time-limited reset token."""
+        db = self.user_repository.db
+        token_hash = hashlib.sha256(token.encode()).hexdigest()
+        record = (
+            db.query(PasswordResetToken)
+            .filter(PasswordResetToken.token_hash == token_hash)
+            .first()
+        )
+        if record is None or record.used or record.expires_at < datetime.utcnow():
+            raise ValueError("Invalid or expired reset token")
+
+        self.user_repository.update(record.user_id, password_hash=get_password_hash(new_password))
+        record.used = True
+        db.commit()
+        logger.info(f"Password reset completed for user {record.user_id}")
+        return True

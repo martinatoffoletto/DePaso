@@ -17,5 +17,23 @@ services:
       timeout: 5s
       retries: 5
 
+  api:
+    # No arranca con `docker compose up` a secas (start.sh corre uvicorn local).
+    # Para el stack completo dockerizado: docker compose --profile full up
+    profiles: ["full"]
+    build: ./depaso_rest
+    container_name: depaso_api
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql+psycopg://depaso:depaso123@db:5432/depaso_dev
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:-change-this-in-production}
+      DEBUG: "false"
+      ENVIRONMENT: production
+    ports:
+      - "8000:8000"
+
 volumes:
   depaso_pgdata:

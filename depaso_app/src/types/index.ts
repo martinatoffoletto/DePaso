@@ -258,6 +258,41 @@ export interface Location {
   address?: string;
 }
 
+export interface ImpactEquivalences {
+  car_km: number;
+  tree_months: number;
+  smartphone_charges: number;
+}
+
+export interface ClientImpact {
+  total_co2_saved_kg: number;
+  shipments_delivered: number;
+  shipments_collaborative: number;
+  equivalences: ImpactEquivalences;
+}
+
+export interface AdminDashboard {
+  total_users: number;
+  total_carriers: number;
+  carriers_pending_verification: number;
+  shipments_total: number;
+  shipments_active: number;
+  shipments_delivered: number;
+  shipments_pending: number;
+  total_co2_saved_kg: number;
+  matching_success_rate: number;
+}
+
+export type ModerationAction = "verify" | "suspend" | "reactivate";
+
+export interface MatchingWeights {
+  geo: number;
+  detour: number;
+  cargo: number;
+  reputation: number;
+  time_window: number;
+}
+
 export interface ScoreBreakdown {
   geo: number;
   detour: number;

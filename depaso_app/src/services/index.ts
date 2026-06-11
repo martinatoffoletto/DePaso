@@ -1,5 +1,5 @@
 import { apiClient } from "./api";
-import { MatchingResponse, CarrierScoreResponse } from "../types";
+import { ClientImpact, MatchingResponse, CarrierScoreResponse } from "../types";
 
 export const matchingService = {
   async matchBest(shipmentId: number): Promise<MatchingResponse> {
@@ -20,23 +20,10 @@ export const matchingService = {
   },
 };
 
-export interface CO2Response {
-  dedicated_emission_kg: number;
-  collaborative_emission_kg: number;
-  saved_kg: number;
-  saved_percent: number;
-}
-
 export const co2Service = {
-  async calculateEmissions(
-    dedicatedKm: number,
-    collaborativeIncrementalKm: number,
-  ): Promise<CO2Response> {
-    const response = await apiClient.post<CO2Response>(`/co2/calculate`, {
-      dedicated_km: dedicatedKm,
-      collaborative_incremental_km: collaborativeIncrementalKm,
-      emission_factor_kg_per_km: 0.2,
-    });
+  /** Accumulated CO2 savings of the authenticated client + equivalences (RF-CO2-02). */
+  async getMyImpact(): Promise<ClientImpact> {
+    const response = await apiClient.get<ClientImpact>(`/co2/me/summary`);
     return response.data;
   },
 };

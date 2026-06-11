@@ -1,4 +1,5 @@
 import React from "react";
+import { ColorValue } from "react-native";
 import { Tabs } from "expo-router";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useAuthStore } from "@/src/stores/authStore";
@@ -7,13 +8,15 @@ import { T } from "@/constants/tokens";
 
 type IconName = React.ComponentProps<typeof MaterialCommunityIcons>["name"];
 
-function TabIcon({ name, color, size }: { name: IconName; color: string; size: number }) {
+function TabIcon({ name, color, size }: { name: IconName; color: ColorValue; size: number }) {
   return <MaterialCommunityIcons name={name} color={color} size={size} />;
 }
 
 export default function TabLayout() {
   const { user } = useAuthStore();
   const isCarrier = user?.user_type === UserType.CARRIER;
+  const isAdmin = user?.user_type === UserType.ADMIN;
+  const isClient = !isCarrier && !isAdmin;
 
   return (
     <Tabs
@@ -63,6 +66,26 @@ export default function TabLayout() {
               color={color}
               size={size}
             />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="impacto"
+        options={{
+          href: isClient ? undefined : null,
+          title: "Impacto",
+          tabBarIcon: ({ color, size }) => (
+            <TabIcon name="leaf" color={color} size={size} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="admin"
+        options={{
+          href: isAdmin ? undefined : null,
+          title: "Admin",
+          tabBarIcon: ({ color, size }) => (
+            <TabIcon name="shield-account-outline" color={color} size={size} />
           ),
         }}
       />

@@ -2,26 +2,28 @@
 Auth module API router.
 HTTP endpoints for authentication, registration, and password management.
 """
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
 
+from src.app.core.config import settings
 from src.app.core.database import get_db
 from src.app.core.dependencies import CurrentUserId
-from src.app.shared.exceptions import DomainException
+from src.app.core.limiter import limiter
 from src.app.modules.auth.schemas import (
-    RegisterRequest,
-    LoginRequest,
-    RefreshRequest,
-    TokenResponse,
-    UserSummary,
+    ChangePasswordRequest,
     CurrentUserResponse,
     ForgotPasswordRequest,
     ForgotPasswordResponse,
+    LoginRequest,
+    RefreshRequest,
+    RegisterRequest,
     ResetPasswordRequest,
-    ChangePasswordRequest,
+    TokenResponse,
+    UserSummary,
 )
 from src.app.modules.auth.service import AuthService
 from src.app.modules.users import UserRepository, UserService
+from src.app.shared.exceptions import DomainException
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -37,19 +39,21 @@ def get_user_service(db: Session = Depends(get_db)) -> UserService:
 
 
 @router.post("/register", response_model=TokenResponse, status_code=status.HTTP_201_CREATED)
+@limiter.limit(settings.rate_limit_auth)
 async def register(
-    request: RegisterRequest,
+    request: Request,
+    payload: RegisterRequest,
     service: AuthService = Depends(get_auth_service),
 ) -> TokenResponse:
-    """Register a new user (client or carrier)."""
+    """Register a new user (client or carrier). Rate-limited (RNF-SEC-06)."""
     try:
         user = service.register(
-            email=request.email,
-            password=request.password,
-            first_name=request.first_name,
-            last_name=request.last_name,
-            phone_number=request.phone_number,
-            user_type=request.user_type,
+            email=payload.email,
+            password=payload.password,
+            first_name=payload.first_name,
+            last_name=payload.last_name,
+            phone_number=payload.phone_number,
+            user_type=payload.user_type,
         )
         access_token, refresh_token, expires_in = service.create_tokens(user.id)
         return TokenResponse(
@@ -65,13 +69,15 @@ async def register(
 
 
 @router.post("/login", response_model=TokenResponse)
+@limiter.limit(settings.rate_limit_auth)
 async def login(
-    request: LoginRequest,
+    request: Request,
+    payload: LoginRequest,
     service: AuthService = Depends(get_auth_service),
 ) -> TokenResponse:
-    """Authenticate a user and return tokens."""
+    """Authenticate a user and return tokens. Rate-limited (RNF-SEC-06)."""
     try:
-        user = service.authenticate(email=request.email, password=request.password)
+        user = service.authenticate(email=payload.email, password=payload.password)
         access_token, refresh_token, expires_in = service.create_tokens(user.id)
         return TokenResponse(
             access_token=access_token,
@@ -130,9 +136,13 @@ async def forgot_password(
     request: ForgotPasswordRequest,
     service: AuthService = Depends(get_auth_service),
 ) -> ForgotPasswordResponse:
-    """Request a password reset email. Always returns 200 to prevent email enumeration."""
-    service.request_password_reset(request.email)
-    return ForgotPasswordResponse()
+    """Request a password reset. Always returns 200 to prevent email enumeration.
+
+    No SMTP in the prototype: in debug mode the token is returned so the
+    flow can be demoed end-to-end; otherwise it's only logged server-side.
+    """
+    token = service.request_password_reset(request.email)
+    return ForgotPasswordResponse(debug_token=token if settings.debug else None)
 
 
 @router.post("/reset-password", status_code=status.HTTP_200_OK)
