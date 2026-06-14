@@ -1,6 +1,6 @@
-import { View, StyleSheet, TouchableOpacity, ActivityIndicator } from "react-native";
+import { View, StyleSheet, TouchableOpacity } from "react-native";
 import { Text } from "react-native-paper";
-import { Redirect, useRouter } from "expo-router";
+import { useRouter } from "expo-router";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAuthStore } from "@/src/stores/authStore";
@@ -52,7 +52,9 @@ const FEATURES = [
 ];
 
 export default function Index() {
-  const { isAuthenticated, isLoading } = useAuthStore();
+  // Auth gating lives in the root layout (Stack.Protected); this screen only
+  // shows the splash while the token is restored, then the welcome.
+  const isLoading = useAuthStore((s) => s.isLoading);
   const router = useRouter();
   const insets = useSafeAreaInsets();
 
@@ -72,10 +74,6 @@ export default function Index() {
         <Text style={styles.splashBarLabel}>CARGANDO RUTAS</Text>
       </View>
     );
-  }
-
-  if (isAuthenticated) {
-    return <Redirect href={"/(main)" as any} />;
   }
 
   return (

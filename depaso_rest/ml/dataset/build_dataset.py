@@ -4,7 +4,7 @@ Fase 1 del dataset — limpieza y normalización (TODO IA/ML).
 Toma un directorio crudo (images/ + labels.csv, mezcla de Open Images y fotos
 propias) y produce el dataset final que consume ml/train_classifier.py:
 
-  1. Valida labels.csv (archivos existentes, categorías xs..xl, campos completos).
+  1. Valida labels.csv (archivos existentes, categorías s..xl, campos completos).
   2. Deduplica con perceptual hash (imagehash.phash, distancia <= umbral).
   3. Normaliza: RGB, lado máximo 1024 px, JPG calidad 90.
   4. Escribe <out>/images/ + <out>/labels.csv limpio.
@@ -16,7 +16,7 @@ Uso:
 import argparse
 from pathlib import Path
 
-VALID_CATEGORIES = {"xs", "s", "m", "l", "xl"}
+VALID_CATEGORIES = {"s", "m", "l", "xl"}
 MAX_SIDE = 1024
 JPEG_QUALITY = 90
 PHASH_THRESHOLD = 4  # distancia de Hamming <= 4 se considera duplicado

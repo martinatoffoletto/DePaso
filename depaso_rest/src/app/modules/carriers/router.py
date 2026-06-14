@@ -8,8 +8,10 @@ from sqlalchemy.orm import Session
 from src.app.core.database import get_db
 from src.app.core.dependencies import CurrentUserId
 from src.app.shared.exceptions import DomainException
+from src.app.modules.carriers.exceptions import CarrierNotFoundError
 from src.app.modules.carriers.schemas import (
     CarrierCreate,
+    CarrierProfileCreate,
     CarrierResponse,
     CarrierSummaryResponse,
     CarrierUpdate,
@@ -78,6 +80,54 @@ async def get_my_carrier(
     return CarrierResponse.model_validate(_my_carrier(current_user_id, db))
 
 
+@router.post("/me", response_model=CarrierResponse, status_code=status.HTTP_201_CREATED)
+async def create_my_carrier(
+    data: CarrierProfileCreate,
+    current_user_id: CurrentUserId,
+    service: CarrierService = Depends(get_carrier_service),
+) -> CarrierResponse:
+    """Create a carrier profile for the current user (role switching, RF-USR-06).
+
+    user_id is taken from the JWT, not the body, so a client can't create a
+    profile for someone else.
+    """
+    try:
+        service.get_carrier_by_user_id(current_user_id)
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT,
+                            detail="This user already has a carrier profile.")
+    except CarrierNotFoundError:
+        pass
+    try:
+        carrier = service.create_carrier(
+            user_id=current_user_id,
+            company_name=data.company_name,
+            vehicle_type=data.vehicle_type,
+            license_plate=data.license_plate,
+            capacity_kg=data.capacity_kg,
+            capacity_volume_m3=data.capacity_volume_m3,
+        )
+        return CarrierResponse.model_validate(carrier)
+    except DomainException as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=e.message)
+
+
+@router.patch("/me", response_model=CarrierResponse)
+async def update_my_carrier(
+    data: CarrierUpdate,
+    current_user_id: CurrentUserId,
+    service: CarrierService = Depends(get_carrier_service),
+    db: Session = Depends(get_db),
+) -> CarrierResponse:
+    """Update current user's carrier information."""
+    try:
+        carrier = _my_carrier(current_user_id, db)
+        updates = data.model_dump(exclude_unset=True)
+        updated_carrier = service.update_carrier(carrier.id, **updates)
+        return CarrierResponse.model_validate(updated_carrier)
+    except DomainException as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=e.message)
+
+
 @router.get("/me/feed", response_model=list[FeedItemResponse])
 async def my_feed(
     current_user_id: CurrentUserId,
@@ -85,10 +135,15 @@ async def my_feed(
 ) -> list[FeedItemResponse]:
     """Pending shipments compatible with this carrier (RF-MAT-03, RF-CAR-03)."""
     carrier = _my_carrier(current_user_id, db)
+    from src.app.modules.matching.repository import MatchingWeightsRepository
+    from src.app.modules.matching.service import DEFAULT_WEIGHTS
+    weights = MatchingWeightsRepository(db).load(DEFAULT_WEIGHTS)
+    
     matching = MatchingService(
         shipment_repo=ShipmentRepository(db),
         carrier_repo=CarrierRepository(db),
         route_repo=RouteRepository(db),
+        weights=weights,
     )
     return matching.feed_for_carrier(carrier.id)
 

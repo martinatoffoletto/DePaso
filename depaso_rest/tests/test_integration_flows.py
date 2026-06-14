@@ -1,0 +1,406 @@
+from datetime import datetime, timedelta, timezone
+
+import pytest
+from fastapi.testclient import TestClient
+
+# Mock OS environment to bypass rate limit
+import os
+os.environ["RATE_LIMIT_ENABLED"] = "false"
+
+
+# --- helpers ----------------------------------------------------------------
+
+def _register(client: TestClient, email: str, user_type: str = "client") -> tuple[dict, int]:
+    """Register a user and return (auth headers, user id)."""
+    res = client.post("/api/v1/auth/register", json={
+        "email": email,
+        "password": "Password123!",
+        "first_name": "Test",
+        "last_name": "User",
+        "phone_number": "123456789",
+        "user_type": user_type,
+    })
+    assert res.status_code == 201, res.text
+    body = res.json()
+    return {"Authorization": f"Bearer {body['access_token']}"}, body["user"]["id"]
+
+
+def _make_admin(db) -> dict:
+    """Insert an admin straight into the DB and return its auth headers."""
+    from src.app.core.security import create_access_token
+    from src.app.modules.users.models import User
+
+    admin = db.query(User).filter(User.email == "admin_flows@example.com").first()
+    if admin is None:
+        admin = User(
+            email="admin_flows@example.com", password_hash="fake",
+            first_name="Admin", last_name="Admin", user_type="admin", is_active=True,
+        )
+        db.add(admin)
+        db.commit()
+        db.refresh(admin)
+    token = create_access_token(data={"sub": str(admin.id)})
+    return {"Authorization": f"Bearer {token}"}
+
+
+def _verified_carrier(client: TestClient, db, email: str, vehicle="car",
+                      capacity_kg=25.0) -> tuple[dict, int]:
+    """Register a user, create a carrier profile and have an admin verify it."""
+    headers, _ = _register(client, email, user_type="client")
+    res = client.post("/api/v1/carriers/me", json={
+        "company_name": "ACME Logistics",
+        "vehicle_type": vehicle,
+        "license_plate": "ABC-123",
+        "capacity_kg": capacity_kg,
+        "capacity_volume_m3": 2.0,
+    }, headers=headers)
+    assert res.status_code == 201, res.text
+    carrier_id = res.json()["id"]
+
+    admin_headers = _make_admin(db)
+    res_v = client.patch(f"/api/v1/admin/carriers/{carrier_id}",
+                         json={"action": "verify"}, headers=admin_headers)
+    assert res_v.status_code == 200, res_v.text
+    return headers, carrier_id
+
+
+def _wide_window() -> tuple[str, str]:
+    """A route time window that always contains 'now' so the feed includes it."""
+    now = datetime.now(timezone.utc)
+    start = (now - timedelta(hours=1)).strftime("%Y-%m-%dT%H:%M:%SZ")
+    end = (now + timedelta(hours=8)).strftime("%Y-%m-%dT%H:%M:%SZ")
+    return start, end
+
+def test_integration_flow_carrier_capacity_and_matching(client: TestClient, db):
+    """
+    Test End-to-End:
+    1. Register client and carrier.
+    2. Admin verifies carrier.
+    3. Carrier publishes a route.
+    4. Client requests 3 shipments.
+    5. Carrier accepts shipments until capacity is exhausted.
+    6. System rejects exceeding capacity.
+    """
+    # 1. Register Client
+    res_client = client.post("/api/v1/auth/register", json={
+        "email": "client@example.com",
+        "password": "Password123!",
+        "first_name": "John",
+        "last_name": "Client",
+        "phone_number": "123456789",
+        "user_type": "client"
+    })
+    assert res_client.status_code == 201
+    client_token = res_client.json()["access_token"]
+    client_headers = {"Authorization": f"Bearer {client_token}"}
+    client_id = res_client.json()["user"]["id"]
+
+    # 2. Register Carrier as a client first, then create carrier profile
+    res_carrier = client.post("/api/v1/auth/register", json={
+        "email": "carrier@example.com",
+        "password": "Password123!",
+        "first_name": "Jane",
+        "last_name": "Carrier",
+        "phone_number": "987654321",
+        "user_type": "client"
+    })
+    assert res_carrier.status_code == 201
+    carrier_token = res_carrier.json()["access_token"]
+    carrier_headers = {"Authorization": f"Bearer {carrier_token}"}
+    carrier_user_id = res_carrier.json()["user"]["id"]
+
+    # 3. Create Carrier Profile (Car, 25kg capacity)
+    res_carrier_profile = client.post("/api/v1/carriers/me", json={
+        "user_id": carrier_user_id,
+        "company_name": "Jane Logistics",
+        "vehicle_type": "car",
+        "license_plate": "ABC-123",
+        "capacity_kg": 25.0,
+        "capacity_volume_m3": 2.0
+    }, headers=carrier_headers)
+    assert res_carrier_profile.status_code == 201
+    carrier_profile_id = res_carrier_profile.json()["id"]
+
+    # 4. Admin verifies the carrier
+    # Create an admin user directly in DB for testing
+    from src.app.modules.users.models import User
+    admin_user = User(
+        email="admin@example.com",
+        password_hash="fake",
+        first_name="Admin",
+        last_name="Admin",
+        user_type="admin",
+        is_active=True
+    )
+    db.add(admin_user)
+    db.commit()
+    
+    # Generate admin token
+    from src.app.core.security import create_access_token
+    admin_token = create_access_token(data={"sub": str(admin_user.id)})
+    admin_headers = {"Authorization": f"Bearer {admin_token}"}
+
+    res_verify = client.patch(f"/api/v1/admin/carriers/{carrier_profile_id}", json={
+        "action": "verify"
+    }, headers=admin_headers)
+    assert res_verify.status_code == 200
+
+    # 5. Carrier publishes a route (from point A to B)
+    res_route = client.post("/api/v1/routes", json={
+        "kind": "collaborative_route",
+        "origin_lat": -34.6037,
+        "origin_lon": -58.3816,
+        "destination_lat": -34.5837,
+        "destination_lon": -58.4016,
+        "window_start": "2030-01-01T10:00:00Z",
+        "window_end": "2030-01-01T18:00:00Z"
+    }, headers=carrier_headers)
+    assert res_route.status_code == 201
+    route_id = res_route.json()["id"]
+
+    # 6. Client requests 3 shipments along that route
+    # Shipment 1: 10kg
+    s1 = client.post("/api/v1/shipments", json={
+        "package_size": "m",
+        "modality": "collaborative",
+        "assignment_mode": "manual",
+        "origin_lat": -34.6000,
+        "origin_lon": -58.3850,
+        "destination_lat": -34.5900,
+        "destination_lon": -58.3950,
+        "weight_kg": 10.0
+    }, headers=client_headers).json()
+
+    # Shipment 2: 15kg
+    s2 = client.post("/api/v1/shipments", json={
+        "package_size": "l",
+        "modality": "collaborative",
+        "assignment_mode": "manual",
+        "origin_lat": -34.6000,
+        "origin_lon": -58.3850,
+        "destination_lat": -34.5900,
+        "destination_lon": -58.3950,
+        "weight_kg": 15.0
+    }, headers=client_headers).json()
+
+    # Shipment 3: 5kg
+    s3 = client.post("/api/v1/shipments", json={
+        "package_size": "s",
+        "modality": "collaborative",
+        "assignment_mode": "manual",
+        "origin_lat": -34.6000,
+        "origin_lon": -58.3850,
+        "destination_lat": -34.5900,
+        "destination_lon": -58.3950,
+        "weight_kg": 5.0
+    }, headers=client_headers).json()
+
+    # 7. Carrier checks their feed and should see shipments
+    res_feed = client.get("/api/v1/carriers/me/feed", headers=carrier_headers)
+    assert res_feed.status_code == 200
+    # The feed logic might rely on time window, our route is 2030 but default window check
+    # uses datetime.utcnow(). We might need to mock time or ignore feed strictly.
+    # We can just accept them directly to test capacity.
+
+    # 8. Carrier accepts Shipment 1 (10kg) -> Success (25 - 10 = 15kg left)
+    res_accept1 = client.post(f"/api/v1/shipments/{s1['id']}/accept", json={"route_id": route_id}, headers=carrier_headers)
+    assert res_accept1.status_code == 200
+
+    # 9. Carrier accepts Shipment 2 (15kg) -> Success (15 - 15 = 0kg left)
+    res_accept2 = client.post(f"/api/v1/shipments/{s2['id']}/accept", json={"route_id": route_id}, headers=carrier_headers)
+    assert res_accept2.status_code == 200
+
+    # 10. Carrier attempts to accept Shipment 3 (5kg) -> Reject due to capacity
+    res_accept3 = client.post(f"/api/v1/shipments/{s3['id']}/accept", json={"route_id": route_id}, headers=carrier_headers)
+    assert res_accept3.status_code == 422
+    assert "capacity" in res_accept3.json()["detail"].lower()
+
+    # 11. Carrier delivers Shipment 1 -> Capacity is freed
+    # Update status: pickup_arrived -> in_transit -> delivered
+    for st in ["pickup_arrived", "in_transit", "delivered"]:
+        res_status = client.post(f"/api/v1/shipments/{s1['id']}/status", json={"new_status": st}, headers=carrier_headers)
+        assert res_status.status_code == 200
+
+    # Now Carrier should have 10kg free capacity, so accepting Shipment 3 (5kg) should succeed
+    res_accept3_retry = client.post(f"/api/v1/shipments/{s3['id']}/accept", json={"route_id": route_id}, headers=carrier_headers)
+    assert res_accept3_retry.status_code == 200
+
+    # 12. Client rates Carrier for Shipment 1
+    res_rating = client.post(f"/api/v1/shipments/{s1['id']}/rating", json={
+        "stars": 5,
+        "comment": "Great service!"
+    }, headers=client_headers)
+    assert res_rating.status_code == 201
+
+    # Check Carrier summary
+    res_summary = client.get("/api/v1/carriers/me/summary", headers=carrier_headers)
+    assert res_summary.status_code == 200
+    summary = res_summary.json()
+    assert summary["deliveries_completed"] == 1
+    assert summary["reputation"] == 5.0
+
+
+def test_client_lifecycle_quote_create_edit_cancel(client: TestClient):
+    """CASOS 1.1 + 1.2: quote -> create -> edit (reprice) -> cancel."""
+    headers, _ = _register(client, "lifecycle@example.com")
+
+    # 1. Quote before creating: both modalities priced.
+    quote = client.post("/api/v1/shipments/quote", json={
+        "origin_lat": -34.6037, "origin_lon": -58.3816,
+        "destination_lat": -34.5837, "destination_lon": -58.4016,
+        "package_size": "s",
+    })
+    assert quote.status_code == 200, quote.text
+    q = quote.json()
+    assert q["price_collaborative"] < q["price_dedicated"]  # collab is cheaper
+    assert q["distance_km"] > 0
+
+    # 2. Create the shipment -> PENDING.
+    created = client.post("/api/v1/shipments", json={
+        "package_size": "s",
+        "modality": "collaborative",
+        "assignment_mode": "manual",
+        "origin_lat": -34.6037, "origin_lon": -58.3816,
+        "destination_lat": -34.5837, "destination_lon": -58.4016,
+        "weight_kg": 3.0,
+    }, headers=headers)
+    assert created.status_code == 201, created.text
+    shipment = created.json()
+    sid = shipment["id"]
+    assert shipment["status"] == "pending"
+    original_price = shipment["estimated_price"]
+
+    # 3. Edit it: bump the package size -> price must be recalculated.
+    edited = client.patch(f"/api/v1/shipments/{sid}", json={
+        "package_size": "l",
+    }, headers=headers)
+    assert edited.status_code == 200, edited.text
+    assert edited.json()["package_size"] == "l"
+    assert edited.json()["estimated_price"] != original_price
+
+    # 4. A different user cannot edit my shipment.
+    other_headers, _ = _register(client, "intruder@example.com")
+    forbidden = client.patch(f"/api/v1/shipments/{sid}", json={"weight_kg": 1.0},
+                             headers=other_headers)
+    assert forbidden.status_code == 403
+
+    # 5. Cancel while still PENDING.
+    cancelled = client.post(f"/api/v1/shipments/{sid}/cancel", headers=headers)
+    assert cancelled.status_code == 200, cancelled.text
+    assert cancelled.json()["status"] == "cancelled"
+
+    # 6. A cancelled shipment can no longer be edited.
+    after = client.patch(f"/api/v1/shipments/{sid}", json={"package_size": "m"},
+                         headers=headers)
+    assert after.status_code == 400
+
+
+def test_admin_weights_then_collaborative_happy_path(client: TestClient, db):
+    """CASOS 3.1: admin tunes weights, carrier on-route, full happy path E2E."""
+    # 1. Admin retunes the matching weights (must keep sum == 1.0).
+    admin_headers = _make_admin(db)
+    res_w = client.patch("/api/v1/matching/weights", json={
+        "geo": 0.40, "detour": 0.25,
+    }, headers=admin_headers)
+    assert res_w.status_code == 200, res_w.text
+    assert abs(sum(res_w.json().values()) - 1.0) < 1e-6
+
+    # An invalid set (sum != 1) is rejected.
+    bad = client.patch("/api/v1/matching/weights", json={"geo": 0.99},
+                       headers=admin_headers)
+    assert bad.status_code == 422
+
+    # 2. Verified carrier publishes a route covering 'now'.
+    carrier_headers, _ = _verified_carrier(client, db, "happy_carrier@example.com")
+    start, end = _wide_window()
+    route = client.post("/api/v1/routes", json={
+        "kind": "collaborative_route",
+        "origin_lat": -34.6037, "origin_lon": -58.3816,
+        "destination_lat": -34.5837, "destination_lon": -58.4016,
+        "window_start": start, "window_end": end,
+    }, headers=carrier_headers)
+    assert route.status_code == 201, route.text
+    route_id = route.json()["id"]
+
+    # 3. Client requests a collaborative shipment right on that corridor.
+    client_headers, _ = _register(client, "happy_client@example.com")
+    ship = client.post("/api/v1/shipments", json={
+        "package_size": "m",
+        "modality": "collaborative",
+        "assignment_mode": "manual",
+        "origin_lat": -34.6000, "origin_lon": -58.3850,
+        "destination_lat": -34.5900, "destination_lon": -58.3950,
+        "weight_kg": 4.0,
+    }, headers=client_headers).json()
+    sid = ship["id"]
+
+    # 4. Carrier sees the shipment ranked in their feed.
+    feed = client.get("/api/v1/carriers/me/feed", headers=carrier_headers)
+    assert feed.status_code == 200, feed.text
+    feed_ids = [item["shipment_id"] for item in feed.json()]
+    assert sid in feed_ids, f"shipment {sid} not in feed {feed.json()}"
+
+    # 5. Carrier accepts -> shipment becomes ASSIGNED for the client.
+    accept = client.post(f"/api/v1/shipments/{sid}/accept",
+                         json={"route_id": route_id}, headers=carrier_headers)
+    assert accept.status_code == 200, accept.text
+    detail = client.get(f"/api/v1/shipments/{sid}", headers=client_headers)
+    assert detail.json()["status"] == "assigned"
+
+    # 6. Carrier walks the delivery milestones.
+    for st in ["pickup_arrived", "in_transit", "delivered"]:
+        r = client.post(f"/api/v1/shipments/{sid}/status",
+                        json={"new_status": st}, headers=carrier_headers)
+        assert r.status_code == 200, r.text
+
+    # 7. Client gives 5 stars; carrier summary reflects it + CO2 + earnings.
+    rating = client.post(f"/api/v1/shipments/{sid}/rating",
+                         json={"stars": 5, "comment": "Excelente"},
+                         headers=client_headers)
+    assert rating.status_code == 201, rating.text
+
+    summary = client.get("/api/v1/carriers/me/summary", headers=carrier_headers).json()
+    assert summary["deliveries_completed"] == 1
+    assert summary["reputation"] == 5.0
+    assert summary["total_co2_saved_kg"] > 0  # collaborative trip saved CO2
+    assert summary["total_earnings"] > 0
+
+
+def test_carrier_late_cancellation_penalty(client: TestClient, db):
+    """CASOS 3.2: carrier backs out after accepting -> back to PENDING + penalty."""
+    carrier_headers, carrier_id = _verified_carrier(client, db, "quitter@example.com")
+    start, end = _wide_window()
+    route = client.post("/api/v1/routes", json={
+        "kind": "collaborative_route",
+        "origin_lat": -34.6037, "origin_lon": -58.3816,
+        "destination_lat": -34.5837, "destination_lon": -58.4016,
+        "window_start": start, "window_end": end,
+    }, headers=carrier_headers).json()
+
+    client_headers, _ = _register(client, "jilted@example.com")
+    ship = client.post("/api/v1/shipments", json={
+        "package_size": "m",
+        "modality": "collaborative",
+        "assignment_mode": "manual",
+        "origin_lat": -34.6000, "origin_lon": -58.3850,
+        "destination_lat": -34.5900, "destination_lon": -58.3950,
+        "weight_kg": 4.0,
+    }, headers=client_headers).json()
+    sid = ship["id"]
+
+    # Reputation before backing out (fresh carriers start at 5.0).
+    rep_before = client.get("/api/v1/carriers/me/summary",
+                            headers=carrier_headers).json()["reputation"]
+
+    accept = client.post(f"/api/v1/shipments/{sid}/accept",
+                         json={"route_id": route["id"]}, headers=carrier_headers)
+    assert accept.status_code == 200, accept.text
+
+    cancel = client.post(f"/api/v1/shipments/{sid}/carrier-cancel",
+                         headers=carrier_headers)
+    assert cancel.status_code == 200, cancel.text
+    assert cancel.json()["status"] == "pending"  # available again for others
+
+    rep_after = client.get("/api/v1/carriers/me/summary",
+                           headers=carrier_headers).json()["reputation"]
+    assert rep_after < rep_before  # reputation penalty applied

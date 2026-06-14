@@ -16,9 +16,13 @@ class CarrierBase(BaseModel):
 
 
 class CarrierCreate(CarrierBase):
-    """Schema for carrier creation."""
+    """Schema for carrier creation by an admin (explicit user_id)."""
 
     user_id: int
+
+
+class CarrierProfileCreate(CarrierBase):
+    """Self-service carrier profile creation — user_id comes from the JWT."""
 
 
 class CarrierUpdate(BaseModel):

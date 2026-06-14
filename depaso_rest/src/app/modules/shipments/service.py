@@ -9,6 +9,7 @@ from src.app.modules.shipments import pricing
 from src.app.modules.shipments.repository import ShipmentRepository
 from src.app.modules.shipments.models import Shipment, ShipmentEvent, Rating
 from src.app.modules.shipments.exceptions import ShipmentNotFoundError, InvalidShipmentStatusError
+from src.app.shared.exceptions import ValidationError
 from src.app.modules.carriers.repository import CarrierRepository
 from src.app.modules.routes.repository import RouteRepository
 from src.app.modules.co2.service import CO2Service
@@ -86,6 +87,39 @@ class ShipmentService:
         if not shipment:
             raise ShipmentNotFoundError()
         return shipment
+
+    def update_shipment(self, shipment_id: int, client_id: int, **updates) -> Shipment:
+        """Update a pending shipment. Re-calculates price if needed."""
+        shipment = self.get_shipment_by_id(shipment_id)
+        if shipment.client_id != client_id:
+            raise ValueError("Only the shipment owner can update it.")
+        if shipment.status != ShipmentStatus.PENDING:
+            raise ValidationError(
+                "Only pending shipments can be updated.", "SHIPMENT_NOT_PENDING"
+            )
+
+        # Clean None values from updates
+        updates = {k: v for k, v in updates.items() if v is not None}
+        if not updates:
+            return shipment
+
+        # If origin, destination, package_size or modality changed, recalculate price
+        needs_repricing = any(k in updates for k in ("origin_lat", "origin_lon", "destination_lat", "destination_lon", "package_size", "modality"))
+        if needs_repricing:
+            origin = Point(
+                updates.get("origin_lat", shipment.origin_lat),
+                updates.get("origin_lon", shipment.origin_lon)
+            )
+            dest = Point(
+                updates.get("destination_lat", shipment.destination_lat),
+                updates.get("destination_lon", shipment.destination_lon)
+            )
+            pkg_size = updates.get("package_size", shipment.package_size)
+            modality = updates.get("modality", shipment.modality)
+            updates["estimated_price"] = pricing.price_for(origin, dest, pkg_size, modality)
+
+        updated = self.repository.update(shipment_id, **updates)
+        return updated
 
     def list_shipments_by_client(self, client_id: int, skip: int = 0, limit: int = 20) -> tuple[list[Shipment], int]:
         return self.repository.list_by_client(client_id, skip, limit)

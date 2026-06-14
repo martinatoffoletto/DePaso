@@ -15,7 +15,14 @@ from fastapi.testclient import TestClient
 
 from src.app.main import create_app
 from src.app.core.database import get_db
-from src.app.modules.users.models import Base
+from src.app.shared.base_model import Base
+from src.app.modules.auth.models import PasswordResetToken
+from src.app.modules.carriers.models import Carrier
+from src.app.modules.matching.models import MatchingWeight
+from src.app.modules.packages.models import Package
+from src.app.modules.routes.models import CarrierRoute
+from src.app.modules.shipments.models import Rating, Shipment, ShipmentEvent
+from src.app.modules.tracking.models import GpsTrace
 from src.app.modules.users.models import User
 
 # Test database setup

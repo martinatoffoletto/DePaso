@@ -19,11 +19,10 @@ type Category = {
 };
 
 const CATEGORIES: Category[] = [
-  { id: "xs", label: "Sobre / Documento", description: "Hasta 0.5 kg — cartas, sobres, papeles", maxKg: 0.5, icon: "email-outline" },
-  { id: "s",  label: "Caja chica",        description: "Hasta 3 kg — libro, ropa, accesorio",   maxKg: 3,   icon: "package-variant" },
-  { id: "m",  label: "Caja mediana",      description: "Hasta 10 kg — electrodoméstico chico",  maxKg: 10,  icon: "cube-outline" },
-  { id: "l",  label: "Caja grande",       description: "Hasta 30 kg — TV, valija, monitor",     maxKg: 30,  icon: "television-play" },
-  { id: "xl", label: "Voluminoso / Flete",description: "Más de 30 kg — muebles, mudanza",       maxKg: 200, icon: "wardrobe-outline" },
+  { id: "s",  label: "Pequeño / Documentos", description: "Hasta 3 kg — sobres, libros, ropa",     maxKg: 3,   icon: "email-outline" },
+  { id: "m",  label: "Carga mediana",        description: "Hasta 10 kg — electrodoméstico chico",  maxKg: 10,  icon: "cube-outline" },
+  { id: "l",  label: "Grande / Voluminoso",  description: "Hasta 30 kg — TV, valija, monitor",     maxKg: 30,  icon: "television-play" },
+  { id: "xl", label: "Mudanza / Flete",      description: "Más de 30 kg — muebles, mudanza",       maxKg: 200, icon: "wardrobe-outline" },
 ];
 
 function mockClassify(): { categoryId: string; confidence: number; weightKg: number } {
@@ -48,7 +47,7 @@ function StepDots({ current, total }: { current: number; total: number }) {
 }
 
 function ScanCorners() {
-  const corners: Array<{ top?: number; bottom?: number; left?: number; right?: number }> = [
+  const corners: { top?: number; bottom?: number; left?: number; right?: number }[] = [
     { top: 0, left: 0 },
     { top: 0, right: 0 },
     { bottom: 0, left: 0 },

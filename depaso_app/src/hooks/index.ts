@@ -64,7 +64,7 @@ export const useLocation = () => {
       return geocode[0]
         ? `${geocode[0].street}, ${geocode[0].city}`
         : `${latitude}, ${longitude}`;
-    } catch (err) {
+    } catch {
       return `${latitude}, ${longitude}`;
     }
   };

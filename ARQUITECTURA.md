@@ -107,7 +107,7 @@ routes (id, carrier_id, kind[collab_route|dedicated_window], origin GEOGRAPHY(Po
         window_start, window_end, recurrence, active)
 shipments (id, client_id, carrier_id?, origin Point, destination Point, status,
            modality[dedicated|collaborative], assignment[on_demand|by_space],
-           category[XS|S|M|L|XL], volume_est, price, window_start, window_end,
+           category[S|M|L|XL], volume_est, price, window_start, window_end,
            photo_url, co2_saved_kg, created_at)
 shipment_events (id, shipment_id, status, timestamp, location?)        # auditoría de estados
 classifications (id, shipment_id?, image_url, predicted_category, confidence,
@@ -286,7 +286,7 @@ depaso_app/
 > Requisito UADE: modelo **entrenado por el equipo** (no desde cero — transfer learning está
 > permitido y es lo correcto), documentando dataset, arquitectura, métricas, validación y sesgos.
 
-### Categorías (5): `XS` (sobres/documentos) · `S` (caja chica) · `M` (caja mediana) · `L` (caja grande/valija) · `XL` (muebles/flete)
+### Categorías (4): `S` (paquetes pequeños y documentos) · `M` (cargas medianas) · `L` (cargas grandes o voluminosas) · `XL` (mudanzas o fletes)
 
 ### Fase 1 — Construcción del dataset (~2-3 semanas, en paralelo con otras tareas)
 
@@ -351,7 +351,7 @@ Notebook `evaluate_and_bias.ipynb`, corre **solo sobre el test set**:
 1. **Métricas globales:** accuracy (objetivo ≥80%), precision/recall/F1 por clase
    (`sklearn.metrics.classification_report`).
 2. **Matriz de confusión** normalizada (heatmap con seaborn) — analizar confusiones
-   adyacentes (S↔M, M↔L son esperables; XS↔XL sería grave).
+   adyacentes (S↔M, M↔L son esperables; S↔XL sería grave).
 3. **Análisis de sesgos:** agrupar el test set por cada columna de metadata y calcular
    accuracy por grupo:
    - por iluminación (natural vs artificial vs baja)
@@ -426,7 +426,7 @@ empezarlo ya, aunque el resto avance despacio.
 | **Luy et al. (2023):** las plataformas asumen que todos son gig-workers y desaprovechan a los conductores ocasionales (ODs); el OD requiere su propio flujo | Módulo `routes/` nuevo: el transportista **publica su trayecto habitual** (`collaborative_route`) o su ventana dedicada (`dedicated_window`); el matching colaborativo opera sobre esos trayectos, no sobre posiciones |
 | **Akamatsu & Oyama (2023/24):** los mecanismos de mercado (subastas, elasticidades) requieren datos históricos masivos inexistentes en el arranque | **Scoring determinístico multivariable** con pesos configurables — la alternativa correcta para cold-start; el ML de matching queda como trabajo futuro con datos reales |
 | **Saleh et al. (2024):** las decisiones de Deep RL no son explicables al usuario — problema de auditabilidad | Cada score devuelve su **breakdown por componente + explicación legible** (`CarrierScoreResponse.explanation`): "¿por qué me asignaron este pedido?" siempre tiene respuesta |
-| **Naumann et al. (2023):** estimar volumen exacto desde foto móvil 2D es inviable sin sensores 3D | El clasificador predice **categorías volumétricas discretas** (XS–XL) con CNN + transfer learning, no volumen continuo |
+| **Naumann et al. (2023):** estimar volumen exacto desde foto móvil 2D es inviable sin sensores 3D | El clasificador predice **categorías volumétricas discretas** (S–XL, 4 clases) con CNN + transfer learning, no volumen continuo |
 | **Encuesta propia (n=145):** 62% de transportistas potenciales solo participa sin desviarse de su trayectoria diaria | Los componentes geo + desvío concentran el **65% del peso** del score (w1=0.35, w2=0.30) |
 
 ### 7.2 Matching inteligente (`modules/matching/service.py`)

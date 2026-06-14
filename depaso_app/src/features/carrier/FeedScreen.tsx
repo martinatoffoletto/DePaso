@@ -11,11 +11,10 @@ import { reverseGeocode } from "@/src/utils/geocoding";
 import { T } from "@/constants/tokens";
 
 const SIZE_LABEL: Record<PackageCategory, string> = {
-  [PackageCategory.XS]: "Sobre",
-  [PackageCategory.S]:  "Chico",
+  [PackageCategory.S]:  "Pequeño",
   [PackageCategory.M]:  "Mediano",
   [PackageCategory.L]:  "Grande",
-  [PackageCategory.XL]: "Voluminoso",
+  [PackageCategory.XL]: "Flete",
 };
 
 function useAddress(lat: number, lon: number): string {
@@ -108,7 +107,8 @@ export default function FeedScreen() {
   const [acceptingId, setAcceptingId] = useState<number | null>(null);
 
   async function load(asRefresh = false) {
-    asRefresh ? setRefreshing(true) : setLoading(true);
+    if (asRefresh) setRefreshing(true);
+    else setLoading(true);
     try {
       const profile = await carriersService.getMyProfile();
       setCarrier(profile);

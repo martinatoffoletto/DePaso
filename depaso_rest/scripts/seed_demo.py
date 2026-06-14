@@ -71,9 +71,7 @@ def seed() -> None:
 
         # Package size catalog (spec 3.3) — límites y precio base por categoría
         db.add_all([
-            Package(size="xs", description="Sobre / documento", max_weight_kg=1,
-                    max_length_cm=35, max_width_cm=25, max_height_cm=5, base_price=900),
-            Package(size="s", description="Caja chica (zapatos)", max_weight_kg=5,
+            Package(size="s", description="Paquetes pequeños y documentos", max_weight_kg=5,
                     max_length_cm=40, max_width_cm=30, max_height_cm=20, base_price=1300),
             Package(size="m", description="Caja mediana", max_weight_kg=15,
                     max_length_cm=60, max_width_cm=40, max_height_cm=40, base_price=1800),

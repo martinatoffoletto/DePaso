@@ -21,9 +21,9 @@ import csv
 import shutil
 from pathlib import Path
 
-# Open Images class -> DePaso category (spec 3.3 XS..XL).
+# Open Images class -> DePaso category (spec 3.3 S..XL).
 CLASS_TO_CATEGORY = {
-    "Envelope": "xs",
+    "Envelope": "s",
     "Box": "m",
     "Suitcase": "l",
     "Furniture": "xl",

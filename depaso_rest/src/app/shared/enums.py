@@ -25,13 +25,12 @@ class VehicleType(str, Enum):
 
 
 class PackageSize(str, Enum):
-    """Package size categories from the AI classifier (section 5.1)."""
+    """4 package categories from the AI classifier (section 5.1)."""
 
-    XS = "xs"   # Documentos, sobres
-    S = "s"     # Caja chica, libro
-    M = "m"     # Caja mediana, electrodoméstico chico
-    L = "l"     # Caja grande, TV, valija
-    XL = "xl"   # Muebles, mudanzas (freight)
+    S = "s"     # Paquetes pequeños y documentos
+    M = "m"     # Cargas medianas
+    L = "l"     # Cargas grandes o voluminosas
+    XL = "xl"   # Mudanzas o fletes
 
 
 class ShipmentStatus(str, Enum):

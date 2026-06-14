@@ -12,10 +12,11 @@ def test_register_new_user(client):
         "/api/v1/auth/register",
         json={
             "email": "newuser@example.com",
-            "password": "securepass123",
+            "password": "Password123!",
             "first_name": "New",
             "last_name": "User",
             "phone_number": "+1234567890",
+            "user_type": "client"
         },
     )
     
@@ -115,3 +116,78 @@ def test_get_current_user_without_token(client):
     response = client.get("/api/v1/auth/me")
     
     assert response.status_code == status.HTTP_401_UNAUTHORIZED
+
+def test_register_new_carrier(client):
+    """Test successful carrier registration."""
+    response = client.post(
+        "/api/v1/auth/register",
+        json={
+            "email": "carrier2@example.com",
+            "password": "Password123!",
+            "first_name": "New",
+            "last_name": "Carrier",
+            "phone_number": "+1234567890",
+            "user_type": "carrier"
+        },
+    )
+    
+    assert response.status_code == status.HTTP_201_CREATED
+    data = response.json()
+    assert data["user"]["user_type"] == "carrier"
+
+
+def test_forgot_and_reset_password_flow(client, test_user):
+    """Test the complete forgot and reset password flow."""
+    # 1. Request forgot password
+    # By default, tests don't run in debug mode, but we can check if it returns 200
+    forgot_response = client.post(
+        "/api/v1/auth/forgot-password",
+        json={"email": test_user.email}
+    )
+    assert forgot_response.status_code == status.HTTP_200_OK
+    
+    # We need the token. In debug mode, it's returned. Let's enable debug for the test.
+    from src.app.core.config import settings
+    original_debug = settings.debug
+    settings.debug = True
+    
+    try:
+        forgot_response = client.post(
+            "/api/v1/auth/forgot-password",
+            json={"email": test_user.email}
+        )
+        assert forgot_response.status_code == status.HTTP_200_OK
+        token = forgot_response.json()["debug_token"]
+        assert token is not None
+
+        # 2. Reset password using the token
+        reset_response = client.post(
+            "/api/v1/auth/reset-password",
+            json={
+                "token": token,
+                "new_password": "NewSecurePassword123!"
+            }
+        )
+        assert reset_response.status_code == status.HTTP_200_OK
+
+        # 3. Verify we can login with the NEW password
+        login_response = client.post(
+            "/api/v1/auth/login",
+            json={
+                "email": test_user.email,
+                "password": "NewSecurePassword123!"
+            }
+        )
+        assert login_response.status_code == status.HTTP_200_OK
+        
+        # 4. Verify we CANNOT login with the OLD password
+        old_login_response = client.post(
+            "/api/v1/auth/login",
+            json={
+                "email": test_user.email,
+                "password": "testpassword123"
+            }
+        )
+        assert old_login_response.status_code == status.HTTP_401_UNAUTHORIZED
+    finally:
+        settings.debug = original_debug

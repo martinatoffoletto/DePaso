@@ -14,16 +14,15 @@ type IconName = React.ComponentProps<typeof MaterialCommunityIcons>["name"];
 
 type Category = { id: string; label: string; sub: string; icon: IconName };
 const CATEGORIES: Category[] = [
-  { id: "xs", label: "Sobre",   sub: "≤ 0.5 kg", icon: "email-outline" },
-  { id: "s",  label: "Chica",   sub: "≤ 3 kg",   icon: "package-variant" },
+  { id: "s",  label: "Pequeño", sub: "≤ 3 kg",   icon: "email-outline" },
   { id: "m",  label: "Mediana", sub: "≤ 10 kg",  icon: "cube-outline" },
   { id: "l",  label: "Grande",  sub: "≤ 30 kg",  icon: "television-play" },
   { id: "xl", label: "Flete",   sub: "> 30 kg",  icon: "wardrobe-outline" },
 ];
 
 const CATEGORY_AI_LABEL: Record<string, string> = {
-  xs: "un sobre o documento", s: "un paquete chico", m: "un paquete mediano",
-  l: "un paquete grande", xl: "una carga voluminosa",
+  s: "un paquete pequeño o documento", m: "una carga mediana",
+  l: "una carga grande o voluminosa", xl: "una mudanza o flete",
 };
 
 function StepDots({ current, total }: { current: number; total: number }) {
@@ -44,7 +43,7 @@ function StepDots({ current, total }: { current: number; total: number }) {
 }
 
 function ScanCorners() {
-  const corners: Array<{ top?: number; bottom?: number; left?: number; right?: number }> = [
+  const corners: { top?: number; bottom?: number; left?: number; right?: number }[] = [
     { top: 0, left: 0 }, { top: 0, right: 0 }, { bottom: 0, left: 0 }, { bottom: 0, right: 0 },
   ];
   return (

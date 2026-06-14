@@ -46,6 +46,20 @@ class RouteService:
         routes = self.route_repo.list_by_carrier(carrier_id)
         return [RouteResponse.model_validate(r) for r in routes]
 
+    def update_route(self, carrier_id: int, route_id: int, updates: dict) -> RouteResponse:
+        """Update a route owned by the carrier."""
+        route = self.route_repo.get_by_id(route_id)
+        if not route or route.carrier_id != carrier_id:
+            raise ValueError("Route not found or unauthorized.")
+        
+        # Clean None values
+        updates = {k: v for k, v in updates.items() if v is not None}
+        if not updates:
+            return RouteResponse.model_validate(route)
+            
+        updated = self.route_repo.update(route_id, **updates)
+        return RouteResponse.model_validate(updated)
+
     def deactivate(self, carrier_id: int, route_id: int) -> None:
         """Deactivate a route owned by the carrier."""
         route = self.route_repo.get_by_id(route_id)

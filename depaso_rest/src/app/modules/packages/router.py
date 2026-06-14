@@ -1,5 +1,5 @@
 """
-Packages module API router — catálogo de categorías XS..XL (spec 3.3).
+Packages module API router — catálogo de categorías S..XL (spec 3.3).
 """
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
@@ -22,7 +22,7 @@ def get_package_service(db: Session = Depends(get_db)) -> PackageService:
 async def list_packages(
     service: PackageService = Depends(get_package_service),
 ):
-    """List the active package size catalog (XS..XL: límites y precio base)."""
+    """List the active package size catalog (S..XL: límites y precio base)."""
     packages, _ = service.list_packages(limit=50)
     return [PackageResponse.model_validate(p) for p in packages]
 
@@ -32,7 +32,7 @@ async def get_package(
     size: str,
     service: PackageService = Depends(get_package_service),
 ):
-    """Get one package category spec by size (xs, s, m, l, xl)."""
+    """Get one package category spec by size (s, m, l, xl)."""
     try:
         return PackageResponse.model_validate(service.get_by_size(size.lower()))
     except PackageNotFoundError:

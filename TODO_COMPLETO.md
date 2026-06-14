@@ -43,7 +43,7 @@
 - ✅ **CO2 (RF-CO2)**: factores IPCC (moto 0.09, auto 0.18, camioneta 0.25,
   camión 0.60 kg/km), cálculo real vs contrafactual al aceptar, acumuladores
   en summary de carrier y dashboard admin
-- ✅ **PRICING**: tarifa base + por km según categoría XS–XL, descuento
+- ✅ **PRICING**: tarifa base + por km según categoría S–XL (4 clases), descuento
   colaborativo 43%, ETAs estimadas — POST /shipments/quote
 - ✅ **TRACKING (RF-TRK)**: POST /tracking/position (cadete publica GPS),
   GET /tracking/{shipment_id} con control de privacidad (RNF-PRV-02), historial.
@@ -103,7 +103,7 @@
 - [ ] **Open Images V7** (~70%): descargar clases Box, Envelope, Suitcase,
   Furniture (~900 imágenes)
 - [ ] **Fotos propias (~30%, ~600 imágenes)** ← _responsabilidad del equipo_
-  - Cajas XS / S-M / L / XL
+  - Paquetes S (pequeños/documentos) / M / L / XL (fletes)
   - Variar: iluminación (natural/artificial/baja), ángulo (frontal/cenital/oblicuo),
     fondo (liso/desordenado/exterior)
   - Pares con/sin objeto de referencia (celular, botella)

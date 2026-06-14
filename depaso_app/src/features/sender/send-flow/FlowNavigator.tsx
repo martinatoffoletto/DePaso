@@ -133,7 +133,7 @@ export function FlowNavigator() {
         onConfirm={resetAll}
       />
     );
-  }, [step, categoryId, weightKg, description, photoUri, origin, destination, originCoords, destinationCoords, recipientName, recipientPhone, mode]);
+  }, [step, categoryId, weightKg, description, photoUri, origin, destination, originCoords, destinationCoords, recipientName, recipientPhone, mode, quote]);
 
   return <PaperProvider theme={MD3LightTheme}>{screen}</PaperProvider>;
 }

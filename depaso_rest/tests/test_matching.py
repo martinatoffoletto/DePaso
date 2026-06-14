@@ -91,8 +91,8 @@ def make_service(carriers, shipments, routes=()):
 # --- pure component tests ------------------------------------------------------
 
 def test_cargo_compatibility_table():
-    assert cargo_compatible("pedestrian", "xs")
-    assert not cargo_compatible("pedestrian", "s")
+    assert cargo_compatible("pedestrian", "s")     # 4 categorías: peatón lleva S
+    assert not cargo_compatible("pedestrian", "m")
     assert cargo_compatible("motorcycle", "m")
     assert not cargo_compatible("motorcycle", "l")
     assert not cargo_compatible("car", "xl")
@@ -181,7 +181,7 @@ def test_collaborative_soft_mobility_distance_limit():
     # Caballito -> Microcentro is > 5 km road: bikes are excluded
     biker = make_carrier(id=1, vehicle_type="bike")
     route = make_route(carrier_id=1)
-    shipment = make_shipment(modality="collaborative", package_size="xs", weight_kg=0.5)
+    shipment = make_shipment(modality="collaborative", package_size="s", weight_kg=0.5)
     service = make_service([biker], [shipment], [route])
     assert service.rank_carriers(1) == []
 

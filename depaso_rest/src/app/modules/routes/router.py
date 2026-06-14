@@ -8,7 +8,7 @@ from src.app.core.database import get_db
 from src.app.core.dependencies import CurrentUserId
 from src.app.modules.carriers.repository import CarrierRepository
 from src.app.modules.routes.repository import RouteRepository
-from src.app.modules.routes.schemas import RouteCreateRequest, RouteResponse
+from src.app.modules.routes.schemas import RouteCreateRequest, RouteResponse, RouteUpdate
 from src.app.modules.routes.service import RouteService
 
 router = APIRouter(prefix="/routes", tags=["routes"])
@@ -55,6 +55,22 @@ async def my_routes(
     """List routes published by the current carrier."""
     carrier_id = _get_carrier_id(user_id, db)
     return service.list_for_carrier(carrier_id)
+
+
+@router.patch("/{route_id}", response_model=RouteResponse)
+async def update_route(
+    route_id: int,
+    data: RouteUpdate,
+    user_id: CurrentUserId,
+    db: Session = Depends(get_db),
+    service: RouteService = Depends(get_route_service),
+):
+    """Update a route owned by the current carrier."""
+    carrier_id = _get_carrier_id(user_id, db)
+    try:
+        return service.update_route(carrier_id, route_id, data.model_dump(exclude_unset=True))
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
 
 
 @router.delete("/{route_id}", status_code=status.HTTP_204_NO_CONTENT)

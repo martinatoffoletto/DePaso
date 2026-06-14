@@ -18,7 +18,6 @@ export enum TransportType {
 }
 
 export enum PackageCategory {
-  XS = "xs",
   S = "s",
   M = "m",
   L = "l",

@@ -9,7 +9,7 @@ class ClassificationResponse(BaseModel):
     """Response from image classification (RF-VIS-01)."""
 
     classification_id: int
-    category: str = Field(..., pattern="^(xs|s|m|l|xl)$")
+    category: str = Field(..., pattern="^(s|m|l|xl)$")
     confidence: float = Field(..., ge=0, le=1)
     needs_manual: bool          # confidence < threshold -> suggest manual input (RF-VIS-02)
     model_loaded: bool          # False = stub fallback (dev without the trained model)
@@ -19,7 +19,7 @@ class ClassificationFeedback(BaseModel):
     """User decision over the suggestion (feeds RF-VIS-04 logging)."""
 
     accepted: bool
-    manual_category: str | None = Field(None, pattern="^(xs|s|m|l|xl)$")
+    manual_category: str | None = Field(None, pattern="^(s|m|l|xl)$")
 
 
 class ClassificationLogEntry(BaseModel):

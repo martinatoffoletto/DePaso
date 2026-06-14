@@ -8,7 +8,7 @@ from pydantic import BaseModel, Field
 class PackageBase(BaseModel):
     """Base package schema."""
 
-    size: str = Field(..., pattern="^(xs|s|m|l|xl|freight)$")
+    size: str = Field(..., pattern="^(s|m|l|xl|freight)$")
     description: str | None = None
     max_weight_kg: float = Field(..., gt=0)
     max_length_cm: float = Field(..., gt=0)

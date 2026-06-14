@@ -28,6 +28,18 @@ class RouteCreateRequest(BaseModel):
         return self
 
 
+class RouteUpdate(BaseModel):
+    """Schema for updating an existing route."""
+
+    origin_lat: float | None = None
+    origin_lon: float | None = None
+    destination_lat: float | None = None
+    destination_lon: float | None = None
+    window_start: datetime | None = None
+    window_end: datetime | None = None
+    recurrence_days: str | None = None
+
+
 class RouteResponse(BaseModel):
     """A published carrier route."""
 

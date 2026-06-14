@@ -36,6 +36,21 @@ class ShipmentCreate(BaseModel):
     description: str | None = None
 
 
+class ShipmentUpdate(BaseModel):
+    """Schema for updating a pending shipment."""
+
+    package_size: str | None = None
+    modality: str | None = None
+    assignment_mode: str | None = None
+    origin_lat: float | None = Field(default=None, ge=-90, le=90)
+    origin_lon: float | None = Field(default=None, ge=-180, le=180)
+    destination_lat: float | None = Field(default=None, ge=-90, le=90)
+    destination_lon: float | None = Field(default=None, ge=-180, le=180)
+    weight_kg: float | None = Field(default=None, gt=0)
+    photo_url: str | None = None
+    description: str | None = None
+
+
 class ShipmentResponse(ShipmentBase):
     """Schema for shipment response."""
 
@@ -57,7 +72,7 @@ class QuoteRequest(BaseModel):
     origin_lon: float = Field(..., ge=-180, le=180)
     destination_lat: float = Field(..., ge=-90, le=90)
     destination_lon: float = Field(..., ge=-180, le=180)
-    package_size: str = Field(..., pattern="^(xs|s|m|l|xl)$")
+    package_size: str = Field(..., pattern="^(s|m|l|xl)$")
 
 
 class QuoteResponse(BaseModel):

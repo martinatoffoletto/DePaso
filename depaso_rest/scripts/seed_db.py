@@ -36,7 +36,7 @@ def _seed_shipments(db, client_user, carriers):
         # Historial — entregados
         Shipment(
             client_id=client_id, carrier_id=c_lucia,
-            package_size="xs", status="delivered",
+            package_size="s", status="delivered",
             modality="collaborative", assignment_mode="on_demand",
             origin_lat=-34.5972, origin_lon=-58.4297,
             destination_lat=-34.5875, destination_lon=-58.3930,
@@ -69,7 +69,7 @@ def _seed_shipments(db, client_user, carriers):
         ),
         Shipment(
             client_id=client_id, carrier_id=c_lucia,
-            package_size="xs", status="delivered",
+            package_size="s", status="delivered",
             modality="collaborative", assignment_mode="on_demand",
             origin_lat=-34.5875, origin_lon=-58.3930,
             destination_lat=-34.6280, destination_lon=-58.4631,
@@ -103,7 +103,7 @@ def _seed_shipments(db, client_user, carriers):
         ),
         Shipment(
             client_id=client_id, carrier_id=None,
-            package_size="xs", status="pending",
+            package_size="s", status="pending",
             modality="collaborative", assignment_mode="on_demand",
             origin_lat=-34.5972, origin_lon=-58.4297,
             destination_lat=-34.6211, destination_lon=-58.3732,
@@ -339,19 +339,8 @@ def seed():
         # ── Catálogo de paquetes ───────────────────────────────────────────────
         packages = [
             Package(
-                size="xs",
-                description="Documentos y sobres",
-                max_weight_kg=0.5,
-                max_length_cm=30,
-                max_width_cm=22,
-                max_height_cm=3,
-                estimated_volume_m3=0.002,
-                base_price=1500.0,
-                is_active=True,
-            ),
-            Package(
                 size="s",
-                description="Caja chica / libro",
+                description="Paquetes pequeños y documentos",
                 max_weight_kg=3.0,
                 max_length_cm=35,
                 max_width_cm=25,

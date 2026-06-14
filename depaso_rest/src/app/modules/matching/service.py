@@ -58,18 +58,18 @@ DEFAULT_WEIGHTS = {
 # spec 5.2: "colaborativo: hasta 15% del trayecto").
 MAX_DETOUR_RATIO_COLLABORATIVE = 0.15
 
-# Pedestrian/bike only carry XS over short trips (spec 3.3).
+# Pedestrian/bike only carry S (small packages/docs) over short trips (spec 3.3).
 MAX_SOFT_MOBILITY_TRIP_KM = 5.0
 SOFT_MOBILITY = {VehicleType.PEDESTRIAN, VehicleType.BIKE}
 
 # Vehicle -> categories it may carry (spec 3.3). Empty intersection = knockout.
 CARGO_COMPATIBILITY: dict[str, set[str]] = {
-    VehicleType.PEDESTRIAN: {PackageSize.XS},
-    VehicleType.BIKE:       {PackageSize.XS},
-    VehicleType.MOTORCYCLE: {PackageSize.XS, PackageSize.S, PackageSize.M},
-    VehicleType.CAR:        {PackageSize.XS, PackageSize.S, PackageSize.M, PackageSize.L},
-    VehicleType.VAN:        {PackageSize.XS, PackageSize.S, PackageSize.M, PackageSize.L, PackageSize.XL},
-    VehicleType.TRUCK:      {PackageSize.XS, PackageSize.S, PackageSize.M, PackageSize.L, PackageSize.XL},
+    VehicleType.PEDESTRIAN: {PackageSize.S},
+    VehicleType.BIKE:       {PackageSize.S},
+    VehicleType.MOTORCYCLE: {PackageSize.S, PackageSize.M},
+    VehicleType.CAR:        {PackageSize.S, PackageSize.M, PackageSize.L},
+    VehicleType.VAN:        {PackageSize.S, PackageSize.M, PackageSize.L, PackageSize.XL},
+    VehicleType.TRUCK:      {PackageSize.S, PackageSize.M, PackageSize.L, PackageSize.XL},
 }
 
 # Moves/freight (XL) are always dedicated, never collaborative (spec 3.3).
@@ -144,6 +144,9 @@ class MatchingService:
         self.carrier_repo = carrier_repo
         self.route_repo = route_repo
         self.weights = weights or DEFAULT_WEIGHTS.copy()
+        
+        from src.app.shared.osrm_client import OSRMClient
+        self.osrm = OSRMClient()
 
     # -- public API -----------------------------------------------------------
 
@@ -275,7 +278,7 @@ class MatchingService:
         for route in routes:
             route_origin = Point(route.origin_lat, route.origin_lon)
             route_dest = Point(route.destination_lat, route.destination_lon)
-            detour = insertion_detour(route_origin, route_dest, pickup, dropoff)
+            detour = insertion_detour(route_origin, route_dest, pickup, dropoff, osrm_client=self.osrm)
             if detour.detour_ratio > MAX_DETOUR_RATIO_COLLABORATIVE:
                 continue
             geo = geo_score_collaborative(pickup, dropoff, route_origin, route_dest)
@@ -308,7 +311,7 @@ class MatchingService:
 
             route_origin = Point(route.origin_lat, route.origin_lon)
             route_dest = Point(route.destination_lat, route.destination_lon)
-            detour = insertion_detour(route_origin, route_dest, pickup, dropoff)
+            detour = insertion_detour(route_origin, route_dest, pickup, dropoff, osrm_client=self.osrm)
 
             # HARD constraint (Yang et al.): excessive detour cancels the
             # environmental advantage — exclude, don't just penalize.

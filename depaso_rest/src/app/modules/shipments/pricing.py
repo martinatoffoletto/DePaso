@@ -11,14 +11,12 @@ from src.app.shared.geo import Point, eta_minutes, road_km
 
 # Base fare + per-km rate (ARS) by package category.
 BASE_FARE: dict[str, float] = {
-    PackageSize.XS: 1500.0,
     PackageSize.S: 2000.0,
     PackageSize.M: 2800.0,
     PackageSize.L: 4000.0,
     PackageSize.XL: 9000.0,
 }
 PER_KM: dict[str, float] = {
-    PackageSize.XS: 250.0,
     PackageSize.S: 300.0,
     PackageSize.M: 380.0,
     PackageSize.L: 520.0,

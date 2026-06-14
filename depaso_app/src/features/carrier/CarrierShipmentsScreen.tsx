@@ -12,11 +12,10 @@ import { reverseGeocode } from "@/src/utils/geocoding";
 import { T } from "@/constants/tokens";
 
 const SIZE_LABEL: Record<PackageCategory, string> = {
-  [PackageCategory.XS]: "Sobre",
-  [PackageCategory.S]:  "Chico",
+  [PackageCategory.S]:  "Pequeño",
   [PackageCategory.M]:  "Mediano",
   [PackageCategory.L]:  "Grande",
-  [PackageCategory.XL]: "Voluminoso",
+  [PackageCategory.XL]: "Flete",
 };
 
 const ACTIVE: ShipmentStatus[] = [
@@ -148,7 +147,8 @@ export default function CarrierShipmentsScreen() {
   useGpsPublisher(active.length > 0);
 
   async function load(asRefresh = false) {
-    asRefresh ? setRefreshing(true) : setLoading(true);
+    if (asRefresh) setRefreshing(true);
+    else setLoading(true);
     try {
       const [list, sum] = await Promise.all([
         shipmentsService.getAssignedShipments(),

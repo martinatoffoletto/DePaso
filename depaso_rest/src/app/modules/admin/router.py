@@ -109,3 +109,5 @@ async def moderate_carrier(
     db.commit()
     db.refresh(carrier)
     return CarrierResponse.model_validate(carrier)
+
+# Matching weights live under GET/PATCH /matching/weights (validated, sum==1).

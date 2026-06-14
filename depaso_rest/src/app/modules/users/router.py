@@ -39,6 +39,38 @@ async def create_user(
     except DomainException as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=e.message)
 
+@router.get("/me", response_model=UserResponse)
+async def get_me(
+    current_user_id: CurrentUserId,
+    service: UserService = Depends(get_user_service),
+) -> UserResponse:
+    """Get the current user."""
+    try:
+        user = service.get_user_by_id(current_user_id)
+        return UserResponse.model_validate(user)
+    except DomainException as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=e.message)
+
+
+@router.patch("/me", response_model=UserResponse)
+async def update_me(
+    user_data: UserUpdate,
+    current_user_id: CurrentUserId,
+    service: UserService = Depends(get_user_service),
+) -> UserResponse:
+    """Update the current user."""
+    try:
+        user = service.update_user(
+            current_user_id,
+            first_name=user_data.first_name,
+            last_name=user_data.last_name,
+            phone_number=user_data.phone_number,
+            user_type=user_data.user_type,
+        )
+        return UserResponse.model_validate(user)
+    except DomainException as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=e.message)
+
 
 @router.get("/{user_id}", response_model=UserResponse)
 async def get_user(

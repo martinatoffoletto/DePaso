@@ -28,7 +28,7 @@ import pandas as pd
 import tensorflow as tf
 from sklearn.model_selection import train_test_split
 
-CATEGORIES = ["xs", "s", "m", "l", "xl"]  # index order shared with vision/service.py
+CATEGORIES = ["s", "m", "l", "xl"]  # index order shared with vision/service.py
 IMG_SIZE = 224
 BATCH_SIZE = 32
 SEED = 42

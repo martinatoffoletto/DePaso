@@ -24,7 +24,6 @@ logger = structlog.get_logger(__name__)
 
 # Output classes — index order MUST match training (ml/train_classifier.py).
 CATEGORIES: list[str] = [
-    PackageSize.XS,
     PackageSize.S,
     PackageSize.M,
     PackageSize.L,

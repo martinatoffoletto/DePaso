@@ -50,11 +50,10 @@ function timelineSteps(status: ShipmentStatus) {
 }
 
 const SIZE_LABEL: Record<PackageCategory, string> = {
-  [PackageCategory.XS]: "Sobre",
-  [PackageCategory.S]:  "Chico",
+  [PackageCategory.S]:  "Pequeño",
   [PackageCategory.M]:  "Mediano",
   [PackageCategory.L]:  "Grande",
-  [PackageCategory.XL]: "Voluminoso",
+  [PackageCategory.XL]: "Flete",
 };
 
 const CADETE_COLORS = [T.amber, T.violet, T.emerald, T.sky];
@@ -65,7 +64,7 @@ function formatDate(iso: string): string {
 }
 
 function thumbIcon(cat: PackageCategory): IconName {
-  if (cat === PackageCategory.XS) return "email-outline";
+  if (cat === PackageCategory.S) return "email-outline";
   if (cat === PackageCategory.L || cat === PackageCategory.XL) return "cube-outline";
   return "package-variant";
 }

@@ -12,8 +12,8 @@ import { DeliveryMode, AssignmentMode, PackageCategory, Quote } from "@/src/type
 type IconName = React.ComponentProps<typeof MaterialCommunityIcons>["name"];
 
 const SIZE_LABEL: Record<string, string> = {
-  xs: "Sobre / Documento", s: "Caja chica", m: "Caja mediana",
-  l: "Caja grande", xl: "Voluminoso / Flete",
+  s: "Pequeño / Documentos", m: "Carga mediana",
+  l: "Grande / Voluminoso", xl: "Mudanza / Flete",
 };
 
 function StepDots({ current, total }: { current: number; total: number }) {

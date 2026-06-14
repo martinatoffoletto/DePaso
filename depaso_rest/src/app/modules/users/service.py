@@ -50,7 +50,8 @@ class UserService:
         return self.repository.list_active(skip, limit)
 
     def update_user(self, user_id: int, first_name: str | None = None,
-                    last_name: str | None = None, phone_number: str | None = None) -> User:
+                    last_name: str | None = None, phone_number: str | None = None,
+                    user_type: str | None = None) -> User:
         """Update user information."""
         user = self.get_user_by_id(user_id)
         updates = {}
@@ -60,6 +61,8 @@ class UserService:
             updates["last_name"] = last_name
         if phone_number:
             updates["phone_number"] = phone_number
+        if user_type:
+            updates["user_type"] = user_type
 
         updated_user = self.repository.update(user_id, **updates)
         if not updated_user:

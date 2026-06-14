@@ -1,7 +1,7 @@
 import "../global.css";
-import React, { useEffect, useRef } from "react";
+import { useEffect } from "react";
 import { DarkTheme, ThemeProvider } from "@react-navigation/native";
-import { Stack, useRouter, useSegments } from "expo-router";
+import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import "react-native-reanimated";
 
@@ -9,36 +9,27 @@ import { Providers } from "@/src/components/Providers";
 import { useAuthStore } from "@/src/stores/authStore";
 
 export default function RootLayout() {
-  const { isAuthenticated, isLoading, restoreToken } = useAuthStore();
-  const router = useRouter();
-  const segments = useSegments();
-  const mounted = useRef(false);
+  // Route gating uses Stack.Protected (Expo Router's recommended pattern):
+  // the guard decides which group is mounted, so there is no manual redirect
+  // effect racing with the navigation state.
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
+  const restoreToken = useAuthStore((s) => s.restoreToken);
 
   useEffect(() => {
     restoreToken();
-    mounted.current = true;
-  }, []);
-
-  useEffect(() => {
-    if (!mounted.current || isLoading) return;
-
-    const inMainGroup = segments[0] === "(main)";
-    const inAuthGroup = segments[0] === "(auth)";
-
-    if (isAuthenticated && inAuthGroup) {
-      router.replace("/(main)");
-    } else if (!isAuthenticated && inMainGroup) {
-      router.replace("/(auth)/login");
-    }
-  }, [isAuthenticated, isLoading]);
+  }, [restoreToken]);
 
   return (
     <Providers>
       <ThemeProvider value={DarkTheme}>
         <Stack screenOptions={{ headerShown: false }}>
-          <Stack.Screen name="index" />
-          <Stack.Screen name="(main)" />
-          <Stack.Screen name="(auth)" />
+          <Stack.Protected guard={isAuthenticated}>
+            <Stack.Screen name="(main)" />
+          </Stack.Protected>
+          <Stack.Protected guard={!isAuthenticated}>
+            <Stack.Screen name="index" />
+            <Stack.Screen name="(auth)" />
+          </Stack.Protected>
         </Stack>
         <StatusBar style="auto" />
       </ThemeProvider>
