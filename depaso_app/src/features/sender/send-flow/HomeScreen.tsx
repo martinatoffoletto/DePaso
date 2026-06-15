@@ -2,6 +2,7 @@ import { useState } from "react";
 import { View, TouchableOpacity, ScrollView, Image, Alert, Text } from "react-native";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useRouter } from "expo-router";
 import * as ImagePicker from "expo-image-picker";
 import { useAuthStore } from "@/src/stores/authStore";
 import { T } from "@/constants/tokens";
@@ -22,6 +23,7 @@ const RECENT = [
 ];
 
 export function HomeScreen({ onStart }: HomeScreenProps) {
+  const router = useRouter();
   const insets = useSafeAreaInsets();
   const { user } = useAuthStore();
   const firstName = user?.first_name ?? "Usuario";
@@ -188,7 +190,9 @@ export function HomeScreen({ onStart }: HomeScreenProps) {
       <View>
         <View className="flex-row justify-between items-baseline">
           <Text className="text-[15px] font-semibold text-ink tracking-[-0.3px]">Volvé a mandar</Text>
-          <Text className="text-[10px] tracking-[1.5px] text-emeraldDeep uppercase">VER HISTORIAL</Text>
+          <TouchableOpacity onPress={() => router.push("/(main)/envios")} hitSlop={8}>
+            <Text className="text-[10px] tracking-[1.5px] text-emeraldDeep uppercase">VER HISTORIAL</Text>
+          </TouchableOpacity>
         </View>
         <View className="flex-row gap-2 mt-[10px]">
           {RECENT.map((r, i) => (
@@ -210,7 +214,7 @@ export function HomeScreen({ onStart }: HomeScreenProps) {
       </View>
 
       {/* ── Eco band ── */}
-      <View className="bg-forest rounded-[18px] p-[14px] pr-4 flex-row items-center gap-3 overflow-hidden">
+      <TouchableOpacity onPress={() => router.push("/(main)/impacto")} activeOpacity={0.88} className="bg-forest rounded-[18px] p-[14px] pr-4 flex-row items-center gap-3 overflow-hidden">
         <View className="absolute right-[-20px] top-[-10px] w-[140px] h-20 rounded-[60px] bg-lime opacity-[0.18]" />
         <View className="w-9 h-9 rounded-xl bg-lime items-center justify-center shrink-0">
           <MaterialCommunityIcons name="leaf" size={20} color={T.forest} />
@@ -224,7 +228,7 @@ export function HomeScreen({ onStart }: HomeScreenProps) {
           </Text>
         </View>
         <MaterialCommunityIcons name="chevron-right" size={18} color="rgba(244,239,227,0.5)" />
-      </View>
+      </TouchableOpacity>
     </ScrollView>
   );
 }

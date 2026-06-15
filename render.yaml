@@ -11,7 +11,9 @@ services:
     # El esquema se crea solo al arrancar (create_all en el lifespan).
     # Para migraciones gestionadas: correr `alembic upgrade head` manualmente
     # (preDeployCommand requiere plan pago en Render).
-    buildCommand: pip install -r requirements.txt
+    # alembic upgrade head runs here because preDeployCommand requires a paid plan.
+    # On first deploy this creates all tables; subsequent deploys apply new migrations.
+    buildCommand: pip install -r requirements.txt && alembic upgrade head
     startCommand: uvicorn src.app.main:app --host 0.0.0.0 --port $PORT
     healthCheckPath: /api/v1/health
     autoDeploy: true
@@ -26,5 +28,8 @@ services:
         value: "false"
       - key: ENVIRONMENT
         value: production
+      # VISION_MODEL_PATH is optional — the endpoint falls back to mock/rule-based
+      # mode when the var is absent or the model file is not mounted.
+      # Set this manually in the Render dashboard only if you mount a model volume.
       - key: VISION_MODEL_PATH
-        value: ./ml/models/cargo_classifier_v1.keras
+        sync: false

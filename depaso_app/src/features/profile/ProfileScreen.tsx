@@ -37,7 +37,7 @@ function ProfileRow({ icon, label, value, trailing = "chevron", accent = false, 
   const isToggleOff = trailing === "toggle-off";
   const isText = !isChevron && !isToggleOn && !isToggleOff;
   return (
-    <TouchableOpacity style={p.row} activeOpacity={onPress || isChevron ? 0.7 : 1} onPress={onPress}>
+    <TouchableOpacity style={p.row} activeOpacity={onPress ? 0.7 : 1} onPress={onPress}>
       <View style={[p.iconBox, accent && p.iconBoxAccent]}>
         <MaterialCommunityIcons name={icon} size={18} color={danger ? T.red : accent ? T.forest : T.inkSoft} />
       </View>
@@ -310,6 +310,8 @@ export default function ProfileScreen() {
   const [addrModal, setAddrModal]       = useState(false);
   const [contactModal, setContactModal] = useState(false);
   const [routeModal, setRouteModal]     = useState(false);
+  const [notifOn, setNotifOn]           = useState(true);
+  const [collabOn, setCollabOn]         = useState(true);
 
   const isCarrier = user?.user_type === UserType.CARRIER;
 
@@ -332,7 +334,7 @@ export default function ProfileScreen() {
         {/* Top bar */}
         <View style={[p.topBar, { paddingTop: insets.top + 6 }]}>
           <Text style={p.topTitle}>Mi cuenta</Text>
-          <TouchableOpacity style={p.settingsBtn} activeOpacity={0.75}>
+          <TouchableOpacity style={p.settingsBtn} activeOpacity={0.75} onPress={() => Alert.alert("Configuración", "Las opciones de configuración no están disponibles en esta versión.")}>
             <MaterialCommunityIcons name="cog-outline" size={18} color={T.ink} />
           </TouchableOpacity>
         </View>
@@ -401,10 +403,10 @@ export default function ProfileScreen() {
 
         {/* ── Sections ── */}
         <ProfileSection title="CUENTA" rows={[
-          <ProfileRow key="datos" icon="account-outline"    label="Datos personales"  value="Nombre, email, celular" />,
+          <ProfileRow key="datos" icon="account-outline"    label="Datos personales"  value="Nombre, email, celular" onPress={() => Alert.alert("Datos personales", "La edición de tus datos no está disponible en esta versión.")} />,
           <ProfileRow key="dirs"  icon="map-marker-outline" label="Mis direcciones"   value={`${addresses.length} guardada${addresses.length !== 1 ? "s" : ""}`} onPress={() => setAddrModal(true)} />,
           <ProfileRow key="pers"  icon="account-multiple-outline" label="Mis personas" value={`${contacts.length} guardada${contacts.length !== 1 ? "s" : ""}`} onPress={() => setContactModal(true)} />,
-          <ProfileRow key="pago"  icon="wallet-outline"     label="Métodos de pago"   value="Mercado Pago ··· 4821" />,
+          <ProfileRow key="pago"  icon="wallet-outline"     label="Métodos de pago"   value="Mercado Pago ··· 4821" onPress={() => Alert.alert("Métodos de pago", "Los métodos de pago no están disponibles en esta versión.")} />,
         ]} />
 
         {isCarrier && (
@@ -421,20 +423,20 @@ export default function ProfileScreen() {
         )}
 
         <ProfileSection title="ACTIVIDAD" rows={[
-          <ProfileRow key="hist"  icon="history"      label="Historial de envíos"    value={`${MOCK.shipments} envíos · este año`} />,
-          <ProfileRow key="eco"   icon="leaf"         label="Mi impacto eco"         value="CO₂ ahorrado y equivalencias" accent onPress={() => router.push("/(main)/impacto" as any)} />,
-          <ProfileRow key="stars" icon="star-outline" label="Reseñas y calificación" value={`${reputation.toFixed(1)} · 11 reseñas`} />,
+          <ProfileRow key="hist"  icon="history"      label="Historial de envíos"    value={`${MOCK.shipments} envíos · este año`} onPress={() => router.push("/(main)/envios")} />,
+          <ProfileRow key="eco"   icon="leaf"         label="Mi impacto eco"         value="CO₂ ahorrado y equivalencias" accent onPress={() => router.push("/(main)/impacto")} />,
+          <ProfileRow key="stars" icon="star-outline" label="Reseñas y calificación" value={`${reputation.toFixed(1)} · 11 reseñas`} onPress={() => Alert.alert("Reseñas", "Las reseñas y calificaciones no están disponibles en esta versión.")} />,
         ]} />
 
         <ProfileSection title="PREFERENCIAS" rows={[
-          <ProfileRow key="notif" icon="bell-outline" label="Notificaciones"                  trailing="toggle-on" />,
-          <ProfileRow key="colab" icon="leaf"         label="Preferir envíos colaborativos"   trailing="toggle-on" />,
-          <ProfileRow key="lang"  icon="translate"    label="Idioma"                          trailing="ES-AR" />,
+          <ProfileRow key="notif" icon="bell-outline" label="Notificaciones"                  trailing={notifOn ? "toggle-on" : "toggle-off"} onPress={() => setNotifOn(v => !v)} />,
+          <ProfileRow key="colab" icon="leaf"         label="Preferir envíos colaborativos"   trailing={collabOn ? "toggle-on" : "toggle-off"} onPress={() => setCollabOn(v => !v)} />,
+          <ProfileRow key="lang"  icon="translate"    label="Idioma"                          trailing="ES-AR" onPress={() => Alert.alert("Idioma", "Solo disponible en español (AR) por ahora.")} />,
         ]} />
 
         <ProfileSection title="AYUDA Y LEGAL" rows={[
-          <ProfileRow key="help"  icon="help-circle-outline"   label="Centro de ayuda" />,
-          <ProfileRow key="terms" icon="file-document-outline" label="Términos y privacidad" />,
+          <ProfileRow key="help"  icon="help-circle-outline"   label="Centro de ayuda" onPress={() => Alert.alert("Centro de ayuda", "Nuestro centro de ayuda estará disponible próximamente.")} />,
+          <ProfileRow key="terms" icon="file-document-outline" label="Términos y privacidad" onPress={() => Alert.alert("Términos y privacidad", "Disponibles en depaso.app/legal próximamente.")} />,
         ]} />
 
         <TouchableOpacity style={p.logoutBtn} onPress={handleLogout} activeOpacity={0.8}>

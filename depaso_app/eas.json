@@ -6,9 +6,13 @@
   "build": {
     "development": {
       "developmentClient": true,
-      "distribution": "internal"
+      "distribution": "internal",
+      "ios": {
+        "simulator": true
+      }
     },
     "preview": {
+      "developmentClient": false,
       "distribution": "internal",
       "android": {
         "buildType": "apk"
@@ -19,6 +23,9 @@
     },
     "production": {
       "autoIncrement": true,
+      "android": {
+        "buildType": "aab"
+      },
       "env": {
         "EXPO_PUBLIC_API_URL": "https://depaso-api.onrender.com/api/v1"
       }

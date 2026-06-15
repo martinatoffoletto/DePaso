@@ -151,9 +151,8 @@ export function OfferSelectionScreen({
           </View>
           <View className="flex-row gap-[14px] pt-[10px] border-t border-borderSoft">
             {[
-              { icon: "clock-outline" as const,     label: "28 min"     },
-              { icon: "map-marker-path" as const,   label: "Directo"    },
-              { icon: "shield-outline" as const,    label: "Asegurado"  },
+              { icon: "clock-outline" as const,   label: "28 min"  },
+              { icon: "map-marker-path" as const, label: "Directo" },
             ].map((s) => (
               <View key={s.label} className="flex-row items-center gap-[5px]">
                 <MaterialCommunityIcons name={s.icon} size={14} color={T.inkSoft} />

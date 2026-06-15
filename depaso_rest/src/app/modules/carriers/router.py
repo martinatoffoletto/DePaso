@@ -10,6 +10,7 @@ from src.app.core.dependencies import CurrentUserId
 from src.app.shared.exceptions import DomainException
 from src.app.modules.carriers.exceptions import CarrierNotFoundError
 from src.app.modules.carriers.schemas import (
+    AvailabilityWindowRequest,
     CarrierCreate,
     CarrierProfileCreate,
     CarrierResponse,
@@ -22,6 +23,8 @@ from src.app.modules.matching.schemas import FeedItemResponse
 from src.app.modules.matching.service import MatchingService
 from src.app.modules.shipments.repository import ShipmentRepository
 from src.app.modules.routes.repository import RouteRepository
+from src.app.modules.routes.schemas import RouteCreateRequest, RouteResponse
+from src.app.modules.routes.service import RouteService
 from src.app.shared.enums import ShipmentStatus
 
 router = APIRouter(prefix="/carriers", tags=["carriers"])
@@ -168,6 +171,38 @@ async def my_summary(
         total_earnings=round(sum(s.estimated_price or 0 for s in delivered), 2),
         total_co2_saved_kg=round(sum(s.co2_savings_kg or 0 for s in delivered), 3),
     )
+
+
+@router.post("/me/availability", response_model=RouteResponse, status_code=status.HTTP_201_CREATED)
+async def register_availability_window(
+    data: AvailabilityWindowRequest,
+    current_user_id: CurrentUserId,
+    db: Session = Depends(get_db),
+) -> RouteResponse:
+    """Register a habitual availability window for BY_AVAILABILITY matching (RF-CAR-02).
+
+    Creates a `dedicated_window` entry in carrier_routes so the matching engine
+    can assign dedicated shipments whose request time falls within this window.
+    Use `POST /routes` directly if you need finer control (e.g., updating an
+    existing window or registering a collaborative route).
+    """
+    carrier = _my_carrier(current_user_id, db)
+    route_data = RouteCreateRequest(
+        kind="dedicated_window",
+        origin_lat=data.origin_lat,
+        origin_lon=data.origin_lon,
+        window_start=data.window_start,
+        window_end=data.window_end,
+        recurrence_days=data.recurrence_days,
+    )
+    service = RouteService(
+        route_repo=RouteRepository(db),
+        carrier_repo=CarrierRepository(db),
+    )
+    try:
+        return service.publish(carrier.id, route_data)
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
 
 
 @router.get("/{carrier_id}", response_model=CarrierResponse)

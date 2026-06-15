@@ -40,16 +40,21 @@ FINETUNE_LR = 1e-5
 FINETUNE_UNFREEZE_LAYERS = 30
 
 
-def load_labels(data_dir: Path) -> pd.DataFrame:
-    df = pd.read_csv(data_dir / "labels.csv")
+def _enrich(df: pd.DataFrame, data_dir: Path) -> pd.DataFrame:
+    """Add derived columns used by the tf.data pipeline (label index, ref_flag, path)."""
+    df = df.copy()
     df["category"] = df["category"].str.lower()
     unknown = set(df["category"]) - set(CATEGORIES)
     if unknown:
-        raise ValueError(f"Unknown categories in labels.csv: {unknown}")
+        raise ValueError(f"Unknown categories: {unknown}")
     df["label"] = df["category"].map(CATEGORIES.index)
     df["ref_flag"] = df["has_reference_object"].astype(bool).astype("float32")
     df["path"] = df["filename"].map(lambda f: str(data_dir / "images" / f))
     return df
+
+
+def load_labels(data_dir: Path) -> pd.DataFrame:
+    return _enrich(pd.read_csv(data_dir / "labels.csv"), data_dir)
 
 
 def split_dataset(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
@@ -69,7 +74,9 @@ def make_dataset(df: pd.DataFrame, training: bool) -> tf.data.Dataset:
         img = tf.io.read_file(path)
         img = tf.io.decode_image(img, channels=3, expand_animations=False)
         img = tf.image.resize(img, [IMG_SIZE, IMG_SIZE])
-        img = tf.cast(img, tf.float32)
+        img = tf.keras.applications.mobilenet_v2.preprocess_input(
+            tf.cast(img, tf.float32)
+        )  # normalise to [-1, 1] here; model graph does NOT repeat it
         return (img, tf.reshape(ref_flag, [1])), tf.one_hot(label, len(CATEGORIES))
 
     ds = tf.data.Dataset.from_tensor_slices(
@@ -99,8 +106,10 @@ def build_model() -> tf.keras.Model:
     img_in = tf.keras.Input((IMG_SIZE, IMG_SIZE, 3), name="image")
     ref_in = tf.keras.Input((1,), name="has_reference_object")
 
+    # preprocess_input is applied in make_dataset (data pipeline owns it once).
+    # Augmentation receives already-normalised [-1, 1] values; active only during
+    # training (Keras disables RandomFlip/RandomRotation/etc. at inference time).
     x = augmentation(img_in)
-    x = tf.keras.applications.mobilenet_v2.preprocess_input(x)
     x = base(x, training=False)
     x = tf.keras.layers.GlobalAveragePooling2D()(x)
     x = tf.keras.layers.Concatenate()([x, ref_in])
@@ -112,8 +121,19 @@ def build_model() -> tf.keras.Model:
 
 
 def train(data_dir: Path, out_dir: Path) -> None:
-    df = load_labels(data_dir)
-    train_df, val_df, test_df = split_dataset(df)
+    split_files = [data_dir / f for f in ("train.csv", "val.csv", "test.csv")]
+    if all(p.exists() for p in split_files):
+        # Honour the bias-stratified splits produced by make_splits.py (preferred).
+        print("Using pre-built splits from make_splits.py (bias-stratified).")
+        train_df, val_df, test_df = [
+            _enrich(pd.read_csv(p), data_dir) for p in split_files
+        ]
+    else:
+        # Fall back to category-only stratification (useful when running the
+        # trainer standalone without having run make_splits.py first).
+        print("No pre-built splits found; re-splitting from labels.csv.")
+        df = load_labels(data_dir)
+        train_df, val_df, test_df = split_dataset(df)
     print(f"Dataset: {len(train_df)} train / {len(val_df)} val / {len(test_df)} test")
 
     train_ds = make_dataset(train_df, training=True)
@@ -158,10 +178,10 @@ def train(data_dir: Path, out_dir: Path) -> None:
         "version": "v1",
         "trained_at": datetime.now(timezone.utc).isoformat(),
         "categories": CATEGORIES,
-        "dataset_size": len(df),
+        "dataset_size": len(train_df) + len(val_df) + len(test_df),
         "split": {"train": len(train_df), "val": len(val_df), "test": len(test_df)},
         "best_val_accuracy": round(float(val_acc), 4),
-        "architecture": "MobileNetV2 + GAP + concat(ref_flag) + Dense(128) + Dropout(0.3) + Dense(5)",
+        "architecture": "MobileNetV2 + GAP + concat(ref_flag) + Dense(128) + Dropout(0.3) + Dense(4)",
         "training": {
             "phase_a": {"epochs": HEAD_EPOCHS, "lr": HEAD_LR, "frozen_base": True},
             "phase_b": {"epochs": FINETUNE_EPOCHS, "lr": FINETUNE_LR,

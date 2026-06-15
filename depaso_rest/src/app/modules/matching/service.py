@@ -18,7 +18,7 @@ Formula (spec 5.2):
   score = w1*compat_geo + w2*(1 - detour_norm) + w3*compat_cargo
         + w4*reputation_norm + w5*compat_time
 """
-from datetime import datetime
+from datetime import datetime, timezone
 
 from src.app.modules.carriers.models import Carrier
 from src.app.modules.carriers.repository import CarrierRepository
@@ -341,15 +341,28 @@ class MatchingService:
     # -- dedicated: match against available carriers ---------------------------
 
     def _rank_dedicated(self, shipment: Shipment) -> list[CarrierScoreResponse]:
+        """Score dedicated-mode candidates.
+
+        Two sub-modalities (spec 3):
+        - ON_DEMAND: carrier flagged is_available=True with a real-time location.
+        - BY_AVAILABILITY: carrier has published a dedicated_window route that
+          covers the shipment's request time (spec 3.3, RF-CAR-02).
+        """
         pickup = Point(shipment.origin_lat, shipment.origin_lon)
+        # Use naive UTC for DB comparisons (stored datetimes are naive UTC).
+        now = datetime.now(timezone.utc).replace(tzinfo=None)
+
+        results: list[CarrierScoreResponse] = []
+        seen_carrier_ids: set[int] = set()
+
+        # --- 1. ON_DEMAND ---------------------------------------------------
         candidates = self.carrier_repo.list_available_with_location(
             min_capacity_kg=shipment.weight_kg
         )
-
-        results: list[CarrierScoreResponse] = []
         for carrier in candidates:
             if not self._passes_common_knockouts(carrier, shipment):
                 continue
+            seen_carrier_ids.add(carrier.id)
             carrier_pos = (
                 Point(carrier.current_lat, carrier.current_lon)
                 if carrier.current_lat is not None and carrier.current_lon is not None
@@ -372,8 +385,47 @@ class MatchingService:
                 detour_ratio=None,
                 eta_min=eta,
                 route_id=None,
-                extra_reasons=["Viaje dedicado: sin restricción de desvío"],
+                extra_reasons=["Viaje dedicado on-demand: disponible ahora"],
             ))
+
+        # --- 2. BY_AVAILABILITY ---------------------------------------------
+        # Carriers who registered a habitual availability window are ranked even
+        # if they don't have is_available=True in their carrier profile — their
+        # commitment is the window itself (spec 3.3, RF-CAR-02).
+        if self.route_repo is not None:
+            for route in self.route_repo.list_active_in_window(now):
+                if route.kind != "dedicated_window":
+                    continue
+                carrier = self.carrier_repo.get_by_id(route.carrier_id)
+                if carrier is None or not self._passes_common_knockouts(carrier, shipment):
+                    continue
+                if carrier.id in seen_carrier_ids:
+                    # Already ranked as ON_DEMAND — avoid double-counting.
+                    continue
+                time_c = time_window_score(route.window_start, route.window_end, now)
+                if time_c == 0.0:
+                    # Completely outside the time-decay window — skip.
+                    continue
+                seen_carrier_ids.add(carrier.id)
+                # Use the zone centre (route origin) as the carrier's effective position.
+                zone_center = Point(route.origin_lat, route.origin_lon)
+                geo = geo_score_dedicated(zone_center, pickup)
+                results.append(self._build_response(
+                    carrier=carrier,
+                    shipment=shipment,
+                    geo=geo,
+                    detour_component=1.0,
+                    time_component=time_c,
+                    detour_km=None,
+                    detour_ratio=None,
+                    eta_min=eta_minutes(road_km(zone_center, pickup), carrier.vehicle_type),
+                    route_id=route.id,
+                    extra_reasons=[
+                        f"Disponible por ventana habitual hasta "
+                        f"{route.window_end.strftime('%H:%M')} (BY_AVAILABILITY)",
+                    ],
+                ))
+
         return results
 
     # -- shared helpers ---------------------------------------------------------
@@ -386,6 +438,16 @@ class MatchingService:
             return False
         if not cargo_compatible(carrier.vehicle_type, shipment.package_size):
             return False
+        # Soft mobility (pedestrian/bike) cannot handle trips longer than 5 km
+        # in ANY modality — including dedicated (spec 3.3, RF-MAT-02).
+        # Previously this check existed only inside _rank_collaborative and
+        # feed_for_carrier, leaving a gap where a pedestrian could receive a
+        # dedicated 8 km shipment.
+        if carrier.vehicle_type in SOFT_MOBILITY:
+            trip_pickup = Point(shipment.origin_lat, shipment.origin_lon)
+            trip_dropoff = Point(shipment.destination_lat, shipment.destination_lon)
+            if road_km(trip_pickup, trip_dropoff) > MAX_SOFT_MOBILITY_TRIP_KM:
+                return False
         return True
 
     def _build_response(

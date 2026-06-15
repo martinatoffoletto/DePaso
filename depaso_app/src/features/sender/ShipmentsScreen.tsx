@@ -5,6 +5,7 @@ import { Text } from "react-native-paper";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useFocusEffect } from "@react-navigation/native";
+import { useRouter } from "expo-router";
 import { shipmentsService } from "@/src/services/shipments";
 import { trackingService } from "@/src/services/carriers";
 import { Shipment, ShipmentStatus, PackageCategory, DeliveryMode, TrackedPosition } from "@/src/types";
@@ -128,39 +129,29 @@ function LiveShipmentCard({ shipment, onPress }: { shipment: Shipment; onPress: 
   const steps = timelineSteps(shipment.status);
   const origAddr = useAddress(shipment.origin_lat, shipment.origin_lon);
   const destAddr = useAddress(shipment.destination_lat, shipment.destination_lon);
-  const originCoord = { latitude: shipment.origin_lat, longitude: shipment.origin_lon };
-  const destCoord   = { latitude: shipment.destination_lat, longitude: shipment.destination_lon };
 
   return (
     <TouchableOpacity style={s.liveCard} onPress={onPress} activeOpacity={0.95}>
-      {/* Real map strip */}
-      <View style={{ overflow: "hidden" }}>
-        <MapView
-          style={{ height: 130 }}
-          region={liveMapRegion(shipment)}
-          scrollEnabled={false} zoomEnabled={false} pitchEnabled={false} rotateEnabled={false}
-          pointerEvents="none"
-        >
-          <Marker coordinate={originCoord} pinColor={T.forest} />
-          <Marker coordinate={destCoord} pinColor={T.emerald} />
-          <Polyline coordinates={[originCoord, destCoord]} strokeColor={T.forest} strokeWidth={3} lineDashPattern={[8, 5]} />
-        </MapView>
-        {/* EN CURSO pill */}
-        <View style={{ position: "absolute", top: 12, left: 12, flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: T.forest, paddingHorizontal: 9, paddingVertical: 5, borderRadius: 8 }}>
-          <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: T.lime }} />
-          <Text style={{ fontSize: 9.5, letterSpacing: 1.2, fontWeight: "700", color: T.lime, textTransform: "uppercase" }}>EN CURSO</Text>
-        </View>
-        {/* ID pill */}
-        <View style={{ position: "absolute", top: 12, right: 12, backgroundColor: "rgba(244,239,227,0.95)", borderWidth: 1, borderColor: T.border, paddingHorizontal: 8, paddingVertical: 5, borderRadius: 8 }}>
-          <Text style={{ fontSize: 9.5, letterSpacing: 1, color: T.ink, fontWeight: "700" }}>DP-{String(shipment.id).padStart(4, "0")}</Text>
-        </View>
-        {/* ETA + weight */}
-        <View style={{ position: "absolute", bottom: 10, left: 12, right: 12, flexDirection: "row", justifyContent: "space-between" }}>
-          <View style={{ flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: "rgba(244,239,227,0.95)", borderWidth: 1, borderColor: T.border, paddingHorizontal: 9, paddingVertical: 5, borderRadius: 8 }}>
-            <MaterialCommunityIcons name="clock-outline" size={12} color={T.forest} />
-            <Text style={{ fontSize: 12, fontWeight: "600", color: T.ink }}>En camino</Text>
+      {/* Route header */}
+      <View style={{ padding: 14, borderBottomWidth: 1, borderBottomColor: T.borderSoft }}>
+        <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: T.forest, paddingHorizontal: 9, paddingVertical: 5, borderRadius: 8 }}>
+            <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: T.lime }} />
+            <Text style={{ fontSize: 9.5, letterSpacing: 1.2, fontWeight: "700", color: T.lime, textTransform: "uppercase" }}>EN CURSO</Text>
           </View>
-          <View style={{ backgroundColor: "rgba(244,239,227,0.95)", borderWidth: 1, borderColor: T.border, paddingHorizontal: 9, paddingVertical: 5, borderRadius: 8 }}>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 5, backgroundColor: T.cardSoft, borderWidth: 1, borderColor: T.border, paddingHorizontal: 8, paddingVertical: 5, borderRadius: 8 }}>
+              <MaterialCommunityIcons name="clock-outline" size={11} color={T.forest} />
+              <Text style={{ fontSize: 9.5, color: T.inkSoft, fontWeight: "600" }}>En camino</Text>
+            </View>
+            <View style={{ backgroundColor: T.cardSoft, borderWidth: 1, borderColor: T.border, paddingHorizontal: 8, paddingVertical: 5, borderRadius: 8 }}>
+              <Text style={{ fontSize: 9.5, letterSpacing: 1, color: T.ink, fontWeight: "700" }}>DP-{String(shipment.id).padStart(4, "0")}</Text>
+            </View>
+          </View>
+        </View>
+        <MiniRouteLine origin={origAddr} destination={destAddr} />
+        <View style={{ marginTop: 8 }}>
+          <View style={{ backgroundColor: T.cardSoft, borderWidth: 1, borderColor: T.borderSoft, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4, alignSelf: "flex-start" }}>
             <Text style={{ fontSize: 9.5, letterSpacing: 1, color: T.inkSoft, fontWeight: "700", textTransform: "uppercase" }}>{shipment.weight_kg} KG</Text>
           </View>
         </View>
@@ -564,6 +555,7 @@ function RatingModal({ shipment, onClose, onRated }: { shipment: Shipment; onClo
 }
 
 function PastShipmentCard({ item, onPress, onRate }: { item: Shipment; onPress: () => void; onRate: () => void }) {
+  const router = useRouter();
   const isDelivered = item.status === ShipmentStatus.DELIVERED;
   const isCancelled = item.status === ShipmentStatus.CANCELLED;
   const isCollab = item.modality === DeliveryMode.COLLABORATIVE;
@@ -641,7 +633,7 @@ function PastShipmentCard({ item, onPress, onRate }: { item: Shipment; onPress: 
           </TouchableOpacity>
         )}
         {isCancelled && (
-          <TouchableOpacity style={s.resendBtn} activeOpacity={0.85}>
+          <TouchableOpacity style={s.resendBtn} activeOpacity={0.85} onPress={() => router.push("/(main)/enviar")}>
             <Text style={{ fontSize: 11.5, fontWeight: "600", color: T.inkSoft }}>Reenviar</Text>
           </TouchableOpacity>
         )}
@@ -707,7 +699,7 @@ export default function MisEnviosScreen() {
           <Text style={s.eyebrow}>HISTORIAL</Text>
           <Text style={s.title}>Mis envíos</Text>
         </View>
-        <TouchableOpacity style={s.headerBtn} activeOpacity={0.75}>
+        <TouchableOpacity style={s.headerBtn} activeOpacity={0.75} onPress={() => Alert.alert("Búsqueda", "La búsqueda estará disponible en una próxima versión.")}>
           <MaterialCommunityIcons name="magnify" size={18} color={T.ink} />
         </TouchableOpacity>
       </View>
@@ -753,10 +745,7 @@ export default function MisEnviosScreen() {
           {tab !== "active" && tabList.length > 0 && (
             <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 4 }}>
               <Text style={s.sectionLabel}>ANTERIORES</Text>
-              <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
-                <Text style={{ fontSize: 10, letterSpacing: 1.5, color: T.inkSoft, textTransform: "uppercase", fontWeight: "600" }}>ESTE MES</Text>
-                <MaterialCommunityIcons name="chevron-down" size={12} color={T.inkSoft} />
-              </View>
+              <Text style={{ fontSize: 10, letterSpacing: 1.5, color: T.inkSoft, textTransform: "uppercase", fontWeight: "600" }}>ESTE MES</Text>
             </View>
           )}
 

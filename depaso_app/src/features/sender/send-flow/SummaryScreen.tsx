@@ -74,6 +74,7 @@ export function SummaryScreen({
 }: SummaryScreenProps) {
   const insets = useSafeAreaInsets();
   const [loading, setLoading] = useState(false);
+  const [assignmentMode, setAssignmentMode] = useState<AssignmentMode>(AssignmentMode.ON_DEMAND);
   const isCollaborative = mode === "colaborativa";
   const price = quote
     ? (isCollaborative ? quote.price_collaborative : quote.price_dedicated)
@@ -86,7 +87,7 @@ export function SummaryScreen({
       await shipmentsService.createShipment({
         package_size: categoryId as PackageCategory,
         modality: mode === "dedicada" ? DeliveryMode.DEDICATED : DeliveryMode.COLLABORATIVE,
-        assignment_mode: AssignmentMode.ON_DEMAND,
+        assignment_mode: assignmentMode,
         origin_lat: originCoords.latitude,
         origin_lon: originCoords.longitude,
         destination_lat: destinationCoords.latitude,
@@ -202,6 +203,31 @@ export function SummaryScreen({
             value={isCollaborative ? "Colaborativa" : "Dedicada"}
           />
           <View style={styles.divider} />
+          <View style={rowStyles.row}>
+            <MaterialCommunityIcons name="clock-fast" size={17} color={T.inkMute} />
+            <Text style={rowStyles.label}>Asignación</Text>
+            <View style={styles.modeToggle}>
+              <TouchableOpacity
+                style={[styles.modeBtn, assignmentMode === AssignmentMode.ON_DEMAND && styles.modeBtnActive]}
+                onPress={() => setAssignmentMode(AssignmentMode.ON_DEMAND)}
+                activeOpacity={0.8}
+              >
+                <Text style={[styles.modeBtnText, assignmentMode === AssignmentMode.ON_DEMAND && styles.modeBtnTextActive]}>
+                  On demand
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modeBtn, assignmentMode === AssignmentMode.BY_AVAILABILITY && styles.modeBtnActive]}
+                onPress={() => setAssignmentMode(AssignmentMode.BY_AVAILABILITY)}
+                activeOpacity={0.8}
+              >
+                <Text style={[styles.modeBtnText, assignmentMode === AssignmentMode.BY_AVAILABILITY && styles.modeBtnTextActive]}>
+                  Disponibilidad
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+          <View style={styles.divider} />
           <Row icon="cash" label="Precio est." value={price != null ? `$${price.toLocaleString("es-AR")} ARS` : "A confirmar"} />
         </View>
 
@@ -308,4 +334,14 @@ const styles = StyleSheet.create({
   confirmText: { color: "#fff", fontWeight: "700", fontSize: 17 },
   cancelBtn: { alignItems: "center", paddingVertical: 10 },
   cancelText: { color: T.inkMute, fontSize: 14 },
+
+  modeToggle: { flexDirection: "row", gap: 6 },
+  modeBtn: {
+    paddingHorizontal: 10, paddingVertical: 5,
+    borderRadius: 8, borderWidth: 1, borderColor: T.border,
+    backgroundColor: T.card,
+  },
+  modeBtnActive: { borderColor: T.forest, backgroundColor: T.forest },
+  modeBtnText: { fontSize: 12, color: T.inkMute, fontWeight: "500" },
+  modeBtnTextActive: { color: "#fff" },
 });

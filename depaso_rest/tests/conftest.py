@@ -56,11 +56,18 @@ def db():
 
 @pytest.fixture(scope="function")
 def client(db):
-    """Create test client with overridden dependency."""
+    """Create test client with overridden dependency.
+
+    Uses TestClient as a context manager so Starlette's lifespan (startup /
+    shutdown) runs for every test.  Without __enter__, app.state.classifier
+    (set by the vision lifespan hook) would never be initialised and every
+    request that touches the classifier would blow up with AttributeError.
+    """
     app = create_app()
     app.dependency_overrides[get_db] = override_get_db
 
-    yield TestClient(app)
+    with TestClient(app) as client:
+        yield client
 
     app.dependency_overrides.clear()
 

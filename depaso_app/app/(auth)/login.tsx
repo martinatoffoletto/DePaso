@@ -1,7 +1,7 @@
 import { useState } from "react";
 import {
   View, ScrollView, TouchableOpacity,
-  TextInput, ActivityIndicator, Text,
+  TextInput, ActivityIndicator, Text, Alert,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
@@ -123,7 +123,7 @@ export default function LoginScreen() {
 
       <View className="flex-row justify-between items-center mt-[14px] mb-[6px]">
         <Text className="text-[9.5px] tracking-[1.5px] text-inkMute uppercase font-semibold">CONTRASEÑA</Text>
-        <TouchableOpacity hitSlop={8}>
+        <TouchableOpacity hitSlop={8} onPress={() => router.push("/(auth)/forgot-password")}>
           <Text className="text-[9px] tracking-[1px] text-emeraldDeep uppercase font-semibold">OLVIDÉ</Text>
         </TouchableOpacity>
       </View>
@@ -173,7 +173,7 @@ export default function LoginScreen() {
           { label: "Apple",  dark: true },
           { label: "Google", dark: false },
         ].map((s, i) => (
-          <TouchableOpacity key={i} className="flex-1 bg-card border border-border rounded-[14px] py-[14px] flex-row items-center justify-center gap-2" activeOpacity={0.8}>
+          <TouchableOpacity key={i} className="flex-1 bg-card border border-border rounded-[14px] py-[14px] flex-row items-center justify-center gap-2" activeOpacity={0.8} onPress={() => Alert.alert("No disponible", "El inicio de sesión con Apple y Google estará disponible próximamente.")}>
             <View className={`w-[22px] h-[22px] rounded-full items-center justify-center ${s.dark ? "bg-ink" : "bg-white border border-border"}`}>
               <Text className="text-[12px] font-bold" style={{ color: s.dark ? "#F4EFE3" : T.ink }}>{s.label[0]}</Text>
             </View>

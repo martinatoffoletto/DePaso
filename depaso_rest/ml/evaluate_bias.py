@@ -14,6 +14,7 @@ Usage (Colab or local with the model + dataset available):
   python evaluate_bias.py --data-dir dataset/ --model-dir models/
 """
 import argparse
+import sys
 from pathlib import Path
 
 import numpy as np
@@ -21,7 +22,9 @@ import pandas as pd
 import tensorflow as tf
 from sklearn.metrics import accuracy_score, classification_report, confusion_matrix
 
-from train_classifier import CATEGORIES, make_dataset
+# Ensure train_classifier is importable regardless of the caller's working directory.
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from train_classifier import CATEGORIES, make_dataset  # noqa: E402
 
 BIAS_DIMENSIONS = ["lighting", "angle", "background", "has_reference_object"]
 

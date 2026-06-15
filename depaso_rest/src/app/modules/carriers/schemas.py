@@ -2,7 +2,7 @@
 Carriers module schemas.
 """
 from datetime import datetime
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 
 class CarrierBase(BaseModel):
@@ -59,3 +59,26 @@ class CarrierSummaryResponse(BaseModel):
     active_shipments: int
     total_earnings: float
     total_co2_saved_kg: float
+
+
+class AvailabilityWindowRequest(BaseModel):
+    """Register or update the carrier's habitual availability window (BY_AVAILABILITY, RF-CAR-02).
+
+    Creates a dedicated_window entry in carrier_routes so the matching engine
+    can assign dedicated shipments to this carrier during their declared window.
+    """
+
+    origin_lat: float = Field(..., description="Latitude of the carrier's availability zone centre.")
+    origin_lon: float = Field(..., description="Longitude of the carrier's availability zone centre.")
+    window_start: datetime
+    window_end: datetime
+    recurrence_days: str | None = Field(
+        default=None,
+        description='Comma-separated weekday abbreviations, e.g. "mon,tue,wed,thu,fri".',
+    )
+
+    @model_validator(mode="after")
+    def validate_window(self) -> "AvailabilityWindowRequest":
+        if self.window_end <= self.window_start:
+            raise ValueError("window_end must be strictly after window_start.")
+        return self
