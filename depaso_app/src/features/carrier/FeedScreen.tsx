@@ -9,6 +9,7 @@ import { shipmentsService } from "@/src/services/shipments";
 import { Carrier, DeliveryMode, FeedItem, PackageCategory } from "@/src/types";
 import { reverseGeocode } from "@/src/utils/geocoding";
 import { T } from "@/constants/tokens";
+import PublishRouteScreen from "./PublishRouteScreen";
 
 const SIZE_LABEL: Record<PackageCategory, string> = {
   [PackageCategory.S]:  "Pequeño",
@@ -105,6 +106,7 @@ export default function FeedScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [acceptingId, setAcceptingId] = useState<number | null>(null);
+  const [showRouteModal, setShowRouteModal] = useState(false);
 
   async function load(asRefresh = false) {
     if (asRefresh) setRefreshing(true);
@@ -146,7 +148,19 @@ export default function FeedScreen() {
           <Text style={s.eyebrow}>PEDIDOS COMPATIBLES</Text>
           <Text style={s.title}>Para tu ruta</Text>
         </View>
+        <TouchableOpacity
+          style={s.routeBtn}
+          onPress={() => setShowRouteModal(true)}
+          hitSlop={10}
+          accessibilityLabel="Publicar trayecto"
+        >
+          <MaterialCommunityIcons name="map-marker-path" size={20} color={T.forest} />
+        </TouchableOpacity>
       </View>
+
+      {showRouteModal && (
+        <PublishRouteScreen onClose={() => setShowRouteModal(false)} />
+      )}
 
       {loading ? (
         <View style={s.center}><ActivityIndicator size="large" color={T.forest} /></View>
