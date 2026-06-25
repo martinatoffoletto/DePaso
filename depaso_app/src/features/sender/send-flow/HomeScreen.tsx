@@ -1,10 +1,12 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { View, TouchableOpacity, ScrollView, Image, Alert, Text } from "react-native";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import * as ImagePicker from "expo-image-picker";
 import { useAuthStore } from "@/src/stores/authStore";
+import { co2Service } from "@/src/services";
+import type { ClientImpact } from "@/src/types";
 import { T } from "@/constants/tokens";
 
 type IconName = React.ComponentProps<typeof MaterialCommunityIcons>["name"];
@@ -30,6 +32,13 @@ export function HomeScreen({ onStart }: HomeScreenProps) {
   const initial = firstName.charAt(0).toUpperCase();
 
   const [photoUri, setPhotoUri] = useState<string | null>(null);
+  const [impact, setImpact] = useState<ClientImpact | null>(null);
+
+  useEffect(() => {
+    co2Service.getMyImpact()
+      .then(setImpact)
+      .catch(() => {});
+  }, []);
 
   async function pickFromCamera() {
     const { status } = await ImagePicker.requestCameraPermissionsAsync();
@@ -94,17 +103,22 @@ export function HomeScreen({ onStart }: HomeScreenProps) {
 
         <View className="flex-row mt-[18px]">
           <View className="flex-1 pr-[10px] mr-[14px]" style={{ borderRightWidth: 1, borderRightColor: "rgba(244,239,227,0.12)" }}>
-            <Text className="text-[22px] font-bold text-[#F4EFE3] tracking-[-0.5px]">12</Text>
+            <Text className="text-[22px] font-bold text-[#F4EFE3] tracking-[-0.5px]">
+              {impact != null ? String(impact.shipments_delivered) : "—"}
+            </Text>
             <Text className="text-[9px] tracking-[1.5px] uppercase mt-0.5" style={{ color: "rgba(244,239,227,0.55)" }}>ENVÍOS</Text>
           </View>
           <View className="flex-1 pr-[10px] mr-[14px]" style={{ borderRightWidth: 1, borderRightColor: "rgba(244,239,227,0.12)" }}>
             <Text className="text-[22px] font-bold text-lime tracking-[-0.5px]">
-              21<Text className="text-xs font-normal text-[#F4EFE3]">kg</Text>
+              {impact != null ? impact.total_co2_saved_kg.toFixed(1) : "—"}
+              {impact != null ? <Text className="text-xs font-normal text-[#F4EFE3]">kg</Text> : null}
             </Text>
             <Text className="text-[9px] tracking-[1.5px] uppercase mt-0.5" style={{ color: "rgba(244,239,227,0.55)" }}>CO₂ AHORRADO</Text>
           </View>
           <View className="flex-1">
-            <Text className="text-[22px] font-bold text-[#F4EFE3] tracking-[-0.5px]">4.9</Text>
+            <Text className="text-[22px] font-bold text-[#F4EFE3] tracking-[-0.5px]">
+              {user ? user.rating.toFixed(1) : "—"}
+            </Text>
             <Text className="text-[9px] tracking-[1.5px] uppercase mt-0.5" style={{ color: "rgba(244,239,227,0.55)" }}>REPUTACIÓN</Text>
           </View>
         </View>
@@ -130,7 +144,7 @@ export function HomeScreen({ onStart }: HomeScreenProps) {
           <>
             <TouchableOpacity className="h-[160px] rounded-2xl overflow-hidden mb-3" onPress={handlePhotoZonePress} activeOpacity={0.9}>
               <Image source={{ uri: photoUri }} className="w-full h-full" resizeMode="cover" />
-              <View className="absolute bottom-[10px] left-[10px] flex-row items-center gap-[5px] bg-forest px-[10px] py-[5px] rounded-lg">
+              <View className="absolute bottom-[10px] left-[10px] flex-row items-center gap-[5px] px-[10px] py-[5px] rounded-lg" style={{ backgroundColor: "rgba(26,26,26,0.85)" }}>
                 <MaterialCommunityIcons name="check-circle" size={12} color={T.lime} />
                 <Text className="text-[8.5px] tracking-[1px] text-lime font-bold uppercase">FOTO LISTA · TOCÁ PARA CAMBIAR</Text>
               </View>
@@ -156,20 +170,25 @@ export function HomeScreen({ onStart }: HomeScreenProps) {
           </>
         ) : (
           <>
-            <TouchableOpacity className="h-[120px] rounded-2xl bg-forest overflow-hidden items-center justify-center" onPress={handlePhotoZonePress} activeOpacity={0.88}>
+            <TouchableOpacity
+              className="h-[120px] rounded-2xl overflow-hidden items-center justify-center"
+              style={{ backgroundColor: "#1A1A1A" }}
+              onPress={handlePhotoZonePress}
+              activeOpacity={0.88}
+            >
               <View className="absolute top-[14px] right-[14px] bottom-[14px] left-[14px]">
                 <ScanCornersLime />
               </View>
               <View className="flex-row items-center gap-[14px] px-5">
                 <View
                   className="w-[52px] h-[52px] rounded-2xl bg-lime items-center justify-center"
-                  style={{ shadowColor: "#000", shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.3, shadowRadius: 14 }}
+                  style={{ shadowColor: "#A3E635", shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.4, shadowRadius: 14 }}
                 >
-                  <MaterialCommunityIcons name="camera-outline" size={26} color={T.forest} />
+                  <MaterialCommunityIcons name="camera-outline" size={26} color="#1A1A1A" />
                 </View>
                 <View>
                   <Text className="text-[16px] font-bold text-[#F4EFE3] tracking-[-0.3px]">Adjuntá una foto</Text>
-                  <Text className="text-[9px] tracking-[1.5px] uppercase mt-1" style={{ color: "rgba(244,239,227,0.6)" }}>LA IA HACE EL RESTO</Text>
+                  <Text className="text-[9px] tracking-[1.5px] uppercase mt-1" style={{ color: "rgba(255,255,255,0.45)" }}>LA IA HACE EL RESTO</Text>
                 </View>
               </View>
             </TouchableOpacity>
@@ -214,20 +233,24 @@ export function HomeScreen({ onStart }: HomeScreenProps) {
       </View>
 
       {/* ── Eco band ── */}
-      <TouchableOpacity onPress={() => router.push("/(main)/impacto")} activeOpacity={0.88} className="bg-forest rounded-[18px] p-[14px] pr-4 flex-row items-center gap-3 overflow-hidden">
-        <View className="absolute right-[-20px] top-[-10px] w-[140px] h-20 rounded-[60px] bg-lime opacity-[0.18]" />
-        <View className="w-9 h-9 rounded-xl bg-lime items-center justify-center shrink-0">
-          <MaterialCommunityIcons name="leaf" size={20} color={T.forest} />
+      <TouchableOpacity
+        onPress={() => router.push("/(main)/impacto")}
+        activeOpacity={0.88}
+        className="rounded-[18px] p-[14px] pr-4 flex-row items-center gap-3"
+        style={{ backgroundColor: T.mint, borderWidth: 1, borderColor: T.border }}
+      >
+        <View className="w-9 h-9 rounded-xl items-center justify-center shrink-0" style={{ backgroundColor: T.emerald }}>
+          <MaterialCommunityIcons name="leaf" size={18} color="#fff" />
         </View>
         <View className="flex-1">
-          <Text className="text-sm font-semibold text-[#F4EFE3] tracking-[-0.2px]">Logística colaborativa</Text>
-          <Text className="text-[11.5px] leading-[17px] mt-0.5" style={{ color: "rgba(244,239,227,0.7)" }}>
+          <Text className="text-sm font-semibold tracking-[-0.2px]" style={{ color: T.forest }}>Logística colaborativa</Text>
+          <Text className="text-[11.5px] leading-[17px] mt-0.5" style={{ color: T.inkSoft }}>
             {"Compartiendo viajes ahorrás hasta "}
-            <Text className="text-lime font-semibold">1.8 kg CO₂</Text>
+            <Text style={{ color: T.emeraldDeep, fontWeight: "600" }}>1.8 kg CO₂</Text>
             {" por envío en AMBA"}
           </Text>
         </View>
-        <MaterialCommunityIcons name="chevron-right" size={18} color="rgba(244,239,227,0.5)" />
+        <MaterialCommunityIcons name="chevron-right" size={18} color={T.inkFaint} />
       </TouchableOpacity>
     </ScrollView>
   );

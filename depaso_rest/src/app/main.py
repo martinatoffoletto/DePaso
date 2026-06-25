@@ -18,7 +18,6 @@ from src.app.modules.admin.router import router as admin_router
 from src.app.modules.auth.router import router as auth_router
 from src.app.modules.carriers.router import router as carriers_router
 from src.app.modules.co2.router import router as co2_router
-from src.app.modules.freight.router import router as freight_router
 from src.app.modules.matching.router import router as matching_router
 from src.app.modules.packages.router import router as packages_router
 from src.app.modules.routes.router import router as routes_router
@@ -141,7 +140,6 @@ def create_app() -> FastAPI:
     app.include_router(co2_router, prefix=api_prefix)
     app.include_router(vision_router, prefix=api_prefix)
     app.include_router(tracking_router, prefix=api_prefix)
-    app.include_router(freight_router, prefix=api_prefix)
     app.include_router(routes_router, prefix=api_prefix)
     app.include_router(admin_router, prefix=api_prefix)
 

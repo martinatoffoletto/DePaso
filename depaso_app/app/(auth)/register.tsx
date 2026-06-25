@@ -28,14 +28,34 @@ function pwdStrength(pwd: string): number {
   return 4;
 }
 
-const STRENGTH_LABELS = ["", "DÉBIL", "REGULAR", "BUENA", "FUERTE"];
+const STRENGTH_LABELS = ["", "Débil", "Regular", "Buena", "Fuerte"];
 const STRENGTH_COLORS = [T.border, T.red, T.amber, T.emerald, T.emerald];
 
-function FieldLabel({ label }: { label: string }) {
+function Label({ text }: { text: string }) {
   return (
-    <Text className="text-[9.5px] tracking-[1.5px] text-inkMute uppercase mb-[6px] font-semibold">
-      {label}
+    <Text style={{ fontSize: 9.5, letterSpacing: 1.5, color: T.inkMute, textTransform: "uppercase", fontWeight: "700", marginBottom: 8 }}>
+      {text}
     </Text>
+  );
+}
+
+function Field({ icon, placeholder, value, onChangeText, secureTextEntry, keyboardType, autoCapitalize, error, right }: any) {
+  return (
+    <View style={{ flexDirection: "row", alignItems: "center", gap: 12, backgroundColor: T.card, borderRadius: 16, paddingHorizontal: 14, height: 52, borderWidth: 1.2, borderColor: error ? T.red : value ? T.forest : T.border }}>
+      {icon && <MaterialCommunityIcons name={icon} size={18} color={error ? T.red : T.inkMute} />}
+      <TextInput
+        style={{ flex: 1, fontSize: 15, color: T.ink, fontWeight: "500" }}
+        placeholder={placeholder}
+        placeholderTextColor={T.inkFaint}
+        value={value}
+        onChangeText={onChangeText}
+        secureTextEntry={secureTextEntry}
+        keyboardType={keyboardType ?? "default"}
+        autoCapitalize={autoCapitalize ?? "sentences"}
+        autoCorrect={false}
+      />
+      {right}
+    </View>
   );
 }
 
@@ -58,6 +78,7 @@ export default function RegisterScreen() {
 
   const isCarrier = form.user_type === UserType.CARRIER;
   const needsPlate = ![TransportType.PEDESTRIAN, TransportType.BIKE].includes(vehicleType);
+  const strength = pwdStrength(form.password);
 
   const update = (field: string, value: string) => {
     setForm(p => ({ ...p, [field]: value }));
@@ -110,166 +131,149 @@ export default function RegisterScreen() {
     }
   };
 
-  const strength = pwdStrength(form.password);
-
   return (
-    <View className="flex-1 bg-bg" style={{ paddingTop: insets.top }}>
+    <View style={{ flex: 1, backgroundColor: T.bg }}>
+      {/* ── Hero ── */}
+      <View style={{ backgroundColor: T.forest, paddingTop: insets.top + 12, paddingHorizontal: 24, paddingBottom: 28 }}>
+        <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 24 }}>
+          <TouchableOpacity
+            style={{ width: 38, height: 38, borderRadius: 12, backgroundColor: "rgba(244,239,227,0.12)", borderWidth: 1, borderColor: "rgba(244,239,227,0.18)", alignItems: "center", justifyContent: "center" }}
+            onPress={() => router.back()} hitSlop={10}
+          >
+            <MaterialCommunityIcons name="arrow-left" size={18} color="#F4EFE3" />
+          </TouchableOpacity>
+          {/* Step dots */}
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 5 }}>
+            <View style={{ width: 20, height: 6, borderRadius: 4, backgroundColor: "#F4EFE3" }} />
+            <View style={{ width: 6, height: 6, borderRadius: 4, backgroundColor: "rgba(244,239,227,0.25)" }} />
+            <View style={{ width: 6, height: 6, borderRadius: 4, backgroundColor: "rgba(244,239,227,0.25)" }} />
+            <Text style={{ fontSize: 10, letterSpacing: 1.5, color: "rgba(244,239,227,0.4)", marginLeft: 4 }}>01/03</Text>
+          </View>
+          <View style={{ width: 38 }} />
+        </View>
+
+        <Text style={{ fontSize: 10, letterSpacing: 2.5, color: "rgba(244,239,227,0.45)", textTransform: "uppercase", marginBottom: 6, fontWeight: "700" }}>
+          TUS DATOS
+        </Text>
+        <Text style={{ fontSize: 32, fontWeight: "800", color: "#F4EFE3", letterSpacing: -1.2, lineHeight: 36 }}>
+          Creá tu cuenta
+        </Text>
+        <Text style={{ fontSize: 13.5, color: "rgba(244,239,227,0.55)", marginTop: 8, lineHeight: 19 }}>
+          En 3 pasos. Después empezás a enviar.
+        </Text>
+      </View>
+
       <ScrollView
-        className="flex-1"
-        contentContainerStyle={{ paddingHorizontal: 24, paddingBottom: insets.bottom + 110 }}
+        style={{ flex: 1 }}
+        contentContainerStyle={{ paddingHorizontal: 24, paddingTop: 24, paddingBottom: insets.bottom + 120 }}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
-        <View className="flex-row items-center justify-between pt-[6px]">
-          <TouchableOpacity
-            className="w-[38px] h-[38px] rounded-xl border border-border bg-card items-center justify-center"
-            onPress={() => router.back()}
-            hitSlop={10}
-          >
-            <MaterialCommunityIcons name="arrow-left" size={18} color={T.ink} />
-          </TouchableOpacity>
-          <View className="flex-row gap-[6px] items-center">
-            <View className="w-[18px] h-[6px] rounded-[4px] bg-forest" />
-            <View className="w-[6px] h-[6px] rounded-[4px] bg-border" />
-            <View className="w-[6px] h-[6px] rounded-[4px] bg-border" />
-            <Text className="text-[10px] tracking-[1.5px] text-inkMute ml-1">01/03</Text>
-          </View>
-          <View className="w-[38px]" />
-        </View>
-
-        <View className="pt-5 pb-[22px]">
-          <Text className="text-[10px] tracking-[2.5px] text-emeraldDeep uppercase mb-[6px]">PASO 01 · TUS DATOS</Text>
-          <Text className="text-[28px] font-bold text-ink tracking-[-1px] leading-[30px]">Creá tu cuenta DePaso</Text>
-          <Text className="text-[13.5px] text-inkSoft leading-[19px] mt-[6px]">En 3 pasos cortos. Después podés empezar a enviar.</Text>
-        </View>
-
         {serverError && (
-          <View className="flex-row items-center gap-2 bg-redBg rounded-[10px] border border-red p-3 mb-4">
-            <MaterialCommunityIcons name="alert-circle-outline" size={16} color={T.red} />
-            <Text className="flex-1 text-red text-[13px]">{serverError}</Text>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 10, backgroundColor: T.redBg, borderRadius: 12, borderWidth: 1, borderColor: T.red, padding: 14, marginBottom: 20 }}>
+            <MaterialCommunityIcons name="alert-circle-outline" size={18} color={T.red} />
+            <Text style={{ flex: 1, color: T.red, fontSize: 13 }}>{serverError}</Text>
           </View>
         )}
 
-        <FieldLabel label="¿CÓMO VAS A USAR DEPASO?" />
-        <View className="flex-row gap-2 mb-[18px]">
+        {/* ── Role selector ── */}
+        <Label text="¿Cómo vas a usar DePaso?" />
+        <View style={{ flexDirection: "row", gap: 10, marginBottom: 22 }}>
           {([
-            { type: UserType.CLIENT,  icon: "cube-outline" as const,  name: "Envío paquetes" },
-            { type: UserType.CARRIER, icon: "truck-outline" as const,  name: "Soy cadete" },
+            { type: UserType.CLIENT,  icon: "cube-outline" as const,  title: "Envío paquetes", sub: "Clientes y empresas" },
+            { type: UserType.CARRIER, icon: "truck-outline" as const,  title: "Soy cadete",     sub: "Reparto y entregas" },
           ] as const).map((r) => {
             const active = form.user_type === r.type;
             return (
               <TouchableOpacity
                 key={r.type}
-                className="flex-1 flex-row items-center gap-2 rounded-[14px] py-3 px-3 relative"
-                style={{ backgroundColor: active ? T.forest : T.card, borderWidth: 1.2, borderColor: active ? T.forest : T.border }}
+                style={{ flex: 1, borderRadius: 18, padding: 16, backgroundColor: active ? T.forest : T.card, borderWidth: 1.5, borderColor: active ? T.forest : T.border, gap: 10 }}
                 onPress={() => setForm(p => ({ ...p, user_type: r.type }))}
                 activeOpacity={0.8}
               >
-                <MaterialCommunityIcons name={r.icon} size={18} color={active ? "#F4EFE3" : T.inkSoft} />
-                <Text className="text-[13px] font-semibold" style={{ color: active ? "#F4EFE3" : T.inkSoft }}>{r.name}</Text>
-                {active && (
-                  <View className="absolute top-2 right-2 w-4 h-4 rounded-full bg-lime items-center justify-center">
-                    <MaterialCommunityIcons name="check" size={10} color={T.forest} />
+                <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+                  <View style={{ width: 36, height: 36, borderRadius: 11, alignItems: "center", justifyContent: "center", backgroundColor: active ? "rgba(244,239,227,0.15)" : T.cardSoft }}>
+                    <MaterialCommunityIcons name={r.icon} size={18} color={active ? "#F4EFE3" : T.inkSoft} />
                   </View>
-                )}
+                  {active && (
+                    <View style={{ width: 20, height: 20, borderRadius: 10, backgroundColor: T.lime, alignItems: "center", justifyContent: "center" }}>
+                      <MaterialCommunityIcons name="check" size={12} color={T.forest} />
+                    </View>
+                  )}
+                </View>
+                <View>
+                  <Text style={{ fontSize: 14, fontWeight: "700", color: active ? "#F4EFE3" : T.ink, letterSpacing: -0.2 }}>{r.title}</Text>
+                  <Text style={{ fontSize: 11.5, color: active ? "rgba(244,239,227,0.6)" : T.inkMute, marginTop: 2 }}>{r.sub}</Text>
+                </View>
               </TouchableOpacity>
             );
           })}
         </View>
 
+        {/* ── Carrier: vehicle + plate ── */}
         {isCarrier && (
-          <View className="mb-[18px]">
-            <FieldLabel label="TU VEHÍCULO" />
-            <View className="flex-row flex-wrap gap-2 mb-3">
+          <View style={{ marginBottom: 22 }}>
+            <Label text="Tu vehículo" />
+            <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 14 }}>
               {VEHICLES.map(v => {
                 const active = vehicleType === v.type;
                 return (
                   <TouchableOpacity
                     key={v.type}
-                    className="flex-row items-center gap-[6px] rounded-xl px-3 py-[9px]"
-                    style={{ backgroundColor: active ? T.forest : T.card, borderWidth: 1.2, borderColor: active ? T.forest : T.border }}
+                    style={{ flexDirection: "row", alignItems: "center", gap: 6, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 9, backgroundColor: active ? T.forest : T.card, borderWidth: 1.2, borderColor: active ? T.forest : T.border }}
                     onPress={() => setVehicleType(v.type)}
                     activeOpacity={0.8}
                   >
-                    <MaterialCommunityIcons name={v.icon} size={15} color={active ? T.lime : T.inkSoft} />
-                    <Text className="text-[12px] font-semibold" style={{ color: active ? "#F4EFE3" : T.inkSoft }}>{v.label}</Text>
+                    <MaterialCommunityIcons name={v.icon} size={14} color={active ? T.lime : T.inkSoft} />
+                    <Text style={{ fontSize: 12.5, fontWeight: "600", color: active ? "#F4EFE3" : T.inkSoft }}>{v.label}</Text>
                   </TouchableOpacity>
                 );
               })}
             </View>
             {needsPlate && (
               <>
-                <FieldLabel label="PATENTE" />
-                <View
-                  className="flex-row items-center gap-[10px] bg-card rounded-[14px] px-[14px] h-[52px] mb-1"
-                  style={{ borderWidth: 1.2, borderColor: errors.license_plate ? T.red : licensePlate ? T.forest : T.border }}
-                >
-                  <MaterialCommunityIcons name="card-text-outline" size={18} color={T.inkMute} />
-                  <TextInput
-                    className="flex-1 text-[15px] text-ink font-medium"
-                    placeholder="AB123CD"
-                    placeholderTextColor={T.inkFaint}
-                    autoCapitalize="characters"
-                    autoCorrect={false}
-                    value={licensePlate}
-                    onChangeText={t => { setLicensePlate(t); if (errors.license_plate) setErrors(p => ({ ...p, license_plate: "" })); }}
-                  />
-                </View>
-                {errors.license_plate ? <Text className="text-[11px] text-red mb-[6px] pl-1">{errors.license_plate}</Text> : null}
+                <Label text="Patente" />
+                <Field
+                  icon="card-text-outline"
+                  placeholder="AB123CD"
+                  value={licensePlate}
+                  onChangeText={(t: string) => { setLicensePlate(t); if (errors.license_plate) setErrors(p => ({ ...p, license_plate: "" })); }}
+                  autoCapitalize="characters"
+                  error={errors.license_plate}
+                />
+                {errors.license_plate ? <Text style={{ fontSize: 11, color: T.red, marginTop: 4, paddingLeft: 4 }}>{errors.license_plate}</Text> : null}
+                <View style={{ height: 10 }} />
               </>
             )}
-            <View className="flex-row items-center gap-2 bg-cardSoft rounded-[10px] border border-borderSoft p-[10px] mt-1">
-              <MaterialCommunityIcons name="shield-check-outline" size={14} color={T.inkMute} />
-              <Text className="flex-1 text-[11px] text-inkSoft leading-4">
-                Tu cuenta de cadete queda pendiente de verificación por el equipo antes de poder aceptar pedidos.
+            <View style={{ flexDirection: "row", alignItems: "flex-start", gap: 10, backgroundColor: T.mint, borderRadius: 12, borderWidth: 1, borderColor: T.border, padding: 12, marginTop: 4 }}>
+              <MaterialCommunityIcons name="shield-check-outline" size={16} color={T.forest} style={{ marginTop: 1 }} />
+              <Text style={{ flex: 1, fontSize: 12, color: T.forest, lineHeight: 17, fontWeight: "500" }}>
+                Tu cuenta de cadete queda pendiente de verificación antes de poder aceptar pedidos.
               </Text>
             </View>
           </View>
         )}
 
-        <View className="flex-row gap-[10px] mb-0">
-          <View className="flex-1">
-            <FieldLabel label="NOMBRE" />
-            <View
-              className="flex-row items-center gap-[10px] bg-card rounded-[14px] px-[14px] h-[52px] mb-1"
-              style={{ borderWidth: 1.2, borderColor: errors.first_name ? T.red : form.first_name ? T.forest : T.border }}
-            >
-              <TextInput
-                className="flex-1 text-[15px] text-ink font-medium"
-                placeholder="Valentina"
-                placeholderTextColor={T.inkFaint}
-                value={form.first_name}
-                onChangeText={t => update("first_name", t)}
-              />
-            </View>
-            {errors.first_name ? <Text className="text-[11px] text-red mb-[6px] pl-1">{errors.first_name}</Text> : null}
+        {/* ── Name ── */}
+        <View style={{ flexDirection: "row", gap: 10, marginBottom: 14 }}>
+          <View style={{ flex: 1 }}>
+            <Label text="Nombre" />
+            <Field placeholder="Valentina" value={form.first_name} onChangeText={(t: string) => update("first_name", t)} error={errors.first_name} />
+            {errors.first_name ? <Text style={{ fontSize: 11, color: T.red, marginTop: 4, paddingLeft: 4 }}>{errors.first_name}</Text> : null}
           </View>
-          <View className="flex-1">
-            <FieldLabel label="APELLIDO" />
-            <View
-              className="flex-row items-center gap-[10px] bg-card rounded-[14px] px-[14px] h-[52px] mb-1"
-              style={{ borderWidth: 1.2, borderColor: errors.last_name ? T.red : form.last_name ? T.forest : T.border }}
-            >
-              <TextInput
-                className="flex-1 text-[15px] text-ink font-medium"
-                placeholder="Rossi"
-                placeholderTextColor={T.inkFaint}
-                value={form.last_name}
-                onChangeText={t => update("last_name", t)}
-              />
-            </View>
-            {errors.last_name ? <Text className="text-[11px] text-red mb-[6px] pl-1">{errors.last_name}</Text> : null}
+          <View style={{ flex: 1 }}>
+            <Label text="Apellido" />
+            <Field placeholder="Rossi" value={form.last_name} onChangeText={(t: string) => update("last_name", t)} error={errors.last_name} />
+            {errors.last_name ? <Text style={{ fontSize: 11, color: T.red, marginTop: 4, paddingLeft: 4 }}>{errors.last_name}</Text> : null}
           </View>
         </View>
 
-        <FieldLabel label="EMAIL" />
-        <View
-          className="flex-row items-center gap-[10px] bg-card rounded-[14px] px-[14px] h-[52px] mb-1"
-          style={{ borderWidth: 1.2, borderColor: errors.email ? T.red : form.email ? T.forest : T.border }}
-        >
-          <MaterialCommunityIcons name="email-outline" size={18} color={T.inkMute} />
+        {/* ── Email ── */}
+        <Label text="Email" />
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 12, backgroundColor: T.card, borderRadius: 16, paddingHorizontal: 14, height: 52, borderWidth: 1.2, borderColor: errors.email ? T.red : form.email ? T.forest : T.border, marginBottom: 4 }}>
+          <MaterialCommunityIcons name="email-outline" size={18} color={errors.email ? T.red : T.inkMute} />
           <TextInput
-            className="flex-1 text-[15px] text-ink font-medium"
+            style={{ flex: 1, fontSize: 15, color: T.ink, fontWeight: "500" }}
             placeholder="tu@email.com"
             placeholderTextColor={T.inkFaint}
             autoCapitalize="none"
@@ -282,29 +286,23 @@ export default function RegisterScreen() {
             <MaterialCommunityIcons name="check-circle-outline" size={18} color={T.emerald} />
           )}
         </View>
-        {errors.email ? <Text className="text-[11px] text-red mb-[6px] pl-1">{errors.email}</Text> : null}
+        {errors.email ? <Text style={{ fontSize: 11, color: T.red, marginBottom: 8, paddingLeft: 4 }}>{errors.email}</Text> : null}
 
-        <View className="h-[10px]" />
-        <FieldLabel label="CELULAR (opcional)" />
-        <View className="flex-row gap-2 mb-1">
-          <View
-            className="flex-row items-center gap-2 bg-card rounded-[14px] px-3 h-[52px]"
-            style={{ borderWidth: 1.2, borderColor: T.border }}
-          >
-            <View className="w-[22px] h-[14px] rounded-sm overflow-hidden flex-col">
-              <View className="flex-1 bg-[#75AADB]" />
-              <View className="flex-1 bg-[#F4EFE3]" />
-              <View className="flex-1 bg-[#75AADB]" />
+        {/* ── Phone ── */}
+        <View style={{ height: 16 }} />
+        <Label text="Celular (opcional)" />
+        <View style={{ flexDirection: "row", gap: 8, marginBottom: 4 }}>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: T.card, borderRadius: 16, paddingHorizontal: 12, height: 52, borderWidth: 1.2, borderColor: T.border }}>
+            <View style={{ width: 22, height: 14, borderRadius: 3, overflow: "hidden", flexDirection: "column" }}>
+              <View style={{ flex: 1, backgroundColor: "#75AADB" }} />
+              <View style={{ flex: 1, backgroundColor: "#F4EFE3" }} />
+              <View style={{ flex: 1, backgroundColor: "#75AADB" }} />
             </View>
-            <Text className="text-sm font-medium text-ink">+54</Text>
-            <MaterialCommunityIcons name="chevron-down" size={14} color={T.inkMute} />
+            <Text style={{ fontSize: 14, fontWeight: "600", color: T.ink }}>+54</Text>
           </View>
-          <View
-            className="flex-1 flex-row items-center gap-[10px] bg-card rounded-[14px] px-[14px] h-[52px]"
-            style={{ borderWidth: 1.2, borderColor: form.phone_number ? T.forest : T.border }}
-          >
+          <View style={{ flex: 1, flexDirection: "row", alignItems: "center", backgroundColor: T.card, borderRadius: 16, paddingHorizontal: 14, height: 52, borderWidth: 1.2, borderColor: form.phone_number ? T.forest : T.border }}>
             <TextInput
-              className="flex-1 text-[15px] text-ink font-medium"
+              style={{ flex: 1, fontSize: 15, color: T.ink, fontWeight: "500" }}
               placeholder="11 5821-9043"
               placeholderTextColor={T.inkFaint}
               keyboardType="phone-pad"
@@ -314,86 +312,79 @@ export default function RegisterScreen() {
           </View>
         </View>
 
-        <View className="h-[10px]" />
-        <FieldLabel label="CONTRASEÑA" />
-        <View
-          className="flex-row items-center gap-[10px] bg-card rounded-[14px] px-[14px] h-[52px] mb-1"
-          style={{ borderWidth: 1.2, borderColor: errors.password ? T.red : form.password ? T.forest : T.border }}
-        >
-          <MaterialCommunityIcons name="lock-outline" size={18} color={T.inkMute} />
+        {/* ── Password ── */}
+        <View style={{ height: 16 }} />
+        <Label text="Contraseña" />
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 12, backgroundColor: T.card, borderRadius: 16, paddingHorizontal: 14, height: 52, borderWidth: 1.2, borderColor: errors.password ? T.red : form.password ? T.forest : T.border, marginBottom: 4 }}>
+          <MaterialCommunityIcons name="lock-outline" size={18} color={errors.password ? T.red : T.inkMute} />
           <TextInput
-            className="flex-1 text-[15px] text-ink font-medium"
+            style={{ flex: 1, fontSize: 15, color: T.ink, fontWeight: "500" }}
             placeholder="Mínimo 8 caracteres"
             placeholderTextColor={T.inkFaint}
             secureTextEntry={!showPwd}
             value={form.password}
             onChangeText={t => update("password", t)}
           />
-          <TouchableOpacity onPress={() => setShowPwd(v => !v)} hitSlop={8}>
-            <Text className="text-[10px] text-inkMute font-semibold tracking-[0.5px]">{showPwd ? "OCU" : "VER"}</Text>
+          <TouchableOpacity onPress={() => setShowPwd(v => !v)} hitSlop={10}>
+            <MaterialCommunityIcons name={showPwd ? "eye-off-outline" : "eye-outline"} size={18} color={T.inkMute} />
           </TouchableOpacity>
         </View>
-        {errors.password ? <Text className="text-[11px] text-red mb-[6px] pl-1">{errors.password}</Text> : null}
-
+        {errors.password ? <Text style={{ fontSize: 11, color: T.red, marginBottom: 6, paddingLeft: 4 }}>{errors.password}</Text> : null}
         {form.password.length > 0 && (
-          <View className="flex-row items-center gap-2 mt-[-2px] mb-1 pl-1">
-            <View className="flex-row gap-[3px]">
-              {[1, 2, 3, 4].map((i) => (
-                <View key={i} className="w-[30px] h-1 rounded-[4px]" style={{ backgroundColor: i <= strength ? STRENGTH_COLORS[strength] : T.border }} />
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 2, paddingLeft: 2 }}>
+            <View style={{ flexDirection: "row", gap: 4 }}>
+              {[1, 2, 3, 4].map(i => (
+                <View key={i} style={{ width: 28, height: 4, borderRadius: 3, backgroundColor: i <= strength ? STRENGTH_COLORS[strength] : T.border }} />
               ))}
             </View>
-            <Text className="text-[9px] tracking-[1.5px] font-bold uppercase" style={{ color: STRENGTH_COLORS[strength] }}>
+            <Text style={{ fontSize: 10, letterSpacing: 1, fontWeight: "700", color: STRENGTH_COLORS[strength], textTransform: "uppercase" }}>
               {STRENGTH_LABELS[strength]}
             </Text>
           </View>
         )}
 
-        <View className="h-[10px]" />
-        <FieldLabel label="CONFIRMAR CONTRASEÑA" />
-        <View
-          className="flex-row items-center gap-[10px] bg-card rounded-[14px] px-[14px] h-[52px] mb-1"
-          style={{ borderWidth: 1.2, borderColor: errors.confirmPassword ? T.red : form.confirmPassword ? T.forest : T.border }}
-        >
-          <MaterialCommunityIcons name="lock-check-outline" size={18} color={T.inkMute} />
+        {/* ── Confirm password ── */}
+        <View style={{ height: 14 }} />
+        <Label text="Repetí la contraseña" />
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 12, backgroundColor: T.card, borderRadius: 16, paddingHorizontal: 14, height: 52, borderWidth: 1.2, borderColor: errors.confirmPassword ? T.red : form.confirmPassword ? T.forest : T.border, marginBottom: 4 }}>
+          <MaterialCommunityIcons name="lock-check-outline" size={18} color={errors.confirmPassword ? T.red : T.inkMute} />
           <TextInput
-            className="flex-1 text-[15px] text-ink font-medium"
+            style={{ flex: 1, fontSize: 15, color: T.ink, fontWeight: "500" }}
             placeholder="Repetí tu contraseña"
             placeholderTextColor={T.inkFaint}
             secureTextEntry={!showPwd}
             value={form.confirmPassword}
             onChangeText={t => update("confirmPassword", t)}
           />
+          {form.confirmPassword && form.password === form.confirmPassword && (
+            <MaterialCommunityIcons name="check-circle-outline" size={18} color={T.emerald} />
+          )}
         </View>
-        {errors.confirmPassword ? <Text className="text-[11px] text-red mb-[6px] pl-1">{errors.confirmPassword}</Text> : null}
+        {errors.confirmPassword ? <Text style={{ fontSize: 11, color: T.red, marginBottom: 6, paddingLeft: 4 }}>{errors.confirmPassword}</Text> : null}
 
+        {/* ── Terms ── */}
         <TouchableOpacity
-          className="flex-row items-start gap-[10px] mt-[18px]"
+          style={{ flexDirection: "row", alignItems: "flex-start", gap: 12, marginTop: 20 }}
           onPress={() => setAccepted(v => !v)}
           activeOpacity={0.8}
         >
-          <View
-            className="w-5 h-5 rounded-md shrink-0 mt-px items-center justify-center"
-            style={{ borderWidth: 1.5, borderColor: accepted ? T.forest : T.border, backgroundColor: accepted ? T.forest : T.card }}
-          >
-            {accepted && <MaterialCommunityIcons name="check" size={12} color="#F4EFE3" />}
+          <View style={{ width: 22, height: 22, borderRadius: 7, borderWidth: 1.5, borderColor: accepted ? T.forest : T.border, backgroundColor: accepted ? T.forest : T.card, alignItems: "center", justifyContent: "center", flexShrink: 0, marginTop: 1 }}>
+            {accepted && <MaterialCommunityIcons name="check" size={13} color="#F4EFE3" />}
           </View>
-          <Text className="flex-1 text-xs text-inkSoft leading-[18px]">
+          <Text style={{ flex: 1, fontSize: 13, color: T.inkSoft, lineHeight: 19 }}>
             {"Acepto los "}
-            <Text className="text-forest font-semibold">términos</Text>
+            <Text style={{ color: T.forest, fontWeight: "600" }}>términos</Text>
             {" y la "}
-            <Text className="text-forest font-semibold">política de privacidad</Text>
+            <Text style={{ color: T.forest, fontWeight: "600" }}>política de privacidad</Text>
             {" de DePaso."}
           </Text>
         </TouchableOpacity>
       </ScrollView>
 
-      <View
-        className="absolute bottom-0 left-0 right-0 px-6 pt-4 bg-bg border-t border-border"
-        style={{ paddingBottom: insets.bottom + 16 }}
-      >
+      {/* ── Sticky CTA ── */}
+      <View style={{ position: "absolute", bottom: 0, left: 0, right: 0, paddingHorizontal: 24, paddingTop: 16, paddingBottom: insets.bottom + 16, backgroundColor: T.bg, borderTopWidth: 1, borderTopColor: T.border }}>
         <TouchableOpacity
-          className={`rounded-2xl h-[54px] flex-row items-center justify-center gap-[10px] mb-2 ${isLoading ? "opacity-65" : ""}`}
-          style={{ backgroundColor: T.forest, shadowColor: T.forest, shadowOffset: { width: 0, height: 12 }, shadowOpacity: 0.4, shadowRadius: 20, elevation: 5 }}
+          style={{ backgroundColor: T.forest, borderRadius: 18, height: 56, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10, marginBottom: 10, shadowColor: T.forest, shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.3, shadowRadius: 16, elevation: 5, opacity: isLoading ? 0.7 : 1 }}
           onPress={handleRegister}
           disabled={isLoading}
           activeOpacity={0.88}
@@ -401,15 +392,15 @@ export default function RegisterScreen() {
           {isLoading
             ? <ActivityIndicator color="#F4EFE3" />
             : <>
-                <Text className="text-[#F4EFE3] font-semibold text-[15px]">Continuar al paso 2</Text>
+                <Text style={{ color: "#F4EFE3", fontWeight: "700", fontSize: 15 }}>Continuar al paso 2</Text>
                 <MaterialCommunityIcons name="arrow-right" size={18} color="#F4EFE3" />
               </>
           }
         </TouchableOpacity>
-        <View className="flex-row justify-center items-center gap-[6px]">
-          <Text className="text-inkSoft text-xs">¿Ya tenés cuenta?</Text>
+        <View style={{ flexDirection: "row", justifyContent: "center", alignItems: "center", gap: 6 }}>
+          <Text style={{ color: T.inkSoft, fontSize: 13 }}>¿Ya tenés cuenta?</Text>
           <TouchableOpacity onPress={() => router.replace("/(auth)/login")} hitSlop={8}>
-            <Text className="text-forest font-bold text-xs underline">Iniciá sesión</Text>
+            <Text style={{ color: T.forest, fontWeight: "700", fontSize: 13 }}>Iniciá sesión</Text>
           </TouchableOpacity>
         </View>
       </View>

@@ -6,6 +6,7 @@ import os
 # Must be set before importing the app: disables slowapi on auth endpoints
 # so tests can hit /auth/login y /auth/register freely.
 os.environ.setdefault("RATE_LIMIT_ENABLED", "false")
+os.environ.setdefault("DATABASE_URL", "sqlite:///:memory:")
 
 import pytest
 from sqlalchemy import create_engine

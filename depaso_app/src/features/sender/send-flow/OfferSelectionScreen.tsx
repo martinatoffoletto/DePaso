@@ -1,3 +1,4 @@
+// ORPHANED - not wired to any navigator. Prices are hardcoded and "Asegurado" badge does not exist in the system.
 import { useState } from "react";
 import { View, TouchableOpacity, ScrollView, Text } from "react-native";
 import { MaterialCommunityIcons } from "@expo/vector-icons";

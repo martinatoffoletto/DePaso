@@ -1,7 +1,7 @@
 import { useState } from "react";
 import {
   View, ScrollView, TouchableOpacity,
-  TextInput, ActivityIndicator, Text, Alert,
+  TextInput, ActivityIndicator, Text,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
@@ -44,150 +44,145 @@ export default function LoginScreen() {
 
   if (connError) {
     return (
-      <View className="flex-1 bg-bg items-center justify-center p-8 gap-4" style={{ paddingTop: insets.top }}>
-        <View className="w-24 h-24 rounded-full bg-redBg items-center justify-center">
-          <MaterialCommunityIcons name="wifi-off" size={48} color={T.red} />
+      <View style={{ flex: 1, backgroundColor: T.bg }}>
+        <View style={{ backgroundColor: T.forest, paddingTop: insets.top + 12, paddingHorizontal: 24, paddingBottom: 32 }}>
+          <TouchableOpacity
+            style={{ width: 38, height: 38, borderRadius: 12, backgroundColor: "rgba(244,239,227,0.12)", borderWidth: 1, borderColor: "rgba(244,239,227,0.18)", alignItems: "center", justifyContent: "center", marginBottom: 28 }}
+            onPress={() => router.back()} hitSlop={10}
+          >
+            <MaterialCommunityIcons name="arrow-left" size={18} color="#F4EFE3" />
+          </TouchableOpacity>
+          <Text style={{ fontSize: 36, fontWeight: "800", color: "#F4EFE3", letterSpacing: -1.3, lineHeight: 40 }}>Sin conexión</Text>
         </View>
-        <Text className="text-xl font-bold text-ink text-center">Sin conexión al servidor</Text>
-        <Text className="text-inkSoft text-center leading-[22px]">
-          No se pudo contactar con DePaso.{"\n"}Verificá tu conexión o que el backend esté activo.
-        </Text>
-        <TouchableOpacity
-          className="flex-row items-center gap-2 bg-forest rounded-xl px-6 py-3 mt-2"
-          onPress={() => setConnError(false)}
-          activeOpacity={0.85}
-        >
-          <MaterialCommunityIcons name="refresh" size={18} color="#fff" />
-          <Text className="text-white font-semibold text-[15px]">Reintentar</Text>
-        </TouchableOpacity>
-        <TouchableOpacity onPress={() => router.back()} className="mt-3">
-          <Text className="text-inkMute text-sm">Volver</Text>
-        </TouchableOpacity>
+        <View style={{ flex: 1, alignItems: "center", justifyContent: "center", padding: 40, gap: 16 }}>
+          <View style={{ width: 72, height: 72, borderRadius: 24, backgroundColor: T.cardSoft, alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: T.border }}>
+            <MaterialCommunityIcons name="wifi-off" size={34} color={T.inkMute} />
+          </View>
+          <Text style={{ fontSize: 17, fontWeight: "700", color: T.ink, textAlign: "center", letterSpacing: -0.3 }}>No se pudo contactar con DePaso</Text>
+          <Text style={{ fontSize: 14, color: T.inkSoft, textAlign: "center", lineHeight: 21 }}>
+            Verificá tu conexión a internet o que el servidor esté activo.
+          </Text>
+          <TouchableOpacity
+            style={{ flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: T.forest, borderRadius: 14, paddingHorizontal: 24, paddingVertical: 14, marginTop: 4 }}
+            onPress={() => setConnError(false)} activeOpacity={0.85}
+          >
+            <MaterialCommunityIcons name="refresh" size={17} color="#F4EFE3" />
+            <Text style={{ color: "#F4EFE3", fontWeight: "600", fontSize: 15 }}>Reintentar</Text>
+          </TouchableOpacity>
+        </View>
       </View>
     );
   }
 
   return (
-    <ScrollView
-      className="flex-1 bg-bg"
-      contentContainerStyle={{ paddingHorizontal: 24, paddingTop: insets.top + 6, paddingBottom: insets.bottom + 40 }}
-      keyboardShouldPersistTaps="handled"
-      showsVerticalScrollIndicator={false}
-    >
-      <View className="flex-row items-center justify-between mb-[6px]">
+    <View style={{ flex: 1, backgroundColor: T.bg }}>
+      {/* ── Hero ── */}
+      <View style={{ backgroundColor: T.forest, paddingTop: insets.top + 12, paddingHorizontal: 24, paddingBottom: 36 }}>
         <TouchableOpacity
-          className="w-[38px] h-[38px] rounded-xl border border-border bg-card items-center justify-center"
-          onPress={() => router.back()}
-          hitSlop={10}
+          style={{ width: 38, height: 38, borderRadius: 12, backgroundColor: "rgba(244,239,227,0.12)", borderWidth: 1, borderColor: "rgba(244,239,227,0.18)", alignItems: "center", justifyContent: "center", marginBottom: 32 }}
+          onPress={() => router.back()} hitSlop={10}
         >
-          <MaterialCommunityIcons name="arrow-left" size={18} color={T.ink} />
+          <MaterialCommunityIcons name="arrow-left" size={18} color="#F4EFE3" />
         </TouchableOpacity>
-        <View className="w-[38px] h-[38px] rounded-[11px] bg-forest items-center justify-center">
-          <MaterialCommunityIcons name="map-marker-path" size={18} color="#F4EFE3" />
-        </View>
-      </View>
 
-      <View className="pt-7 pb-7">
-        <Text className="text-[10px] tracking-[2.5px] text-emeraldDeep uppercase mb-[6px]">INGRESÁ</Text>
-        <Text className="text-[32px] font-bold text-ink tracking-[-1.2px] leading-[34px]">Hola de nuevo</Text>
-        <Text className="text-sm text-inkSoft leading-5 mt-2">
-          Entrá a tu cuenta para seguir moviendo paquetes en AMBA.
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 18 }}>
+          <View style={{ width: 40, height: 40, borderRadius: 13, backgroundColor: "rgba(244,239,227,0.12)", alignItems: "center", justifyContent: "center" }}>
+            <MaterialCommunityIcons name="map-marker-path" size={20} color="#F4EFE3" />
+          </View>
+          <Text style={{ fontSize: 11, letterSpacing: 3.5, color: "rgba(244,239,227,0.4)", textTransform: "uppercase", fontWeight: "700" }}>
+            DEPASO
+          </Text>
+        </View>
+
+        <Text style={{ fontSize: 38, fontWeight: "800", color: "#F4EFE3", letterSpacing: -1.5, lineHeight: 42 }}>
+          {"Hola,\nbienvenido."}
+        </Text>
+        <Text style={{ fontSize: 14, color: "rgba(244,239,227,0.55)", marginTop: 10, lineHeight: 20 }}>
+          Ingresá para seguir moviendo paquetes en AMBA.
         </Text>
       </View>
 
-      {serverError && (
-        <View className="flex-row items-center gap-2 bg-redBg rounded-[10px] border border-red p-3 mb-4">
-          <MaterialCommunityIcons name="alert-circle-outline" size={16} color={T.red} />
-          <Text className="flex-1 text-red text-[13px]">{serverError}</Text>
+      {/* ── Form ── */}
+      <ScrollView
+        contentContainerStyle={{ paddingHorizontal: 24, paddingTop: 28, paddingBottom: insets.bottom + 48 }}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+      >
+        {serverError && (
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 10, backgroundColor: T.redBg, borderRadius: 12, borderWidth: 1, borderColor: T.red, padding: 14, marginBottom: 20 }}>
+            <MaterialCommunityIcons name="alert-circle-outline" size={18} color={T.red} />
+            <Text style={{ flex: 1, color: T.red, fontSize: 13, lineHeight: 18 }}>{serverError}</Text>
+          </View>
+        )}
+
+        {/* Email */}
+        <Text style={{ fontSize: 9.5, letterSpacing: 1.5, color: T.inkMute, textTransform: "uppercase", fontWeight: "700", marginBottom: 8 }}>
+          Email
+        </Text>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 12, backgroundColor: T.card, borderRadius: 16, paddingHorizontal: 16, height: 56, marginBottom: 4, borderWidth: 1.2, borderColor: errors.email ? T.red : email ? T.forest : T.border }}>
+          <MaterialCommunityIcons name="email-outline" size={19} color={errors.email ? T.red : T.inkMute} />
+          <TextInput
+            style={{ flex: 1, fontSize: 15, color: T.ink, fontWeight: "500" }}
+            placeholder="hola@ejemplo.com"
+            placeholderTextColor={T.inkFaint}
+            autoCapitalize="none"
+            keyboardType="email-address"
+            autoCorrect={false}
+            value={email}
+            onChangeText={t => { setEmail(t); if (errors.email) setErrors(e => ({ ...e, email: undefined })); }}
+          />
         </View>
-      )}
+        {errors.email && <Text style={{ fontSize: 11, color: T.red, marginBottom: 8, paddingLeft: 4 }}>{errors.email}</Text>}
 
-      <Text className="text-[9.5px] tracking-[1.5px] text-inkMute uppercase mb-[6px] font-semibold">EMAIL</Text>
-      <View
-        className="flex-row items-center gap-[10px] bg-card rounded-[14px] px-[14px] h-[52px] mb-1"
-        style={{ borderWidth: 1.2, borderColor: errors.email ? T.red : email ? T.forest : T.border }}
-      >
-        <MaterialCommunityIcons name="account-outline" size={18} color={T.inkMute} />
-        <TextInput
-          className="flex-1 text-[15px] text-ink font-medium"
-          placeholder="hola@ejemplo.com"
-          placeholderTextColor={T.inkFaint}
-          autoCapitalize="none"
-          keyboardType="email-address"
-          autoCorrect={false}
-          value={email}
-          onChangeText={t => { setEmail(t); if (errors.email) setErrors(e => ({ ...e, email: undefined })); }}
-        />
-      </View>
-      {errors.email && <Text className="text-[11px] text-red mb-[6px] pl-1">{errors.email}</Text>}
-
-      <View className="flex-row justify-between items-center mt-[14px] mb-[6px]">
-        <Text className="text-[9.5px] tracking-[1.5px] text-inkMute uppercase font-semibold">CONTRASEÑA</Text>
-        <TouchableOpacity hitSlop={8} onPress={() => router.push("/(auth)/forgot-password")}>
-          <Text className="text-[9px] tracking-[1px] text-emeraldDeep uppercase font-semibold">OLVIDÉ</Text>
-        </TouchableOpacity>
-      </View>
-      <View
-        className="flex-row items-center gap-[10px] bg-card rounded-[14px] px-[14px] h-[52px] mb-1"
-        style={{ borderWidth: 1.2, borderColor: errors.password ? T.red : password ? T.forest : T.border }}
-      >
-        <MaterialCommunityIcons name="shield-outline" size={18} color={T.inkMute} />
-        <TextInput
-          className="flex-1 text-[15px] text-ink font-medium"
-          placeholder="••••••••"
-          placeholderTextColor={T.inkFaint}
-          secureTextEntry={!showPwd}
-          value={password}
-          onChangeText={t => { setPassword(t); if (errors.password) setErrors(e => ({ ...e, password: undefined })); }}
-        />
-        <TouchableOpacity onPress={() => setShowPwd(v => !v)} hitSlop={8}>
-          <Text className="text-[10px] text-inkMute font-semibold tracking-[0.5px]">{showPwd ? "OCU" : "VER"}</Text>
-        </TouchableOpacity>
-      </View>
-      {errors.password && <Text className="text-[11px] text-red mb-[6px] pl-1">{errors.password}</Text>}
-
-      <TouchableOpacity
-        className={`rounded-2xl h-[54px] flex-row items-center justify-center gap-[10px] mt-6 mb-2 ${isLoading ? "opacity-65" : ""}`}
-        style={{ backgroundColor: T.forest, shadowColor: T.forest, shadowOffset: { width: 0, height: 12 }, shadowOpacity: 0.4, shadowRadius: 20, elevation: 5 }}
-        onPress={handleLogin}
-        disabled={isLoading}
-        activeOpacity={0.88}
-      >
-        {isLoading
-          ? <ActivityIndicator color="#F4EFE3" />
-          : <>
-              <Text className="text-[#F4EFE3] font-semibold text-[15px]">Iniciar sesión</Text>
-              <MaterialCommunityIcons name="arrow-right" size={18} color="#F4EFE3" />
-            </>
-        }
-      </TouchableOpacity>
-
-      <View className="flex-row items-center gap-3 my-[22px]">
-        <View className="flex-1 h-px bg-border" />
-        <Text className="text-[9px] tracking-[2px] text-inkMute uppercase">O CONTINUÁ CON</Text>
-        <View className="flex-1 h-px bg-border" />
-      </View>
-
-      <View className="flex-row gap-[10px] mb-3">
-        {[
-          { label: "Apple",  dark: true },
-          { label: "Google", dark: false },
-        ].map((s, i) => (
-          <TouchableOpacity key={i} className="flex-1 bg-card border border-border rounded-[14px] py-[14px] flex-row items-center justify-center gap-2" activeOpacity={0.8} onPress={() => Alert.alert("No disponible", "El inicio de sesión con Apple y Google estará disponible próximamente.")}>
-            <View className={`w-[22px] h-[22px] rounded-full items-center justify-center ${s.dark ? "bg-ink" : "bg-white border border-border"}`}>
-              <Text className="text-[12px] font-bold" style={{ color: s.dark ? "#F4EFE3" : T.ink }}>{s.label[0]}</Text>
-            </View>
-            <Text className="text-sm font-semibold text-ink">{s.label}</Text>
+        {/* Password */}
+        <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginTop: 20, marginBottom: 8 }}>
+          <Text style={{ fontSize: 9.5, letterSpacing: 1.5, color: T.inkMute, textTransform: "uppercase", fontWeight: "700" }}>
+            Contraseña
+          </Text>
+          <TouchableOpacity hitSlop={10} onPress={() => router.push("/(auth)/forgot-password")}>
+            <Text style={{ fontSize: 11, color: T.emeraldDeep, fontWeight: "600" }}>Olvidé mi contraseña</Text>
           </TouchableOpacity>
-        ))}
-      </View>
+        </View>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 12, backgroundColor: T.card, borderRadius: 16, paddingHorizontal: 16, height: 56, marginBottom: 4, borderWidth: 1.2, borderColor: errors.password ? T.red : password ? T.forest : T.border }}>
+          <MaterialCommunityIcons name="lock-outline" size={19} color={errors.password ? T.red : T.inkMute} />
+          <TextInput
+            style={{ flex: 1, fontSize: 15, color: T.ink, fontWeight: "500" }}
+            placeholder="••••••••"
+            placeholderTextColor={T.inkFaint}
+            secureTextEntry={!showPwd}
+            value={password}
+            onChangeText={t => { setPassword(t); if (errors.password) setErrors(e => ({ ...e, password: undefined })); }}
+          />
+          <TouchableOpacity onPress={() => setShowPwd(v => !v)} hitSlop={10}>
+            <MaterialCommunityIcons name={showPwd ? "eye-off-outline" : "eye-outline"} size={19} color={T.inkMute} />
+          </TouchableOpacity>
+        </View>
+        {errors.password && <Text style={{ fontSize: 11, color: T.red, marginBottom: 8, paddingLeft: 4 }}>{errors.password}</Text>}
 
-      <View className="flex-row justify-center items-center gap-[6px] mt-3">
-        <Text className="text-inkSoft text-[13px]">¿No tenés cuenta?</Text>
-        <TouchableOpacity onPress={() => router.replace("/(auth)/register")} hitSlop={8}>
-          <Text className="text-forest font-bold text-[13px] underline">Crear una</Text>
+        {/* CTA */}
+        <TouchableOpacity
+          style={{ backgroundColor: T.forest, borderRadius: 18, height: 58, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10, marginTop: 28, shadowColor: T.forest, shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.35, shadowRadius: 20, elevation: 6, opacity: isLoading ? 0.7 : 1 }}
+          onPress={handleLogin}
+          disabled={isLoading}
+          activeOpacity={0.88}
+        >
+          {isLoading
+            ? <ActivityIndicator color="#F4EFE3" />
+            : <>
+                <Text style={{ color: "#F4EFE3", fontWeight: "700", fontSize: 16 }}>Iniciar sesión</Text>
+                <MaterialCommunityIcons name="arrow-right" size={18} color="#F4EFE3" />
+              </>
+          }
         </TouchableOpacity>
-      </View>
-    </ScrollView>
+
+        {/* Sign up */}
+        <View style={{ flexDirection: "row", justifyContent: "center", alignItems: "center", gap: 6, marginTop: 24 }}>
+          <Text style={{ color: T.inkSoft, fontSize: 14 }}>¿No tenés cuenta?</Text>
+          <TouchableOpacity onPress={() => router.replace("/(auth)/register")} hitSlop={8}>
+            <Text style={{ color: T.forest, fontWeight: "700", fontSize: 14 }}>Crear una</Text>
+          </TouchableOpacity>
+        </View>
+      </ScrollView>
+    </View>
   );
 }

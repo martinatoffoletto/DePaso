@@ -14,30 +14,66 @@ import type { Coords } from "./FlowNavigator";
 
 type IconName = React.ComponentProps<typeof MaterialCommunityIcons>["name"];
 
-// ── Nominatim ────────────────────────────────────────────────────────────────
-const AMBA_VIEWBOX = "-59.2,-34.95,-57.8,-34.2";
-
-type NominatimAddress = {
-  road?: string; house_number?: string;
-  neighbourhood?: string; suburb?: string; city_district?: string;
-  city?: string; town?: string; postcode?: string;
-};
+// ── Geocoding (Photon / Komoot — OSM, sin rate-limit) ────────────────────────
+// Photon soporta lang: default | de | en | fr ÚNICAMENTE — no pasar "es"
 type Suggestion = {
   place_id: number; display_name: string;
-  lat: string; lon: string; address?: NominatimAddress;
+  lat: string; lon: string;
+  address?: {
+    road?: string; house_number?: string;
+    neighbourhood?: string; suburb?: string; city_district?: string;
+    city?: string; town?: string; postcode?: string;
+  };
 };
 
-async function searchNominatim(query: string): Promise<Suggestion[]> {
+async function searchAddresses(query: string): Promise<Suggestion[]> {
   if (query.length < 3) return [];
   const params = new URLSearchParams({
-    q: `${query}, Buenos Aires, Argentina`,
-    format: "json", limit: "5", countrycodes: "ar",
-    viewbox: AMBA_VIEWBOX, bounded: "1", addressdetails: "1",
+    q: `${query} Buenos Aires`,
+    limit: "7",
+    lat: "-34.6118",
+    lon: "-58.4173",
   });
-  const res = await fetch(`https://nominatim.openstreetmap.org/search?${params}`, {
-    headers: { "User-Agent": "DePaso-App/1.0" },
-  });
-  return res.json();
+  const controller = new AbortController();
+  const tid = setTimeout(() => controller.abort(), 8000);
+  try {
+    const res = await fetch(`https://photon.komoot.io/api/?${params}`, {
+      signal: controller.signal,
+    });
+    clearTimeout(tid);
+    if (!res.ok) return [];
+    const data = await res.json();
+    const seen = new Set<string>();
+    return (data.features ?? [])
+      .filter((f: any) => (f.properties?.countrycode ?? "AR").toUpperCase() === "AR")
+      .map((f: any): Suggestion => {
+        const p = f.properties ?? {};
+        const street = [p.street, p.housenumber].filter(Boolean).join(" ");
+        return {
+          place_id: p.osm_id ?? Math.floor(Math.random() * 1e9),
+          lat: String(f.geometry.coordinates[1]),
+          lon: String(f.geometry.coordinates[0]),
+          display_name: [street || p.name, p.city ?? p.county].filter(Boolean).join(", "),
+          address: {
+            road: p.street,
+            house_number: p.housenumber,
+            neighbourhood: p.district ?? p.locality,
+            city: p.city ?? p.county,
+            postcode: p.postcode,
+          },
+        };
+      })
+      .filter((r: Suggestion) => {
+        const key = `${parseFloat(r.lat).toFixed(3)},${parseFloat(r.lon).toFixed(3)}`;
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      })
+      .slice(0, 5);
+  } catch {
+    clearTimeout(tid);
+    return [];
+  }
 }
 
 function formatAddress(s: Suggestion): { label: string; sublabel: string } {
@@ -103,6 +139,7 @@ export function AddressScreen({ initial, onBack, onNext }: Props) {
   const [activeField, setActiveField]   = useState<"origin" | "destination" | null>(null);
   const [suggestions, setSuggestions]   = useState<Suggestion[]>([]);
   const [searching, setSearching]       = useState(false);
+  const [noResults, setNoResults]       = useState(false);
   const [locLoading, setLocLoading]     = useState(false);
 
   const debounceRef   = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -116,13 +153,20 @@ export function AddressScreen({ initial, onBack, onNext }: Props) {
     if (field === "origin") { setOrigin(text); setOriginCoords(null); }
     else                    { setDestination(text); setDestCoords(null); }
     setSuggestions([]);
+    setNoResults(false);
     if (debounceRef.current) clearTimeout(debounceRef.current);
     if (text.length < 3) return;
     debounceRef.current = setTimeout(async () => {
       setSearching(true);
-      try { setSuggestions(await searchNominatim(text)); }
-      catch { /* sin red */ }
-      finally { setSearching(false); }
+      try {
+        const results = await searchAddresses(text);
+        setSuggestions(results);
+        setNoResults(results.length === 0);
+      } catch {
+        setNoResults(true);
+      } finally {
+        setSearching(false);
+      }
     }, 450);
   }, []);
 
@@ -132,6 +176,7 @@ export function AddressScreen({ initial, onBack, onNext }: Props) {
     const name = sublabel ? `${label}, ${sublabel}` : label;
     Keyboard.dismiss();
     setSuggestions([]);
+    setNoResults(false);
     if (activeField === "origin") {
       setOrigin(name);
       setOriginCoords(coords);
@@ -175,6 +220,7 @@ export function AddressScreen({ initial, onBack, onNext }: Props) {
     setOrigin(b); setOriginCoords(bc);
     setDestination(a); setDestCoords(ac);
     setSuggestions([]);
+    setNoResults(false);
   }
 
   function handleSavedAddrPress(addr: string) {
@@ -262,12 +308,17 @@ export function AddressScreen({ initial, onBack, onNext }: Props) {
                 }
               </TouchableOpacity>
             </TouchableOpacity>
-            {activeField === "origin" && (searching || suggestions.length > 0) && (
+            {activeField === "origin" && (searching || suggestions.length > 0 || noResults) && (
               <View className="border-t border-borderSoft">
                 {searching ? (
                   <View className="flex-row items-center px-[14px] py-3 gap-3">
                     <ActivityIndicator size={14} color={T.forest} />
                     <Text className="text-[13px] text-inkMute">Buscando...</Text>
+                  </View>
+                ) : noResults ? (
+                  <View className="flex-row items-center px-[14px] py-3 gap-3">
+                    <MaterialCommunityIcons name="map-search-outline" size={16} color={T.inkMute} />
+                    <Text className="text-[13px] text-inkMute">Sin resultados · Verificá la dirección</Text>
                   </View>
                 ) : suggestions.map((s2, i) => {
                   const { label, sublabel } = formatAddress(s2);
@@ -334,12 +385,17 @@ export function AddressScreen({ initial, onBack, onNext }: Props) {
                 : <MaterialCommunityIcons name="chevron-right" size={18} color={T.inkMute} />
               }
             </TouchableOpacity>
-            {activeField === "destination" && (searching || suggestions.length > 0) && (
+            {activeField === "destination" && (searching || suggestions.length > 0 || noResults) && (
               <View className="border-t border-borderSoft">
                 {searching ? (
                   <View className="flex-row items-center px-[14px] py-3 gap-3">
                     <ActivityIndicator size={14} color={T.forest} />
                     <Text className="text-[13px] text-inkMute">Buscando...</Text>
+                  </View>
+                ) : noResults ? (
+                  <View className="flex-row items-center px-[14px] py-3 gap-3">
+                    <MaterialCommunityIcons name="map-search-outline" size={16} color={T.inkMute} />
+                    <Text className="text-[13px] text-inkMute">Sin resultados · Verificá la dirección</Text>
                   </View>
                 ) : suggestions.map((s2, i) => {
                   const { label, sublabel } = formatAddress(s2);

@@ -4,6 +4,7 @@ import MapView, { Marker, Polyline } from "react-native-maps";
 import { Text } from "react-native-paper";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useRouter } from "expo-router";
 import { T } from "@/constants/tokens";
 import type { Coords } from "./FlowNavigator";
 import { shipmentsService } from "@/src/services/shipments";
@@ -73,6 +74,7 @@ export function SummaryScreen({
   onBack, onConfirm,
 }: SummaryScreenProps) {
   const insets = useSafeAreaInsets();
+  const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [assignmentMode, setAssignmentMode] = useState<AssignmentMode>(AssignmentMode.ON_DEMAND);
   const isCollaborative = mode === "colaborativa";
@@ -95,7 +97,21 @@ export function SummaryScreen({
         weight_kg: weightKg,
         description: description || undefined,
       });
-      onConfirm();
+      Alert.alert(
+        "Envío creado",
+        "Tu pedido está pendiente. Te avisamos cuando se asigne un cadete.",
+        [
+          {
+            text: "Ver mis envíos",
+            onPress: () => { onConfirm(); router.push("/(main)/envios"); },
+          },
+          {
+            text: "Seguir enviando",
+            style: "cancel",
+            onPress: onConfirm,
+          },
+        ],
+      );
     } catch (err: any) {
       Alert.alert("Error", err?.response?.data?.detail ?? "No se pudo crear el envío. Intentá de nuevo.");
     } finally {
@@ -131,23 +147,25 @@ export function SummaryScreen({
 
       {/* Map */}
       {originCoords && destinationCoords && (
-        <MapView
-          style={styles.map}
-          region={mapRegion}
-          scrollEnabled={false}
-          zoomEnabled={false}
-          pitchEnabled={false}
-          rotateEnabled={false}
-        >
-          <Marker coordinate={originCoords} pinColor={T.forest} />
-          <Marker coordinate={destinationCoords} pinColor={T.emerald} />
-          <Polyline
-            coordinates={[originCoords, destinationCoords]}
-            strokeColor={T.forest}
-            strokeWidth={3}
-            lineDashPattern={[8, 5]}
-          />
-        </MapView>
+        <View style={styles.mapWrapper}>
+          <MapView
+            style={styles.map}
+            region={mapRegion}
+            scrollEnabled={false}
+            zoomEnabled={false}
+            pitchEnabled={false}
+            rotateEnabled={false}
+          >
+            <Marker coordinate={originCoords} pinColor={T.forest} />
+            <Marker coordinate={destinationCoords} pinColor={T.emerald} />
+            <Polyline
+              coordinates={[originCoords, destinationCoords]}
+              strokeColor={T.forest}
+              strokeWidth={3}
+              lineDashPattern={[8, 5]}
+            />
+          </MapView>
+        </View>
       )}
 
       <ScrollView
@@ -213,7 +231,7 @@ export function SummaryScreen({
                 activeOpacity={0.8}
               >
                 <Text style={[styles.modeBtnText, assignmentMode === AssignmentMode.ON_DEMAND && styles.modeBtnTextActive]}>
-                  On demand
+                  Inmediato
                 </Text>
               </TouchableOpacity>
               <TouchableOpacity
@@ -222,7 +240,7 @@ export function SummaryScreen({
                 activeOpacity={0.8}
               >
                 <Text style={[styles.modeBtnText, assignmentMode === AssignmentMode.BY_AVAILABILITY && styles.modeBtnTextActive]}>
-                  Disponibilidad
+                  Por ruta
                 </Text>
               </TouchableOpacity>
             </View>
@@ -235,13 +253,17 @@ export function SummaryScreen({
         {isCollaborative && (
           <View style={styles.co2Card}>
             <View style={styles.co2IconBox}>
-              <MaterialCommunityIcons name="leaf" size={20} color={T.forest} />
+              <MaterialCommunityIcons name="leaf" size={20} color="#fff" />
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={styles.co2Title}>¡Ahorrás CO₂!</Text>
+              <Text style={styles.co2Title}>Ahorrás CO₂</Text>
               <Text style={styles.co2Sub}>
                 {"Este envío colaborativo evita hasta "}
-                <Text style={styles.co2Highlight}>1.8 kg CO₂</Text>
+                <Text style={styles.co2Highlight}>
+                  {quote?.co2_savings_estimate_kg != null
+                    ? `${quote.co2_savings_estimate_kg.toFixed(1)} kg`
+                    : "~1.8 kg"}{" CO₂"}
+                </Text>
                 {" de emisiones"}
               </Text>
             </View>
@@ -283,7 +305,8 @@ const styles = StyleSheet.create({
   stepSub: { fontSize: 10, letterSpacing: 2.5, color: T.emeraldDeep, textTransform: "uppercase", marginBottom: 4 },
   stepTitle: { fontSize: 24, fontWeight: "700", color: T.ink, letterSpacing: -0.8, lineHeight: 28 },
 
-  map: { height: 180 },
+  mapWrapper: { marginHorizontal: 16, marginBottom: 4, borderRadius: 18, overflow: "hidden", borderWidth: 1, borderColor: T.border },
+  map: { height: 175 },
   packagePhoto: { width: "100%", height: 160, borderRadius: 10, marginBottom: 4 },
 
   content: { padding: 16, gap: 12 },
@@ -309,17 +332,18 @@ const styles = StyleSheet.create({
 
   co2Card: {
     flexDirection: "row", gap: 12,
-    backgroundColor: T.forest, borderRadius: 16, padding: 16,
+    backgroundColor: T.mint, borderRadius: 16, padding: 16,
+    borderWidth: 1, borderColor: T.border,
     alignItems: "flex-start",
   },
   co2IconBox: {
     width: 36, height: 36, borderRadius: 12,
-    backgroundColor: T.lime, alignItems: "center", justifyContent: "center",
+    backgroundColor: T.emerald, alignItems: "center", justifyContent: "center",
     flexShrink: 0,
   },
-  co2Title: { fontSize: 14, fontWeight: "700", color: "#F4EFE3", marginBottom: 2 },
-  co2Sub: { fontSize: 12, color: "rgba(244,239,227,0.75)", lineHeight: 17 },
-  co2Highlight: { color: T.lime, fontWeight: "700" },
+  co2Title: { fontSize: 14, fontWeight: "600", color: T.forest, marginBottom: 2 },
+  co2Sub: { fontSize: 12, color: T.inkSoft, lineHeight: 17 },
+  co2Highlight: { color: T.emeraldDeep, fontWeight: "700" },
 
   confirmBtn: {
     flexDirection: "row", backgroundColor: T.forest,
@@ -331,7 +355,7 @@ const styles = StyleSheet.create({
     shadowRadius: 16,
     elevation: 5,
   },
-  confirmText: { color: "#fff", fontWeight: "700", fontSize: 17 },
+  confirmText: { color: "#F4EFE3", fontWeight: "700", fontSize: 17 },
   cancelBtn: { alignItems: "center", paddingVertical: 10 },
   cancelText: { color: T.inkMute, fontSize: 14 },
 
