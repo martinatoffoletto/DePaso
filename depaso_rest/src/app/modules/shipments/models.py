@@ -15,6 +15,9 @@ class Shipment(Base, TimestampMixin):
     id = Column(Integer, primary_key=True, index=True)
     client_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
     carrier_id = Column(Integer, ForeignKey("carriers.id"), nullable=True, index=True)
+    # Set when the shipment was created by a merchant organization (nullable for
+    # ordinary end-user shipments). Drives the pyme finance/monitoring views.
+    organization_id = Column(Integer, ForeignKey("organizations.id"), nullable=True, index=True)
     package_size = Column(String(20), nullable=False)
     status = Column(String(20), default=ShipmentStatus.PENDING)
     modality = Column(String(20), nullable=False)  # dedicated / collaborative

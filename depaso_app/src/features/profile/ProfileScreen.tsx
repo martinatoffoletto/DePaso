@@ -10,7 +10,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAuthStore } from "@/src/stores/authStore";
 import { useAddressBookStore } from "@/src/stores/addressBookStore";
 import { UserType } from "@/src/types";
-import PublishRouteScreen from "@/src/features/carrier/PublishRouteScreen";
+import PublishTripScreen from "@/src/features/carrier/PublishTripScreen";
 import { T } from "@/constants/tokens";
 
 type IconName = React.ComponentProps<typeof MaterialCommunityIcons>["name"];
@@ -449,7 +449,7 @@ export default function ProfileScreen() {
 
       <AddressModal visible={addrModal}   onClose={() => setAddrModal(false)} />
       <ContactModal visible={contactModal} onClose={() => setContactModal(false)} />
-      {routeModal && <PublishRouteScreen onClose={() => setRouteModal(false)} />}
+      {routeModal && <PublishTripScreen onClose={() => setRouteModal(false)} />}
     </>
   );
 }

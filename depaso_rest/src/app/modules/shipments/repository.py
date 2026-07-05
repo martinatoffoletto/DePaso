@@ -41,6 +41,34 @@ class ShipmentRepository(BaseRepository[Shipment]):
             Shipment.status == ShipmentStatus.PENDING
         ).all()
 
+    def list_by_organization(self, org_id: int, status: str | None = None,
+                             skip: int = 0, limit: int = 50) -> tuple[list[Shipment], int]:
+        """Shipments created by a merchant organization (optionally by status)."""
+        query = self.db.query(Shipment).filter(Shipment.organization_id == org_id)
+        if status is not None:
+            query = query.filter(Shipment.status == status)
+        total = query.count()
+        shipments = (
+            query.order_by(Shipment.created_at.desc())
+            .offset(skip).limit(limit).all()
+        )
+        return shipments, total
+
+    def list_all_by_organization(self, org_id: int) -> list[Shipment]:
+        """Every shipment of an organization (for dashboard/finance aggregation)."""
+        return self.db.query(Shipment).filter(
+            Shipment.organization_id == org_id
+        ).all()
+
+    def list_delivered_by_carriers(self, carrier_ids: list[int]) -> list[Shipment]:
+        """Delivered shipments handled by any of the given carriers (fleet earnings)."""
+        if not carrier_ids:
+            return []
+        return self.db.query(Shipment).filter(
+            Shipment.carrier_id.in_(carrier_ids),
+            Shipment.status == ShipmentStatus.DELIVERED,
+        ).all()
+
     def list_active_by_carrier(self, carrier_id: int) -> list[Shipment]:
         """Shipments the carrier is currently working on."""
         return self.db.query(Shipment).filter(

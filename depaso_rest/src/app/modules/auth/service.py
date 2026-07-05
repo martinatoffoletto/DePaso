@@ -4,7 +4,7 @@ Auth module service for business logic.
 import hashlib
 import logging
 import secrets
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from src.app.core.config import settings
 from src.app.core.security import create_access_token, get_password_hash, verify_password
@@ -113,7 +113,8 @@ class AuthService:
         db.add(PasswordResetToken(
             user_id=user.id,
             token_hash=hashlib.sha256(reset_token.encode()).hexdigest(),
-            expires_at=datetime.utcnow() + timedelta(hours=RESET_TOKEN_TTL_HOURS),
+            expires_at=datetime.now(timezone.utc).replace(tzinfo=None)
+            + timedelta(hours=RESET_TOKEN_TTL_HOURS),
         ))
         db.commit()
         logger.info(f"Password reset token for user {user.id}: {reset_token}")
@@ -128,7 +129,8 @@ class AuthService:
             .filter(PasswordResetToken.token_hash == token_hash)
             .first()
         )
-        if record is None or record.used or record.expires_at < datetime.utcnow():
+        if (record is None or record.used
+                or record.expires_at < datetime.now(timezone.utc).replace(tzinfo=None)):
             raise ValueError("Invalid or expired reset token")
 
         self.user_repository.update(record.user_id, password_hash=get_password_hash(new_password))

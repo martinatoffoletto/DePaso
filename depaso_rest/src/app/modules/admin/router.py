@@ -4,17 +4,26 @@ Admin module API router (RF-ADM).
 Admin access: users with user_type == "admin". For the prototype demo an
 admin is created by the seed script.
 """
-from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import func
+from fastapi import APIRouter, Depends, HTTPException, Request, status
+from sqlalchemy import func, text
 from sqlalchemy.orm import Session
 
+from src.app.core.config import settings
 from src.app.core.database import get_db
 from src.app.core.dependencies import CurrentUserId
-from src.app.modules.admin.schemas import DashboardResponse, ModerationRequest
+from src.app.modules.admin.schemas import (
+    ActivityResponse,
+    ClassificationActivityItem,
+    DashboardResponse,
+    ModerationRequest,
+    ShipmentEventActivityItem,
+    SystemStatusResponse,
+)
 from src.app.modules.carriers.models import Carrier
 from src.app.modules.carriers.schemas import CarrierResponse
-from src.app.modules.shipments.models import Shipment
+from src.app.modules.shipments.models import Shipment, ShipmentEvent
 from src.app.modules.users.models import User
+from src.app.modules.vision.models import Classification
 from src.app.shared.enums import ShipmentStatus
 
 router = APIRouter(prefix="/admin", tags=["admin"])

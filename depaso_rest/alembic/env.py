@@ -11,6 +11,11 @@ from src.app.core.config import settings
 from src.app.modules.auth.models import PasswordResetToken  # noqa: F401
 from src.app.modules.carriers.models import Carrier  # noqa: F401
 from src.app.modules.matching.models import MatchingWeight  # noqa: F401
+from src.app.modules.organizations.models import (  # noqa: F401
+    Organization,
+    OrganizationCarrier,
+    OrganizationMember,
+)
 from src.app.modules.packages.models import Package  # noqa: F401
 from src.app.modules.routes.models import CarrierRoute  # noqa: F401
 from src.app.modules.shipments.models import Rating, Shipment, ShipmentEvent  # noqa: F401

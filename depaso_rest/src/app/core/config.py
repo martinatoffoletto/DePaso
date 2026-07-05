@@ -2,7 +2,12 @@
 Configuration module using Pydantic Settings v2.
 Reads environment variables from .env file.
 """
+from pydantic import model_validator
 from pydantic_settings import BaseSettings
+
+# Placeholder value shipped for local dev. It must never reach production —
+# see the validator below, which refuses to boot with it when environment is prod.
+INSECURE_JWT_DEFAULT = "your-secret-key-change-this"
 
 
 class Settings(BaseSettings):
@@ -12,7 +17,7 @@ class Settings(BaseSettings):
     database_url: str = "sqlite:///./depaso_dev.db"  # Override con DATABASE_URL en .env
 
     # JWT
-    jwt_secret_key: str = "your-secret-key-change-this"
+    jwt_secret_key: str = INSECURE_JWT_DEFAULT
     jwt_algorithm: str = "HS256"
     jwt_expire_minutes: int = 30
     refresh_token_expire_days: int = 7
@@ -26,11 +31,12 @@ class Settings(BaseSettings):
     rate_limit_enabled: bool = True
     rate_limit_auth: str = "5/minute"
 
-    # CORS
+    # CORS — restrict per environment via the CORS_ORIGINS env var (JSON list).
     cors_origins: list[str] = [
         "http://localhost:3000",
         "http://localhost:8081",
         "http://localhost:8100",
+        "http://localhost:5173",  # Vite dev server (depaso_web)
     ]
 
     # AI Models
@@ -44,6 +50,25 @@ class Settings(BaseSettings):
     class Config:
         env_file = ".env"
         case_sensitive = False
+
+    @property
+    def is_production(self) -> bool:
+        return self.environment.lower() in ("production", "prod")
+
+    @model_validator(mode="after")
+    def _enforce_production_secrets(self) -> "Settings":
+        """In production the JWT secret must be a real, non-default value.
+
+        Failing fast at boot is safer than silently signing tokens with a
+        publicly known key (RNF-SEC-01).
+        """
+        if self.is_production and (
+            not self.jwt_secret_key or self.jwt_secret_key == INSECURE_JWT_DEFAULT
+        ):
+            raise ValueError(
+                "JWT_SECRET_KEY must be set to a strong, non-default value in production."
+            )
+        return self
 
 
 settings = Settings()

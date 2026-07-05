@@ -1,6 +1,5 @@
 import { useCallback, useState } from "react";
-import { View, ScrollView, TouchableOpacity, TextInput, ActivityIndicator, Alert, StyleSheet, Modal } from "react-native";
-import { Text } from "react-native-paper";
+import { View, ScrollView, TouchableOpacity, TextInput, ActivityIndicator, Alert, Modal, Text } from "react-native";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useFocusEffect } from "@react-navigation/native";
@@ -36,22 +35,20 @@ function parseLocalDateTime(date: string, time: string): Date | null {
 }
 
 function Label({ text }: { text: string }) {
-  return (
-    <Text style={{ fontSize: 9.5, letterSpacing: 1.5, color: T.inkMute, textTransform: "uppercase", fontWeight: "700", marginBottom: 8 }}>
-      {text}
-    </Text>
-  );
+  return <Text className="text-[9.5px] tracking-[1.5px] text-inkMute uppercase font-bold mb-2">{text}</Text>;
 }
 
 function RouteAddress({ lat, lon }: { lat: number; lon: number }) {
   const [addr, setAddr] = useState(`${lat.toFixed(3)}, ${lon.toFixed(3)}`);
-  useCallback(() => {
-    reverseGeocode(lat, lon).then(setAddr).catch(() => {});
-  }, [lat, lon])();
-  return <Text style={{ fontSize: 12.5, color: T.ink, fontWeight: "500", flex: 1 }} numberOfLines={1}>{addr}</Text>;
+  useFocusEffect(useCallback(() => {
+    let alive = true;
+    reverseGeocode(lat, lon).then((r) => { if (alive) setAddr(r); }).catch(() => {});
+    return () => { alive = false; };
+  }, [lat, lon]));
+  return <Text className="text-[12.5px] text-ink font-medium flex-1" numberOfLines={1}>{addr}</Text>;
 }
 
-export default function PublishRouteScreen({ onClose }: { onClose: () => void }) {
+export default function PublishTripScreen({ onClose }: { onClose: () => void }) {
   const insets = useSafeAreaInsets();
 
   const [kind, setKind] = useState<RouteKind>("collaborative_route");
@@ -76,7 +73,7 @@ export default function PublishRouteScreen({ onClose }: { onClose: () => void })
 
   async function publish() {
     if (!origin.trim()) {
-      Alert.alert("Faltan datos", "Completá el origen de tu trayecto.");
+      Alert.alert("Faltan datos", "Completá el origen de tu viaje.");
       return;
     }
     if (kind === "collaborative_route" && !destination.trim()) {
@@ -147,7 +144,7 @@ export default function PublishRouteScreen({ onClose }: { onClose: () => void })
         "Publicado",
         kind === "dedicated_window"
           ? "Tu ventana dedicada fue publicada."
-          : "Te vamos a sugerir pedidos que te queden de paso.",
+          : "Te vamos a ofrecer pedidos que te queden de paso.",
       );
     } catch (err: unknown) {
       const detail = (err as { response?: { data?: { detail?: unknown } } })?.response?.data?.detail;
@@ -162,7 +159,7 @@ export default function PublishRouteScreen({ onClose }: { onClose: () => void })
       await routesService.deactivate(routeId);
       setMyRoutes((r) => r.filter((x) => x.id !== routeId));
     } catch {
-      Alert.alert("Error", "No se pudo eliminar el trayecto.");
+      Alert.alert("Error", "No se pudo eliminar el viaje.");
     }
   }
 
@@ -171,46 +168,67 @@ export default function PublishRouteScreen({ onClose }: { onClose: () => void })
 
   return (
     <Modal visible animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
-      <View style={[s.container, { paddingTop: 20 }]}>
-        {/* ── Header ── */}
-        <View style={s.header}>
-          <View style={{ flex: 1 }}>
-            <Text style={s.eyebrow}>{isDedicated ? "VENTANA DEDICADA" : "RUTA COLABORATIVA"}</Text>
-            <Text style={s.title}>{isDedicated ? "Ventana de horario" : "Tu trayecto habitual"}</Text>
-          </View>
-          <TouchableOpacity onPress={onClose} hitSlop={10} style={s.closeBtn}>
-            <MaterialCommunityIcons name="close" size={18} color={T.ink} />
+      <View className="flex-1 bg-bg" style={{ paddingTop: 20 }}>
+        {/* Header */}
+        <View className="flex-row items-center justify-between px-5 pb-1">
+          <TouchableOpacity
+            onPress={onClose}
+            hitSlop={10}
+            className="w-[38px] h-[38px] rounded-xl border border-border bg-card items-center justify-center"
+            accessibilityLabel="Cerrar"
+          >
+            <MaterialCommunityIcons name="arrow-left" size={18} color={T.ink} />
           </TouchableOpacity>
+          <View className="flex-row items-center gap-[6px] bg-mint px-[10px] py-[5px] rounded-[9px]">
+            <MaterialCommunityIcons name="leaf" size={11} color={T.forest} />
+            <Text className="text-[9px] tracking-[1.2px] text-forest font-bold uppercase">
+              {isDedicated ? "Dedicado" : "Colaborativo"}
+            </Text>
+          </View>
+          <View className="w-[38px]" />
+        </View>
+
+        {/* Title */}
+        <View className="px-5 pt-4">
+          <Text className="text-[10px] tracking-[2.5px] text-emeraldDeep uppercase mb-[6px]">Publicá un viaje</Text>
+          <Text className="text-[28px] font-bold text-ink tracking-[-1px] leading-[30px]">
+            {isDedicated ? "Elegí tu ventana" : "¿A dónde vas a ir igual?"}
+          </Text>
+          <Text className="text-[12.5px] text-inkSoft leading-[18px] mt-2">
+            {isDedicated
+              ? "Publicá una franja horaria específica para hacer entregas dedicadas."
+              : "Decinos tu ruta y horario. Te ofrecemos paquetes que van en el mismo sentido."}
+          </Text>
         </View>
 
         <ScrollView
-          contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 20, gap: 18, paddingBottom: insets.bottom + 32 }}
+          contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 20, gap: 16, paddingBottom: insets.bottom + 120 }}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-          {/* ── Kind toggle ── */}
-          <View style={s.kindRow}>
+          {/* Kind toggle */}
+          <View className="gap-2">
             {([
-              { k: "collaborative_route" as RouteKind, icon: "repeat" as const,         label: "Habitual",          sub: "Repetición diaria" },
-              { k: "dedicated_window"   as RouteKind, icon: "calendar-clock" as const,  label: "Ventana dedicada",  sub: "Fecha y hora fija" },
-            ]).map(opt => {
+              { k: "collaborative_route" as RouteKind, icon: "repeat" as const, label: "Habitual", sub: "Repetición diaria" },
+              { k: "dedicated_window" as RouteKind, icon: "calendar-clock" as const, label: "Ventana dedicada", sub: "Fecha y hora fija" },
+            ]).map((opt) => {
               const active = kind === opt.k;
               return (
                 <TouchableOpacity
                   key={opt.k}
-                  style={[s.kindBtn, active && s.kindBtnActive]}
+                  className={`flex-row items-center gap-3 rounded-2xl p-[14px] border-[1.2px] ${active ? "bg-forest border-forest" : "bg-card border-border"}`}
                   onPress={() => setKind(opt.k)}
-                  activeOpacity={0.8}
+                  activeOpacity={0.85}
                 >
-                  <View style={{ width: 32, height: 32, borderRadius: 10, alignItems: "center", justifyContent: "center", backgroundColor: active ? "rgba(244,239,227,0.15)" : T.cardSoft }}>
+                  <View className={`w-8 h-8 rounded-[10px] items-center justify-center ${active ? "bg-[#F4EFE3]/15" : "bg-cardSoft"}`}>
                     <MaterialCommunityIcons name={opt.icon} size={15} color={active ? T.lime : T.inkMute} />
                   </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={[s.kindText, active && s.kindTextActive]}>{opt.label}</Text>
-                    <Text style={{ fontSize: 10.5, color: active ? "rgba(244,239,227,0.5)" : T.inkMute }}>{opt.sub}</Text>
+                  <View className="flex-1">
+                    <Text className={`text-sm font-bold ${active ? "text-[#F4EFE3]" : "text-ink"}`}>{opt.label}</Text>
+                    <Text className={`text-[10.5px] ${active ? "text-[#F4EFE3]/50" : "text-inkMute"}`}>{opt.sub}</Text>
                   </View>
                   {active && (
-                    <View style={{ width: 18, height: 18, borderRadius: 9, backgroundColor: T.lime, alignItems: "center", justifyContent: "center" }}>
+                    <View className="w-[18px] h-[18px] rounded-full bg-lime items-center justify-center">
                       <MaterialCommunityIcons name="check" size={11} color={T.forest} />
                     </View>
                   )}
@@ -219,23 +237,13 @@ export default function PublishRouteScreen({ onClose }: { onClose: () => void })
             })}
           </View>
 
-          {/* ── Info banner ── */}
-          <View style={{ flexDirection: "row", gap: 10, backgroundColor: T.mint, borderRadius: 14, padding: 14, borderWidth: 1, borderColor: T.border }}>
-            <MaterialCommunityIcons name="information-outline" size={16} color={T.forest} style={{ marginTop: 1 }} />
-            <Text style={{ flex: 1, fontSize: 13, color: T.forest, lineHeight: 19 }}>
-              {isDedicated
-                ? "Publicá una ventana de tiempo específica para hacer entregas. Elegí la fecha y hora de inicio y fin exactas."
-                : "Publicá el recorrido que ya hacés todos los días. Te sugerimos pedidos de paso, sin desviarte más de un 15%."}
-            </Text>
-          </View>
-
-          {/* ── Origin ── */}
+          {/* Route block */}
           <View>
             <Label text="Desde" />
-            <View style={s.inputBox}>
-              <View style={{ width: 9, height: 9, borderRadius: 5, borderWidth: 2, borderColor: T.forest }} />
+            <View className="flex-row items-center gap-[10px] bg-card rounded-[14px] border-[1.2px] border-border px-[14px] h-[52px]">
+              <View className="w-[10px] h-[10px] rounded-full border-2 border-forest" />
               <TextInput
-                style={s.input}
+                className="flex-1 text-[15px] text-ink font-medium"
                 placeholder="Ej: Caballito, CABA"
                 placeholderTextColor={T.inkFaint}
                 value={origin}
@@ -244,14 +252,13 @@ export default function PublishRouteScreen({ onClose }: { onClose: () => void })
             </View>
           </View>
 
-          {/* ── Destination ── */}
           <View>
             <Label text={isDedicated ? "Hasta (opcional)" : "Hasta"} />
-            <View style={s.inputBox}>
-              <View style={{ width: 9, height: 9, borderRadius: 3, backgroundColor: T.emerald, transform: [{ rotate: "45deg" }] }} />
+            <View className="flex-row items-center gap-[10px] bg-card rounded-[14px] border-[1.2px] border-border px-[14px] h-[52px]">
+              <View className="w-[10px] h-[10px] rounded-[3px] bg-emerald rotate-45" />
               <TextInput
-                style={s.input}
-                placeholder="Ej: Microcentro, CABA"
+                className="flex-1 text-[15px] text-ink font-medium"
+                placeholder="Ej: Tigre Centro"
                 placeholderTextColor={T.inkFaint}
                 value={destination}
                 onChangeText={setDestination}
@@ -259,22 +266,22 @@ export default function PublishRouteScreen({ onClose }: { onClose: () => void })
             </View>
           </View>
 
-          {/* ── Collaborative: days + duration ── */}
+          {/* Collaborative: days + duration */}
           {!isDedicated && (
             <>
               <View>
                 <Label text="Días" />
-                <View style={{ flexDirection: "row", gap: 6 }}>
+                <View className="flex-row gap-[6px]">
                   {DAYS.map((d) => {
                     const active = days.includes(d.key);
                     return (
                       <TouchableOpacity
                         key={d.key}
-                        style={[s.dayBtn, active && s.dayBtnActive]}
+                        className={`flex-1 h-10 rounded-[11px] border-[1.2px] items-center justify-center ${active ? "bg-forest border-forest" : "bg-card border-border"}`}
                         onPress={() => toggleDay(d.key)}
                         activeOpacity={0.8}
                       >
-                        <Text style={[s.dayText, active && s.dayTextActive]}>{d.label}</Text>
+                        <Text className={`text-[13px] font-semibold ${active ? "text-[#F4EFE3]" : "text-inkSoft"}`}>{d.label}</Text>
                       </TouchableOpacity>
                     );
                   })}
@@ -283,17 +290,17 @@ export default function PublishRouteScreen({ onClose }: { onClose: () => void })
 
               <View>
                 <Label text="Disponible desde ahora por" />
-                <View style={{ flexDirection: "row", gap: 8 }}>
+                <View className="flex-row gap-2">
                   {DURATIONS.map((d) => {
                     const active = durationH === d.hours;
                     return (
                       <TouchableOpacity
                         key={d.hours}
-                        style={[s.durBtn, active && s.dayBtnActive]}
+                        className={`flex-1 h-10 rounded-[11px] border-[1.2px] items-center justify-center ${active ? "bg-forest border-forest" : "bg-card border-border"}`}
                         onPress={() => setDurationH(d.hours)}
                         activeOpacity={0.8}
                       >
-                        <Text style={[s.dayText, active && s.dayTextActive]}>{d.label}</Text>
+                        <Text className={`text-[13px] font-semibold ${active ? "text-[#F4EFE3]" : "text-inkSoft"}`}>{d.label}</Text>
                       </TouchableOpacity>
                     );
                   })}
@@ -302,83 +309,84 @@ export default function PublishRouteScreen({ onClose }: { onClose: () => void })
             </>
           )}
 
-          {/* ── Dedicated: date+time ── */}
+          {/* Dedicated: date + time */}
           {isDedicated && (
             <>
               <View>
                 <Label text="Inicio de ventana" />
-                <View style={s.dateRow}>
-                  <View style={[s.inputBox, { flex: 2 }]}>
+                <View className="flex-row gap-2">
+                  <View className="flex-[2] flex-row items-center gap-[10px] bg-card rounded-[14px] border-[1.2px] border-border px-[14px] h-[52px]">
                     <MaterialCommunityIcons name="calendar-outline" size={16} color={T.inkMute} />
-                    <TextInput style={s.input} placeholder="DD/MM/AAAA" placeholderTextColor={T.inkFaint} value={startDate} onChangeText={setStartDate} keyboardType="numeric" />
+                    <TextInput className="flex-1 text-[15px] text-ink font-medium" placeholder="DD/MM/AAAA" placeholderTextColor={T.inkFaint} value={startDate} onChangeText={setStartDate} keyboardType="numeric" />
                   </View>
-                  <View style={[s.inputBox, { flex: 1 }]}>
+                  <View className="flex-1 flex-row items-center gap-[10px] bg-card rounded-[14px] border-[1.2px] border-border px-[14px] h-[52px]">
                     <MaterialCommunityIcons name="clock-outline" size={16} color={T.inkMute} />
-                    <TextInput style={s.input} placeholder="HH:MM" placeholderTextColor={T.inkFaint} value={startTime} onChangeText={setStartTime} keyboardType="numeric" />
+                    <TextInput className="flex-1 text-[15px] text-ink font-medium" placeholder="HH:MM" placeholderTextColor={T.inkFaint} value={startTime} onChangeText={setStartTime} keyboardType="numeric" />
                   </View>
                 </View>
               </View>
 
               <View>
                 <Label text="Fin de ventana" />
-                <View style={s.dateRow}>
-                  <View style={[s.inputBox, { flex: 2 }]}>
+                <View className="flex-row gap-2">
+                  <View className="flex-[2] flex-row items-center gap-[10px] bg-card rounded-[14px] border-[1.2px] border-border px-[14px] h-[52px]">
                     <MaterialCommunityIcons name="calendar-outline" size={16} color={T.inkMute} />
-                    <TextInput style={s.input} placeholder="DD/MM/AAAA" placeholderTextColor={T.inkFaint} value={endDate} onChangeText={setEndDate} keyboardType="numeric" />
+                    <TextInput className="flex-1 text-[15px] text-ink font-medium" placeholder="DD/MM/AAAA" placeholderTextColor={T.inkFaint} value={endDate} onChangeText={setEndDate} keyboardType="numeric" />
                   </View>
-                  <View style={[s.inputBox, { flex: 1 }]}>
+                  <View className="flex-1 flex-row items-center gap-[10px] bg-card rounded-[14px] border-[1.2px] border-border px-[14px] h-[52px]">
                     <MaterialCommunityIcons name="clock-outline" size={16} color={T.inkMute} />
-                    <TextInput style={s.input} placeholder="HH:MM" placeholderTextColor={T.inkFaint} value={endTime} onChangeText={setEndTime} keyboardType="numeric" />
+                    <TextInput className="flex-1 text-[15px] text-ink font-medium" placeholder="HH:MM" placeholderTextColor={T.inkFaint} value={endTime} onChangeText={setEndTime} keyboardType="numeric" />
                   </View>
                 </View>
               </View>
             </>
           )}
 
-          {/* ── Submit ── */}
-          <TouchableOpacity style={s.publishBtn} onPress={publish} disabled={saving} activeOpacity={0.88}>
-            {saving ? (
-              <ActivityIndicator color="#F4EFE3" />
-            ) : (
-              <>
-                <MaterialCommunityIcons name={isDedicated ? "calendar-check" : "map-marker-path"} size={18} color="#F4EFE3" />
-                <Text style={s.publishText}>{isDedicated ? "Publicar ventana" : "Publicar trayecto"}</Text>
-              </>
-            )}
-          </TouchableOpacity>
+          {/* Info band */}
+          <View className="flex-row gap-[10px] bg-mint rounded-[14px] p-[14px] border border-border">
+            <MaterialCommunityIcons name="information-outline" size={16} color={T.forest} style={{ marginTop: 1 }} />
+            <Text className="flex-1 text-[13px] text-forest leading-[19px]">
+              {isDedicated
+                ? "Solo vas a recibir pedidos dentro de la franja que elegís."
+                : "Te ofrecemos paquetes que van en tu mismo sentido, sin desviarte más de un 15%."}
+            </Text>
+          </View>
 
-          {/* ── Active routes ── */}
+          {/* Active routes */}
           {activeRoutes.length > 0 && (
-            <View style={{ gap: 8 }}>
-              <Label text="Trayectos activos" />
+            <View className="gap-2">
+              <Label text="Viajes activos" />
               {activeRoutes.map((r) => (
-                <View key={r.id} style={s.routeRow}>
-                  <View style={{ width: 34, height: 34, borderRadius: 10, backgroundColor: T.mint, alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: T.border }}>
+                <View key={r.id} className="flex-row items-center gap-3 bg-card rounded-[14px] border border-borderSoft p-3">
+                  <View className="w-[34px] h-[34px] rounded-[10px] bg-mint items-center justify-center border border-border">
                     <MaterialCommunityIcons
                       name={r.kind === "dedicated_window" ? "calendar-clock" : "map-marker-path"}
                       size={16}
                       color={T.forest}
                     />
                   </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={s.routeText} numberOfLines={1}>
-                      {r.origin_lat.toFixed(3)}, {r.origin_lon.toFixed(3)}
-                      {r.destination_lat != null
-                        ? ` → ${r.destination_lat.toFixed(3)}, ${r.destination_lon?.toFixed(3)}`
-                        : ""}
-                    </Text>
+                  <View className="flex-1">
+                    {r.destination_lat != null ? (
+                      <View className="flex-row items-center gap-1">
+                        <RouteAddress lat={r.origin_lat} lon={r.origin_lon} />
+                        <MaterialCommunityIcons name="arrow-right" size={12} color={T.inkMute} />
+                        <RouteAddress lat={r.destination_lat} lon={r.destination_lon ?? 0} />
+                      </View>
+                    ) : (
+                      <RouteAddress lat={r.origin_lat} lon={r.origin_lon} />
+                    )}
                     {r.kind === "dedicated_window" ? (
-                      <Text style={s.routeMeta}>
+                      <Text className="text-[10px] tracking-[0.5px] text-inkMute mt-1">
                         {new Date(r.window_start).toLocaleDateString("es-AR")}{" "}
                         {new Date(r.window_start).toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" })}
                         {" → "}
                         {new Date(r.window_end).toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" })}
                       </Text>
                     ) : r.recurrence_days ? (
-                      <Text style={s.routeMeta}>{r.recurrence_days.toUpperCase()}</Text>
+                      <Text className="text-[10px] tracking-[0.5px] text-inkMute mt-1">{r.recurrence_days.toUpperCase()}</Text>
                     ) : null}
                   </View>
-                  <TouchableOpacity onPress={() => remove(r.id)} hitSlop={10} style={{ padding: 4 }}>
+                  <TouchableOpacity onPress={() => remove(r.id)} hitSlop={10} className="p-1" accessibilityLabel="Eliminar viaje">
                     <MaterialCommunityIcons name="trash-can-outline" size={18} color={T.red} />
                   </TouchableOpacity>
                 </View>
@@ -386,42 +394,27 @@ export default function PublishRouteScreen({ onClose }: { onClose: () => void })
             </View>
           )}
         </ScrollView>
+
+        {/* Footer CTA */}
+        <View className="absolute left-0 right-0 bottom-0 px-4 pt-6" style={{ paddingBottom: insets.bottom + 16 }}>
+          <TouchableOpacity
+            className="bg-forest rounded-2xl h-[54px] flex-row items-center justify-center gap-[10px]"
+            style={{ shadowColor: T.forest, shadowOffset: { width: 0, height: 12 }, shadowOpacity: 0.35, shadowRadius: 24, elevation: 6 }}
+            onPress={publish}
+            disabled={saving}
+            activeOpacity={0.9}
+          >
+            {saving ? (
+              <ActivityIndicator color="#F4EFE3" />
+            ) : (
+              <>
+                <Text className="text-[15px] font-bold text-[#F4EFE3]">{isDedicated ? "Publicar ventana" : "Publicar viaje"}</Text>
+                <MaterialCommunityIcons name="arrow-right" size={18} color="#F4EFE3" />
+              </>
+            )}
+          </TouchableOpacity>
+        </View>
       </View>
     </Modal>
   );
 }
-
-const s = StyleSheet.create({
-  container: { flex: 1, backgroundColor: T.bg },
-
-  header: {
-    flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between",
-    paddingHorizontal: 20, paddingBottom: 4,
-  },
-  eyebrow: { fontSize: 9.5, letterSpacing: 2.5, color: T.emeraldDeep, textTransform: "uppercase", fontWeight: "700" },
-  title: { fontSize: 26, fontWeight: "800", color: T.ink, letterSpacing: -0.8, marginTop: 4 },
-  closeBtn: { width: 38, height: 38, borderRadius: 12, borderWidth: 1, borderColor: T.border, backgroundColor: T.card, alignItems: "center", justifyContent: "center" },
-
-  kindRow: { gap: 8 },
-  kindBtn: { flexDirection: "row", alignItems: "center", gap: 12, borderRadius: 16, padding: 14, backgroundColor: T.card, borderWidth: 1.2, borderColor: T.border },
-  kindBtnActive: { backgroundColor: T.forest, borderColor: T.forest },
-  kindText: { fontSize: 14, fontWeight: "700", color: T.ink },
-  kindTextActive: { color: "#F4EFE3" },
-
-  inputBox: { flexDirection: "row", alignItems: "center", gap: 10, backgroundColor: T.card, borderRadius: 14, borderWidth: 1.2, borderColor: T.border, paddingHorizontal: 14, height: 52 },
-  input: { flex: 1, fontSize: 15, color: T.ink, fontWeight: "500" },
-  dateRow: { flexDirection: "row", gap: 8 },
-
-  dayBtn: { flex: 1, height: 40, borderRadius: 11, borderWidth: 1.2, borderColor: T.border, backgroundColor: T.card, alignItems: "center", justifyContent: "center" },
-  durBtn: { flex: 1, height: 40, borderRadius: 11, borderWidth: 1.2, borderColor: T.border, backgroundColor: T.card, alignItems: "center", justifyContent: "center" },
-  dayBtnActive: { backgroundColor: T.forest, borderColor: T.forest },
-  dayText: { fontSize: 13, fontWeight: "600", color: T.inkSoft },
-  dayTextActive: { color: "#F4EFE3" },
-
-  publishBtn: { backgroundColor: T.forest, borderRadius: 16, height: 54, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10, shadowColor: T.forest, shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.3, shadowRadius: 16, elevation: 5 },
-  publishText: { color: "#F4EFE3", fontWeight: "700", fontSize: 15 },
-
-  routeRow: { flexDirection: "row", alignItems: "center", gap: 12, backgroundColor: T.card, borderRadius: 14, borderWidth: 1, borderColor: T.borderSoft, padding: 12 },
-  routeText: { fontSize: 12.5, color: T.ink, fontWeight: "500" },
-  routeMeta: { fontSize: 10, letterSpacing: 0.5, color: T.inkMute, marginTop: 2 },
-});

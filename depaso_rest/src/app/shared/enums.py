@@ -56,3 +56,35 @@ class AssignmentMode(str, Enum):
 
     ON_DEMAND = "on_demand"
     BY_AVAILABILITY = "by_availability"
+
+
+class OrganizationKind(str, Enum):
+    """Type of B2B organization (pyme).
+
+    fleet    -> owns a carrier fleet, manages carrier linking/unlinking.
+    merchant -> uses DePaso for its own logistics, creates/schedules shipments.
+    both     -> operates as fleet and merchant.
+    """
+
+    FLEET = "fleet"
+    MERCHANT = "merchant"
+    BOTH = "both"
+
+
+class OrganizationMemberRole(str, Enum):
+    """Role of a user inside an organization (the 'org' role is derived from
+    membership, never stored in the JWT)."""
+
+    OWNER = "owner"
+    MANAGER = "manager"
+
+
+class OrganizationCarrierStatus(str, Enum):
+    """Link status between an organization and one of its carriers.
+
+    Unlinking a carrier sets status=inactive and stamps unlinked_at; the
+    underlying user/carrier is never deleted.
+    """
+
+    ACTIVE = "active"
+    INACTIVE = "inactive"

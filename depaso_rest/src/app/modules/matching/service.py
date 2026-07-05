@@ -52,6 +52,15 @@ DEFAULT_WEIGHTS = {
     "time_window": 0.10,
 }
 
+
+def _naive_utcnow() -> datetime:
+    """Current UTC as a naive datetime.
+
+    Stored route/window datetimes are naive UTC, so comparisons must use a
+    naive 'now' (avoids the deprecated datetime.utcnow() and aware/naive clash).
+    """
+    return datetime.now(timezone.utc).replace(tzinfo=None)
+
 # --- Hard (knockout) constraints -------------------------------------------
 
 # Collaborative assignment is only valid below this detour ratio (Yang et al.;
@@ -195,7 +204,7 @@ class MatchingService:
         my_routes = []
         if self.route_repo is not None:
             my_routes = [
-                r for r in self.route_repo.list_active_in_window(datetime.utcnow())
+                r for r in self.route_repo.list_active_in_window(_naive_utcnow())
                 if r.carrier_id == carrier_id and r.kind == "collaborative_route"
             ]
 
@@ -297,7 +306,7 @@ class MatchingService:
         pickup = Point(shipment.origin_lat, shipment.origin_lon)
         dropoff = Point(shipment.destination_lat, shipment.destination_lon)
         trip_km = road_km(pickup, dropoff)
-        now = datetime.utcnow()
+        now = _naive_utcnow()
 
         results: list[CarrierScoreResponse] = []
         for route in self.route_repo.list_active_in_window(now):
@@ -350,7 +359,7 @@ class MatchingService:
         """
         pickup = Point(shipment.origin_lat, shipment.origin_lon)
         # Use naive UTC for DB comparisons (stored datetimes are naive UTC).
-        now = datetime.now(timezone.utc).replace(tzinfo=None)
+        now = _naive_utcnow()
 
         results: list[CarrierScoreResponse] = []
         seen_carrier_ids: set[int] = set()

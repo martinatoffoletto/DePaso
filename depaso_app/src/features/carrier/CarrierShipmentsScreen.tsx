@@ -229,10 +229,10 @@ export default function CarrierShipmentsScreen() {
         {summary && (
           <View style={s.statsRow}>
             {[
-              { label: "Entregas",    value: String(summary.deliveries_completed), icon: "package-check-outline" as const },
+              { label: "Entregas",    value: String(summary.deliveries_completed), icon: "package-variant-closed" as const },
               { label: "Ganancias",   value: `$${Math.round(summary.total_earnings / 1000).toFixed(1)}k`, icon: "cash-multiple" as const },
               { label: "Reputación",  value: summary.reputation.toFixed(1),                               icon: "star-outline" as const },
-              { label: "CO₂",         value: `${summary.total_co2_saved_kg.toFixed(0)} kg`,               icon: "leaf-outline" as const },
+              { label: "CO₂",         value: `${summary.total_co2_saved_kg.toFixed(0)} kg`,               icon: "leaf" as const },
             ].map((it, i) => (
               <View key={i} style={s.statCard}>
                 <MaterialCommunityIcons name={it.icon} size={14} color="rgba(244,239,227,0.5)" />

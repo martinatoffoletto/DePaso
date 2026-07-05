@@ -1,0 +1,58 @@
+@import "tailwindcss";
+
+/*
+  DePaso design tokens — portados de depaso_app/constants/tokens.ts (cream / forest / lime).
+  Tailwind v4: cada --color-* genera utilidades (bg-forest, text-ink, border-line, ...).
+*/
+@theme {
+  --color-cream: #f4efe3;
+  --color-cream-deep: #ede6d2;
+  --color-surface: #ffffff;
+  --color-surface-soft: #fbf7ec;
+  --color-line: #e6dfc9;
+  --color-line-soft: #efe9d6;
+
+  --color-forest: #0b3b2e;
+  --color-forest-mid: #145e47;
+  --color-forest-deep: #062319;
+  --color-emerald: #10b981;
+  --color-emerald-deep: #0e8f66;
+  --color-mint: #d5f2e3;
+  --color-lime: #a3e635;
+
+  --color-ink: #13201b;
+  --color-ink-soft: #4a584f;
+  --color-ink-mute: #7a8780;
+  --color-ink-faint: #a8b0a6;
+
+  --color-amber: #e89e2a;
+  --color-amber-bg: #faeec9;
+  --color-red: #d75a4e;
+  --color-red-bg: #f8d9d2;
+  --color-violet: #7c6ae0;
+  --color-violet-bg: #e5dffa;
+  --color-sky: #3a8fd1;
+
+  --font-sans: -apple-system, system-ui, "Segoe UI", Roboto, Helvetica, Arial,
+    sans-serif;
+}
+
+@layer base {
+  * {
+    border-color: var(--color-line);
+  }
+  html {
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+  body {
+    margin: 0;
+    background-color: var(--color-cream);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+  }
+  /* Tabular figures for data columns / axis ticks (dataviz marks-and-anatomy). */
+  .tnum {
+    font-variant-numeric: tabular-nums;
+  }
+}

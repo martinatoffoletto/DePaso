@@ -1,7 +1,7 @@
 """
 Routes module repository for data access.
 """
-from datetime import datetime
+from datetime import datetime, timezone
 
 from sqlalchemy.orm import Session
 
@@ -31,7 +31,7 @@ class RouteRepository(BaseRepository[CarrierRoute]):
         we match on time-of-day overlap handled at service level, so here we
         only filter active ones whose window has not fully expired.
         """
-        at = at or datetime.utcnow()
+        at = at or datetime.now(timezone.utc).replace(tzinfo=None)
         return (
             self.db.query(CarrierRoute)
             .filter(

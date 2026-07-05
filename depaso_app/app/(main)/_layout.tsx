@@ -5,6 +5,7 @@ import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useAuthStore } from "@/src/stores/authStore";
 import { UserType } from "@/src/types";
 import { T } from "@/constants/tokens";
+import { MotoIcon } from "@/src/components/MotoIcon";
 
 type IconName = React.ComponentProps<typeof MaterialCommunityIcons>["name"];
 
@@ -46,10 +47,10 @@ export default function TabLayout() {
       <Tabs.Screen
         name="enviar"
         options={{
-          title: isCarrier ? "Pedidos" : "Enviar",
+          title: isCarrier ? "Inicio" : "Enviar",
           tabBarIcon: ({ color, size }) => (
             <TabIcon
-              name={isCarrier ? "clipboard-list-outline" : "package-variant-closed"}
+              name={isCarrier ? "home-variant-outline" : "package-variant-closed"}
               color={color}
               size={size}
             />
@@ -59,13 +60,22 @@ export default function TabLayout() {
       <Tabs.Screen
         name="envios"
         options={{
-          title: isCarrier ? "Mis Viajes" : "Mis Envíos",
+          title: isCarrier ? "Viajes" : "Mis Envíos",
+          tabBarIcon: ({ color, size }) =>
+            isCarrier ? (
+              <MotoIcon color={color} size={size} strokeWidth={2} />
+            ) : (
+              <TabIcon name="map-marker-path" color={color} size={size} />
+            ),
+        }}
+      />
+      <Tabs.Screen
+        name="pagos"
+        options={{
+          href: isCarrier ? undefined : null,
+          title: "Pagos",
           tabBarIcon: ({ color, size }) => (
-            <TabIcon
-              name={isCarrier ? "truck-outline" : "map-marker-path"}
-              color={color}
-              size={size}
-            />
+            <TabIcon name="wallet-outline" color={color} size={size} />
           ),
         }}
       />

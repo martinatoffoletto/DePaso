@@ -19,6 +19,7 @@ from src.app.modules.auth.router import router as auth_router
 from src.app.modules.carriers.router import router as carriers_router
 from src.app.modules.co2.router import router as co2_router
 from src.app.modules.matching.router import router as matching_router
+from src.app.modules.organizations.router import router as organizations_router
 from src.app.modules.packages.router import router as packages_router
 from src.app.modules.routes.router import router as routes_router
 from src.app.modules.shipments.router import router as shipments_router
@@ -55,6 +56,11 @@ async def lifespan(app: FastAPI):
     from src.app.modules.auth.models import PasswordResetToken  # noqa: F401
     from src.app.modules.carriers.models import Carrier  # noqa: F401
     from src.app.modules.matching.models import MatchingWeight  # noqa: F401
+    from src.app.modules.organizations.models import (  # noqa: F401
+        Organization,
+        OrganizationCarrier,
+        OrganizationMember,
+    )
     from src.app.modules.packages.models import Package  # noqa: F401
     from src.app.modules.routes.models import CarrierRoute  # noqa: F401
     from src.app.modules.shipments.models import Rating, Shipment, ShipmentEvent  # noqa: F401
@@ -137,6 +143,7 @@ def create_app() -> FastAPI:
     app.include_router(packages_router, prefix=api_prefix)
     app.include_router(shipments_router, prefix=api_prefix)
     app.include_router(matching_router, prefix=api_prefix)
+    app.include_router(organizations_router, prefix=api_prefix)
     app.include_router(co2_router, prefix=api_prefix)
     app.include_router(vision_router, prefix=api_prefix)
     app.include_router(tracking_router, prefix=api_prefix)
