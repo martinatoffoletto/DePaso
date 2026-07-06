@@ -57,16 +57,22 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def _enforce_production_secrets(self) -> "Settings":
-        """In production the JWT secret must be a real, non-default value.
+        """In production the JWT secret must be a real, non-default value and
+        CORS must not be an open wildcard.
 
         Failing fast at boot is safer than silently signing tokens with a
-        publicly known key (RNF-SEC-01).
+        publicly known key or accepting credentialed requests from any origin
+        (RNF-SEC-01). CORS is configured per environment via CORS_ORIGINS.
         """
         if self.is_production and (
             not self.jwt_secret_key or self.jwt_secret_key == INSECURE_JWT_DEFAULT
         ):
             raise ValueError(
                 "JWT_SECRET_KEY must be set to a strong, non-default value in production."
+            )
+        if self.is_production and "*" in self.cors_origins:
+            raise ValueError(
+                "CORS_ORIGINS must not be '*' in production; set an explicit allowlist."
             )
         return self
 

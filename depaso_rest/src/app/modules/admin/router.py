@@ -119,4 +119,66 @@ async def moderate_carrier(
     db.refresh(carrier)
     return CarrierResponse.model_validate(carrier)
 
+
+@router.get("/status", response_model=SystemStatusResponse)
+async def system_status(
+    request: Request,
+    admin: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    """Operational health for the monitoring panel (RF-ADM).
+
+    Reports API/DB health and whether the vision classifier is running the
+    trained model or the stub fallback.
+    """
+    try:
+        db.execute(text("SELECT 1"))
+        database = "ok"
+    except Exception:  # noqa: BLE001 - health probe must never raise
+        database = "error"
+
+    classifier = getattr(request.app.state, "classifier", None)
+    vision_loaded = bool(classifier is not None and getattr(classifier, "model", None) is not None)
+
+    return SystemStatusResponse(
+        api="ok",
+        environment=settings.environment,
+        debug=settings.debug,
+        database=database,
+        vision_model_loaded=vision_loaded,
+        vision_model_path=settings.vision_model_path,
+    )
+
+
+@router.get("/activity", response_model=ActivityResponse)
+async def recent_activity(
+    limit: int = 20,
+    admin: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    """Latest classifications and shipment status changes (RF-ADM monitoring)."""
+    limit = max(1, min(limit, 100))
+    classifications = (
+        db.query(Classification)
+        .order_by(Classification.created_at.desc())
+        .limit(limit)
+        .all()
+    )
+    events = (
+        db.query(ShipmentEvent)
+        .order_by(ShipmentEvent.created_at.desc())
+        .limit(limit)
+        .all()
+    )
+    return ActivityResponse(
+        recent_classifications=[
+            ClassificationActivityItem.model_validate(c, from_attributes=True)
+            for c in classifications
+        ],
+        recent_events=[
+            ShipmentEventActivityItem.model_validate(e, from_attributes=True)
+            for e in events
+        ],
+    )
+
 # Matching weights live under GET/PATCH /matching/weights (validated, sum==1).

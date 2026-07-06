@@ -218,9 +218,8 @@ class MatchingService:
             if shipment.modality == ShipmentModality.COLLABORATIVE:
                 if shipment.package_size in COLLABORATIVE_FORBIDDEN_SIZES:
                     continue
-                if (carrier.vehicle_type in SOFT_MOBILITY
-                        and road_km(pickup, dropoff) > MAX_SOFT_MOBILITY_TRIP_KM):
-                    continue
+                # Soft-mobility trip-length knockout is enforced in
+                # _passes_common_knockouts (applies to every modality).
                 best = self._best_route_match(my_routes, pickup, dropoff)
                 if best is None:
                     continue
@@ -305,7 +304,6 @@ class MatchingService:
 
         pickup = Point(shipment.origin_lat, shipment.origin_lon)
         dropoff = Point(shipment.destination_lat, shipment.destination_lon)
-        trip_km = road_km(pickup, dropoff)
         now = _naive_utcnow()
 
         results: list[CarrierScoreResponse] = []
@@ -314,8 +312,6 @@ class MatchingService:
                 continue
             carrier = self.carrier_repo.get_by_id(route.carrier_id)
             if carrier is None or not self._passes_common_knockouts(carrier, shipment):
-                continue
-            if carrier.vehicle_type in SOFT_MOBILITY and trip_km > MAX_SOFT_MOBILITY_TRIP_KM:
                 continue
 
             route_origin = Point(route.origin_lat, route.origin_lon)

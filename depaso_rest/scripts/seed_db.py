@@ -6,7 +6,7 @@ Ejecutar desde depaso_rest/: python scripts/seed_db.py
 """
 import sys
 import os
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 # Asegurar que el path de src esté disponible
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -24,7 +24,7 @@ from src.app.modules.shipments.models import Shipment
 
 
 def _seed_shipments(db, client_user, carriers):
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
     client_id = client_user.id
     # carriers ordenados por id: [0]=moto, [1]=auto, [2]=van, [3]=bici
     c_lucia  = carriers[0].id

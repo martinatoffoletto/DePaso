@@ -12,7 +12,7 @@ Creates (idempotent — skips if the admin already exists):
   - 1 pending collaborative shipment on Lucia's route
   - 1 pending dedicated XL shipment for Carlos
 """
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from src.app.core.database import SessionLocal, engine
 from src.app.core.security import get_password_hash
@@ -81,7 +81,7 @@ def seed() -> None:
                     max_length_cm=300, max_width_cm=200, max_height_cm=200, base_price=6000),
         ])
 
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc).replace(tzinfo=None)
         db.add(CarrierRoute(
             carrier_id=lucia.id, kind="collaborative_route",
             origin_lat=CABALLITO[0], origin_lon=CABALLITO[1],
