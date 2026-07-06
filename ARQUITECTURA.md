@@ -1,8 +1,10 @@
-# DePaso — Stack Tecnológico y Arquitectura Recomendada
+# DePaso — Stack Tecnológico y Arquitectura
 
-> Documento de referencia técnica para el PFI. Cubre stack, arquitectura backend/frontend,
-> organización del código, pantallas, y el plan completo de entrenamiento del modelo de
-> visión computacional. Basado en los requerimientos de `proy.txt` y `PROYECTO.txt`.
+> Documento de referencia técnica para el PFI: **cómo está construido el sistema** (stack,
+> arquitectura backend/frontend/web, organización del código, pantallas, y el plan completo
+> del modelo de visión). Basado en los requerimientos de `proy.txt` y `PROYECTO.txt`.
+> **Qué falta hacer y en qué orden vive en `PLAN_MAESTRO.md`** (única fuente de verdad del backlog).
+> Actualizado: julio 2026 — incluye el panel web `depaso_web` y el módulo `organizations`.
 
 ---
 
@@ -27,18 +29,18 @@
 | **Mapas** | react-native-maps | Ya instalado. Google Maps (Android, key gratis) / Apple Maps (iOS) |
 | **Cámara / fotos** | expo-camera + expo-image-picker + expo-image-manipulator | Foto del paquete → resize a 224×224 **en el cliente** antes de subir (menos ancho de banda, inferencia más rápida) |
 | **Tracking GPS** | expo-location + polling con React Query (`refetchInterval`) | Push productivas excluidas del PFI (7.2) — polling cada 15-30 s cumple RF-TRK |
-| **Panel admin** | **Expo Web** (route group `(admin)` en la misma app) | Reusás todo: API client, tipos, componentes. `npx expo export -p web` y se hostea gratis. Evita mantener un segundo proyecto |
+| **Panel web pymes/admin** | **`depaso_web`**: Vite + React 19 + TS + Tailwind 4 + shadcn/ui + TanStack Query v5 + react-router + Recharts | Carpeta hermana que consume los mismos endpoints. Monitoreo para pymes (flota, envíos, finanzas) + panel admin operativo. Deploy estático gratis (Vercel) |
 | **Deploy backend** | Docker + **Render** (free) o **Fly.io** | RNF-PRT-02. Docker-compose ya existe para dev local |
 | **Logs** | structlog (JSON) | Ya instalado. RNF-MNT-05, RNF-OBS-01 |
 | **Tests** | pytest + pytest-asyncio + httpx (back) / jest + RNTL (front, opcional) | Cobertura ≥ 60% en auth, shipments, matching (RNF-MNT-02) |
 | **CI** | GitHub Actions (free) | lint (ruff/eslint) + tests en cada push |
 
-**Veredicto sobre el stack actual: está bien elegido — no hay que cambiarlo, hay que completarlo.**
-Los únicos cambios recomendados:
-1. **Sacar React Native Paper** (duplica sistema de estilos con NativeWind).
-2. **Agregar PostGIS** real (hoy GeoAlchemy2 está en requirements pero hay que activar la extensión y los índices).
-3. **Agregar OSRM** como servicio de ruteo (sin esto el matching no puede calcular desvíos reales).
-4. **Agregar slowapi** (rate limiting) y **refresh tokens** (hoy parece haber solo access token).
+**Veredicto sobre el stack: está bien elegido y ya completado en lo esencial.**
+Estado de las recomendaciones originales (jul-2026):
+1. ✅ **slowapi** (rate limiting) y **refresh tokens** — implementados.
+2. ✅ **OSRM** — `shared/osrm_client.py` con degradación automática al fallback haversine×1.3 (suficiente para la demo; el contenedor OSRM propio es opcional).
+3. ⚪ **PostGIS** — no activado; el matching usa haversine con factor de circuidad y funciona. Queda como optimización de escalado (documentar en tesis, no bloquea el MVP).
+4. ⚪ **React Native Paper** — la app usa NativeWind + componentes propios como sistema principal.
 
 ---
 
@@ -80,6 +82,7 @@ depaso_rest/
 │   │   ├── tracking/            # RF-TRK: ingesta GPS, última posición, historial de trazas
 │   │   ├── capacity/            # RF-CAP: volumen por vehículo, reserva/liberación
 │   │   ├── co2/                 # RF-CO2: cálculo determinístico, acumulados
+│   │   ├── organizations/       # Pymes: orgs, miembros, flota (alta/baja), envíos B2B, finanzas
 │   │   └── admin/               # RF-ADM: stats, moderación, configuración de pesos
 │   ├── common/                  # utils compartidos (paginación, geo helpers, enums globales)
 │   └── shared/                  # clientes externos: osrm_client.py, storage_client.py (Supabase)
@@ -115,7 +118,17 @@ classifications (id, shipment_id?, image_url, predicted_category, confidence,
 gps_traces (id, carrier_id, shipment_id, location Point, timestamp)    # RF-TRK-03
 ratings (id, shipment_id, stars 1-5, comment, created_at)
 matching_weights (key w1..w5, value float)                             # 5.2 — editables por admin
+
+# Pymes (módulo organizations)
+organizations (id, name, cuit, kind[fleet|merchant|both], owner_user_id, created_at, updated_at)
+organization_members (org_id, user_id, role[owner|manager], joined_at)          # PK compuesta
+organization_carriers (org_id, carrier_id, status[active|inactive], linked_at, unlinked_at)
+shipments.organization_id (FK nullable — envíos creados por la pyme)
 ```
+Reglas del dominio pyme: el rol org se **deriva de la membresía** (no va en el JWT); la baja de un
+carrier es `status=inactive` + `unlinked_at` (nunca borra el user); las finanzas son
+**dinero puesto** (Σ price de envíos de la org) vs **dinero ganado** (Σ ganancias de envíos
+DELIVERED de la flota), por mes + acumulado. Contrato completo: `ORGANIZATIONS_API_CONTRACT.md`.
 
 Índices clave: GIST sobre todas las columnas GEOGRAPHY; índice compuesto sobre
 `gps_traces(carrier_id, timestamp DESC)`; índice sobre `shipments(status)`.
@@ -261,23 +274,30 @@ depaso_app/
 ## 4. Infraestructura y deploy (presupuesto $0, RNF-COST)
 
 ```
-┌─────────────┐   HTTPS    ┌──────────────────┐         ┌─────────────────────┐
-│  Expo App    │ ────────► │  FastAPI (Docker) │ ──────► │ Supabase Postgres   │
-│  (EAS build) │           │  Render free tier │         │ + PostGIS + Storage │
-└─────────────┘           └──────┬───────────┘         └─────────────────────┘
-                                  │
-                                  ▼
-                          ┌──────────────┐
-                          │ OSRM         │  ← demo server público para el prototipo,
-                          │ (ruteo)      │    o contenedor propio con mapa de Buenos Aires
+┌─────────────┐
+│  Expo App    │──┐ HTTPS   ┌──────────────────┐         ┌─────────────────────┐
+│  (EAS build) │  ├───────► │  FastAPI (Docker) │ ──────► │ Supabase Postgres   │
+└─────────────┘  │         │  Render free tier │         │ (+ Storage)         │
+┌─────────────┐  │         └──────┬───────────┘         └─────────────────────┘
+│  depaso_web  │──┘                │
+│  (Vercel)    │                   ▼
+└─────────────┘           ┌──────────────┐
+                          │ OSRM (ruteo) │  ← opcional: fallback haversine×1.3 ya funciona
                           └──────────────┘
 ```
+
+**Decisión de infra (jul-2026): Render + Supabase + Vercel + EAS — sin Kubernetes, sin AWS.**
+Un solo contenedor + DB gestionada + build estático no justifican orquestación: K8s/AWS suman
+complejidad y riesgo de costos sin beneficio para un MVP de presupuesto $0 (RNF-COST). La app
+queda portable igual (Docker + Postgres estándar, RNF-PRT-02) — migrar de proveedor es cambiar
+dónde corre el contenedor, no el código. K8s/autoscaling se documenta en la tesis como
+escalado futuro. Pasos concretos del deploy: `PLAN_MAESTRO.md` §4.
 
 - **Dev local:** `docker-compose` con Postgres+PostGIS (`postgis/postgis:16`) y opcionalmente OSRM con el extracto de Argentina de Geofabrik.
 - **Modelo ML:** se versiona el `.keras` exportado (~15 MB con MobileNetV2) dentro de la imagen Docker; se carga una sola vez en el `lifespan` de FastAPI.
 - **Imágenes de paquetes:** Supabase Storage, bucket privado, URLs firmadas (RNF-SEC-07).
 - **App Android para la defensa:** `eas build -p android --profile preview` → APK instalable.
-- **Panel admin:** `npx expo export -p web` → hosting estático gratis (Netlify/Vercel/GitHub Pages).
+- **Panel web (`depaso_web`):** build estático de Vite → Vercel free (deploy automático desde GitHub, `VITE_API_URL` apunta a Render).
 
 ---
 
@@ -486,5 +506,10 @@ Determinístico, factores IPCC 2019 (moto 0.09 / auto 0.18 / camioneta 0.25 / ca
   cumple RNF-PERF-04 con complejidad mínima y se degrada con gracia (RNF-AVL-02).
 - **Argon2 vs bcrypt:** argon2id es el ganador del Password Hashing Competition y recomendado
   por OWASP por sobre bcrypt; se documenta como mejora sobre la spec original.
-- **Monorepo de 2 apps vs panel admin separado:** Expo Web reutiliza el 100% del API client
-  y los tipos — menos código que mantener para un equipo de 2 personas.
+- **Panel web separado (`depaso_web`) vs Expo Web:** se eligió una SPA Vite independiente porque
+  el panel B2B (pymes + admin) tiene UX de escritorio (tablas densas, gráficos, sidebar) ajena al
+  paradigma móvil; comparte el backend y el design system (tokens), no el runtime. Expo Web habría
+  forzado componentes RN en un contexto de dashboard.
+- **Scoring determinístico vs mecanismos de mercado:** sin datos históricos al arranque, subastas y
+  elasticidades no tienen con qué calibrarse (Akamatsu & Oyama); el scoring explicable con pesos
+  editables es la decisión correcta para cold-start.

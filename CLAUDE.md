@@ -8,9 +8,11 @@ Tesis de grado (PFI) — app de logística colaborativa de última milla con cla
 DePaso/
 ├── depaso_rest/      # Backend FastAPI
 ├── depaso_app/       # Frontend Expo (React Native)
+├── depaso_web/       # Panel web pymes/admin (Vite + React + shadcn/ui)
 ├── docker-compose.yml
 ├── render.yaml       # Deploy config para Render (backend)
-└── TODO_COMPLETO.md  # Estado actual del proyecto y backlog
+├── ARQUITECTURA.md   # Referencia técnica: cómo está construido el sistema
+└── PLAN_MAESTRO.md   # Única fuente de verdad: estado actual y qué falta para el MVP
 ```
 
 ---

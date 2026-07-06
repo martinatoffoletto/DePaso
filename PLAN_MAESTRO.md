@@ -1,181 +1,184 @@
-# DePaso — PLAN MAESTRO (Julio 2026)
+# DePaso — PLAN MAESTRO
 
-**Fecha:** 1 de julio de 2026
-**Objetivo:** cerrar backend al 100%, crear el panel web para pymes (`depaso_web`), rehacer las pantallas del rider y elevar la calidad de UI del app móvil.
-**Fuera de alcance de este plan:** IA/ML (dataset + entrenamiento — lo hace Martina) y tests (se difieren al final, explícitamente).
-
----
-
-## 1. Gap analysis — tesis (`../UADE_PFI_Template-develop`) ↔ código (`DePaso/`)
-
-### 1.1 Qué falta en la tesis (existe en el código, no está escrito)
-
-| Gap | Detalle | Dónde va |
-|---|---|---|
-| **Capítulo 4 vacío** | `chapters/chapter04.tex` tiene solo el título. Falta: arquitectura 4 capas, las 4 modalidades, matching (knockouts + scoring w1–w5), máquina de estados, decisiones (polling vs WebSocket, capacidad derivada, CO₂ al aceptar, argon2 vs bcrypt), restricciones vehículo/carga | `chapter04.tex` |
-| **Sub-capítulo IA** | MobileNetV2 dual-input, dataset, métricas, sesgos | `chapter04.tex` |
-| **Panel web pymes** | El alcance del Cap 1 (línea 100) ya lo cubre: *"Herramientas básicas de monitoreo operativo para administradores"* → `depaso_web` es la materialización de ese ítem, extendido al rol pyme. Solo hay que describir el rol B2B (Cap 3 personas / Cap 4), no ampliar alcance | Cap 3, 4 |
-| **Limitaciones y trabajo futuro** | Cobertura ante daños (gap I1), elasticidad de precios, notificaciones push | Cap final |
-| **Conclusiones / abstract / summary** | Plantillas sin contenido real | `conclusion.tex`, `abstract.tex` |
-
-### 1.2 Qué pide la tesis/specs y falta (o está a medias) en el código
-
-| Gap | Estado | Workstream |
-|---|---|---|
-| C1 — peatón/bici <5km no aplica en `_rank_dedicated` | 5 líneas en `matching/service.py` | A |
-| C2 — Modalidad 2 (`BY_AVAILABILITY`) sin wiring completo en matching + UX de publicación de ventana | Elegida **Opción A (implementar)** | A |
-| Forgot-password: service implementado, **verificar wiring al router** | Auditoría lo marca ambiguo | A |
-| Role switching (RF-USR-06) | No implementado | A |
-| Editar perfil carrier / vehículo post-registro | No implementado | A |
-| Panel admin web (RF-ADM) | Endpoints listos, sin UI | C |
-| Deploy Render + Supabase + APK | Archivos listos, sin ejecutar | (felix, después) |
-
-> Nota: la auditoría es del 13-jun y el TODO del 15-jun se contradicen en algunos puntos
-> (p. ej. matching weights en DB, rate limiting). **Regla: verificar contra el código actual antes de implementar.**
+**Actualizado:** 6 de julio de 2026
+**Qué es este documento:** la única fuente de verdad de *qué falta para terminar el MVP*. Integra y reemplaza a `AUDITORIA_BACKEND.md` y `TODO_COMPLETO.md` (eliminados — su historia queda en git). La referencia técnica de *cómo está construido* el sistema es `ARQUITECTURA.md`.
 
 ---
 
-## 2. Workstreams
+## 0. Stack (resumen — detalle en ARQUITECTURA.md)
 
-### Workstream A — Backend al 100% (`depaso_rest`) — **owner: rm** (reglas de dominio con jhope)
-
-Cerrar todos los gaps funcionales de `AUDITORIA_BACKEND.md` + `TODO_COMPLETO.md`, verificando primero qué ya está resuelto:
-
-1. **Gap C1:** restricción soft-mobility <5km también en `_rank_dedicated` / knockouts comunes (`matching/service.py`).
-2. **Gap C2 (Opción A):** `_rank_dedicated` consulta ventanas `dedicated_window` activas (`list_active_in_window`); `SummaryScreen` deja de hardcodear `ON_DEMAND` (coordinar con jimin).
-3. **Auth:** confirmar forgot/reset password wired al router; agregar change-password si falta.
-4. **Users:** role switching (RF-USR-06) — un usuario con ambos roles cambia de modo activo; PATCH de perfil carrier (vehículo, patente).
-5. **Routes:** `PATCH /routes/{id}`.
-6. **Shipments:** setear `photo_url` en creación; tarifas a config/DB (no constantes).
-7. **Limpieza:** resolver overlap `packages`/`freight` vs `shipments` (fusionar o eliminar módulos muertos); borrar código muerto.
-8. **Hardening:** `JWT_SECRET` sin default en prod (fallar si falta env), CORS restringible por env, `datetime.utcnow()` → `datetime.now(timezone.utc)`.
-9. **Verificar** (pueden ya estar hechos): matching weights en DB + `PATCH /matching/weights`, rate limiting slowapi, refresh tokens.
-
-**Criterio de aceptación:** smoke test E2E pasa; los 93 tests existentes no-vision siguen verdes (no escribir tests nuevos); OpenAPI `/docs` refleja todos los endpoints nuevos.
-
-### Workstream B — Módulo `organizations` (pymes) en backend — **owner: rm + jhope**
-
-Nuevo módulo `depaso_rest/src/app/modules/organizations/` (patrón router/service/repository/schemas/models). Dos tipos de pyme:
-
-- **Pyme de fleteros** (oferta): tiene flota propia → gestiona el **alta y baja de sus transportistas** (invitación/vinculación de carriers existentes o alta directa; baja = desvinculación, no borra el user).
-- **Pyme de productos** (demanda): usa DePaso para su logística → **crea y programa sus envíos/viajes** (carga individual o batch, ventanas horarias, logística recurrente).
-
-Modelo de datos propuesto (validar con bang-chan):
-```
-organizations (id, name, cuit, kind[fleet|merchant|both], owner_user_id, created_at)
-organization_members (org_id, user_id, role[owner|manager], joined_at)
-organization_carriers (org_id, carrier_id, status[active|inactive], linked_at, unlinked_at)
-shipments.organization_id (nullable FK — envíos creados por la pyme)
-```
-
-Endpoints mínimos:
-```
-POST/GET/PATCH  /organizations                       # alta, mi org, editar
-GET             /organizations/me/dashboard          # KPIs de monitoreo
-POST/DELETE/GET /organizations/me/carriers           # alta/baja/lista de flota
-GET             /organizations/me/shipments          # envíos de la pyme (+ filtros)
-POST            /organizations/me/shipments          # crear envío como pyme (reusa shipments.service)
-GET             /organizations/me/finance            # dinero puesto (gastado en envíos) y ganado (por su flota), por período
-```
-
-Finanzas: **dinero puesto** = suma de `price` de envíos creados por la org; **dinero ganado** = suma de ganancias de envíos entregados por carriers de la flota. Agregados por mes + acumulado.
-
-Incluye: migración Alembic, extensión de `scripts/seed_demo.py` con una pyme demo de cada tipo, y rol `org` en el JWT o derivado de membresía.
-
-**Criterio de aceptación:** flujo completo por curl/Swagger: crear org → vincular carrier → crear envío → ver dashboard y finanzas.
-
-### Workstream C — `depaso_web`: panel de monitoreo para pymes — **carpeta nueva en la raíz**
-
-SPA web que consume **los mismos endpoints** del backend.
-
-- **Stack propuesto:** Vite + React 19 + TypeScript + Tailwind CSS 4 + shadcn/ui + TanStack Query v5 + react-router + axios (mismo interceptor de refresh que el app). Recharts para gráficos (seguir skill `dataviz`).
-  *(ARQUITECTURA.md sugería Expo Web, pero Martina pidió carpeta separada — bang-chan ratifica el stack.)*
-- **Design system:** portar tokens cream/forest/lime de `depaso_app/constants/tokens.ts` a Tailwind theme. Calidad alta — usar skills de diseño (`design-taste-frontend` / `high-end-visual-design`), nada genérico.
-- **Pantallas:**
-  1. Login (mismo `/auth/login`, guarda tokens, guard por rol org/admin)
-  2. **Dashboard de monitoreo:** envíos activos, estados, KPIs (entregas, CO₂, plata), actividad reciente
-  3. **Flota:** lista de transportistas de la pyme, alta (invitar/vincular), baja, estado y reputación de cada uno
-  4. **Envíos / logística:** tabla con filtros, crear envío/viaje programado, detalle con timeline y tracking
-  5. **Finanzas:** dinero puesto vs ganado, series por mes, desglose por carrier/envío
-  6. **Admin (rol admin) = monitoreo operativo post-deploy.** Este panel es la materialización del ítem del alcance de la tesis *"Herramientas básicas de monitoreo operativo para administradores"* y es lo que Martina va a usar en producción para operar sin tocar nada a mano. Debe incluir: envíos activos en vivo (auto-refresh), moderación de carriers pendientes (aprobar/suspender/reactivar con un click), edición de matching weights, KPIs globales (dashboard admin existente), estado del sistema (health del API, si el modelo de visión está cargado o en fallback), y últimas clasificaciones/errores visibles. Los endpoints admin ya existen; si falta alguno para health/actividad, rm lo agrega.
-- Estructura espejo del app: `src/features/*`, `src/lib/api.ts`, `src/components/ui/*`.
-
-**Criterio de aceptación:** `npm run build` sin errores, flujo pyme completo contra backend local con seed.
-
-**Dependencia:** B (endpoints de organizations). El scaffolding + login + panel admin pueden arrancar en paralelo porque esos endpoints ya existen.
-
-### Workstream D — Rehacer pantallas del rider — **owner: jimin**
-
-Referencia: mockups en `screens/rider.jsx` (4 pantallas, sistema cream + forest + lime):
-
-| # | Mockup | Destino en `depaso_app` |
-|---|---|---|
-| 01 | `RiderHomeOffline` — decide cómo trabajar (on-demand vs publicar viaje) | `src/features/carrier/` nueva Home del rider |
-| 02 | `RiderHomeOnline` — trabajando: mapa, estado, envío activo | ídem |
-| 03 | `RiderPublishTrip` — publicar viaje (origen/destino/días/ventana) | reemplaza/absorbe `PublishRouteScreen` |
-| 04 | `RiderIncomingOffer` — oferta entrante full-screen (aceptar/rechazar con desvío, ganancia, CO₂) | nueva, integra con feed/accept |
-
-Reglas duras:
-- **NativeWind 4 (`className`) — prohibido StyleSheet y estilos inline.** Los mockups usan CSS inline de web: traducir, no copiar.
-- Tokens desde `constants/tokens.ts` (`T.*`) mapeados en `tailwind.config`.
-- Nav del rider según mockup: Inicio · Viajes · Pagos · Perfil (revisar cómo mapea a los tabs actuales `(main)` por rol CARRIER; la pestaña "Pagos" necesita el summary de ganancias existente).
-- Íconos: `lucide-react-native` o el set ya usado; el `MotoIcon` custom del mockup se porta como componente SVG (`react-native-svg`).
-- Todo wired a endpoints reales: feed, accept, routes, summary, tracking. Nada mockeado.
-- `npx tsc --noEmit` y `npx eslint .` en 0. Rutas tipadas, guard con `Stack.Protected`, zustand por slices (convenciones de CLAUDE.md).
-
-### Workstream E — UI quality pass del app móvil — **owner: jimin (después de D)**
-
-Guiarse por los demás mockups de `screens/` (`auth.jsx`, `home.jsx`, `flow-v2.jsx`, `offer.jsx`, `package-summary.jsx`, `profile.jsx`, `shipments.jsx`):
-- Consistencia de espaciado, jerarquía tipográfica, radios y sombras según mockups.
-- Estados vacíos y de carga cuidados (EmptyState, skeletons), feedback en toda mutación (RNF-UX-03).
-- Eliminar `OfferSelectionScreen.tsx` huérfano (y su badge "Asegurado" hardcodeado) — gap N1/I1.
-- Texto ≥14, contraste AA, español rioplatense (RNF-UX-02/04).
-- Animaciones sutiles con Reanimated 4 donde el mockup lo sugiere (transiciones de la oferta entrante, toggle online/offline).
+| Pieza | Tecnología |
+|---|---|
+| **Backend** (`depaso_rest`) | Python 3.12 + FastAPI + Pydantic v2 + SQLAlchemy 2 + Alembic · PostgreSQL (prod) / SQLite (dev y tests) · JWT access+refresh con argon2 · slowapi · structlog |
+| **App móvil** (`depaso_app`) | Expo SDK 54 + expo-router 6 + React Native 0.81 + React 19 · NativeWind 4 (tokens cream/forest/lime) · zustand + TanStack Query v5 · Reanimated 4 |
+| **Panel web** (`depaso_web`) | Vite + React 19 + TypeScript + Tailwind 4 + shadcn/ui · TanStack Query v5 + react-router-dom + axios · Recharts |
+| **IA/ML** | TensorFlow/Keras · MobileNetV2 transfer learning, dual input (imagen 224×224 + flag objeto de referencia) · entrenamiento en Google Colab |
+| **Infra** | Docker (ya contenerizada) · Render (backend) + Supabase (Postgres) + Vercel (web) + EAS (APK Android) — ver §4 |
 
 ---
 
-## 3. Orden y dependencias
+## 1. Estado actual — QUÉ ESTÁ HECHO (verificado 6-jul contra el código)
 
+### Backend (`depaso_rest`) — ~98%
+- ✅ Auth completo: registro cliente/carrier, login, **refresh tokens**, forgot/reset password wired, argon2, rate limiting slowapi.
+- ✅ Shipments: máquina de estados validada (`PENDING → ASSIGNED → PICKUP_ARRIVED → IN_TRANSIT → DELIVERED / CANCELLED`), eventos auditables, cancelación con penalización de reputación (−0.3), quote con precio dedicado vs colaborativo.
+- ✅ Matching: knockouts (verificado, capacidad residual, tabla vehículo/carga, XL nunca colaborativo, desvío ≤15%), scoring w1–w5 **editable por admin en DB** (`PATCH /matching/weights`), desvío por inserción, explicabilidad en español.
+- ✅ Modalidad 2 (`BY_AVAILABILITY`): wiring completo en `_rank_dedicated` (consulta ventanas `dedicated_window` activas) + toggle real en `SummaryScreen`. **Gap C2: cerrado.**
+- ✅ Routes (trayecto colaborativo + ventana dedicada), Tracking (GPS polling 15s, privacidad), CO₂ (factores IPCC, real vs contrafactual), Ratings, Capacidad derivada, Admin (dashboard, moderación de carriers, weights).
+- ✅ Vision: `POST /vision/classify` con carga del modelo en startup y **fallback determinístico** si el `.keras` no está — la API nunca se rompe sin modelo.
+- ✅ **Módulo `organizations` (pymes)**: models + service + router + migración `002_organizations` registrados. Dos tipos: fletera (gestiona flota: alta/baja de carriers, baja = inactivo, nunca borra el user) y de productos (crea/programa envíos con `organization_id`). Finanzas: dinero puesto (gastado en envíos) vs ganado (por la flota), mensual + acumulado.
+- ✅ Seed demo idempotente + smoke test E2E completo.
+
+### App móvil (`depaso_app`) — ~95%
+- ✅ Flujos cliente y cadete completos y wired a la API real (crear envío con foto+IA, tracking con polling, calificación, feed, hitos de estado, GPS publisher).
+- ✅ **Rider screens rehechas desde los mockups** (`screens/rider.jsx`): RiderHomeScreen (offline/online), PublishTripScreen, IncomingOfferModal, RiderEarningsScreen + tab Pagos, MotoIcon SVG, riderStore. NativeWind, tsc 0 / eslint 0.
+- ✅ Pantalla Impacto CO₂, perfil, tabs por rol, admin.
+
+### Panel web (`depaso_web`) — ~40%
+- ✅ Scaffold Vite + infraestructura: `lib/api.ts` (axios + refresh), `queryClient`, `stores/auth`, `types`, tokens en `index.css`, componentes shadcn/ui (button, card, table, dialog, tabs, badge, toast, select, input, label, skeleton).
+- ❌ Falta: entry point, routing, y todas las páginas (ver §2).
+
+### IA/ML — ~45% (código listo, falta dataset + entrenar → §3)
+
+---
+
+## 2. QUÉ FALTA — código (en ejecución AHORA por el equipo de agentes)
+
+### A. Backend al 100% — owner: **rm** 🔄
+- [ ] Verificar `organizations` end-to-end en ejecución (boot, migración, flujo curl completo) y arreglar bugs.
+- [ ] Publicar `ORGANIZATIONS_API_CONTRACT.md` (contrato para el panel web).
+- [ ] Gap C1: knockout movilidad suave (peatón/bici <5km) en **todos** los paths de matching, incluido `_rank_dedicated`.
+- [ ] `datetime.utcnow()` → `datetime.now(timezone.utc)` en todo el backend.
+- [ ] Hardening: `JWT_SECRET` sin default inseguro en prod; CORS configurable por env (no `*` en prod).
+- [ ] Consolidar overlap `packages`/`freight` vs `shipments` sin romper el frontend.
+
+### C. Panel web `depaso_web` completo — owner: **depaso-web** 🔄
+- [ ] `main.tsx` + `App.tsx` + react-router + guard de auth.
+- [ ] Login (`POST /auth/login`), layout con sidebar.
+- [ ] **Dashboard** (KPIs de la org) · **Flota** (alta/baja de carriers con badges) · **Envíos** (tabla + crear/programar) · **Finanzas** (puesto vs ganado, Recharts).
+- [ ] **Admin** = el ítem de alcance de la tesis *"Herramientas básicas de monitoreo operativo para administradores"*: envíos activos en vivo (polling), moderación de carriers (aprobar/suspender/reactivar), matching weights, KPIs globales, health del API + estado del modelo de visión (cargado/fallback). Es la UI con la que Martina opera todo en producción sin tocar nada a mano.
+- [ ] `npx tsc --noEmit` limpio + `npm run build` OK.
+
+### E. UI quality pass del app móvil — owner: **jimin** 🔄
+- [ ] **Crítico (alcance tesis):** eliminar la card falsa "Asegurado / Hasta $80k" de `app/index.tsx` (la cobertura ante daños está fuera del MVP).
+- [ ] Borrar `OfferSelectionScreen.tsx` huérfano.
+- [ ] Migrar los `StyleSheet.create` restantes a NativeWind (SummaryScreen, CarrierShipmentsScreen, ImpactScreen, ShipmentsScreen, AdminScreen, RouteOfferScreen, ProfileScreen).
+- [ ] Hex hardcodeados (`#8E5A0B` en IncomingOfferModal, etc.) → tokens.
+- [ ] Pase general: estados vacíos/carga, feedback en mutaciones, contraste AA, micro-animaciones Reanimated. Referencia: mockups de `screens/`.
+
+**Verificación global al cerrar A/C/E:**
+```bash
+cd depaso_rest && DATABASE_URL="sqlite:///./depaso_test.db" RATE_LIMIT_ENABLED=false \
+  .venv/bin/python -m pytest tests/ -q -p no:warnings        # existentes en verde
+cd depaso_app && npx tsc --noEmit && npx eslint .            # 0 / 0
+cd depaso_web && npx tsc --noEmit && npm run build           # OK
 ```
-A (backend 100%) ──┬────────────→ listo para demo
-B (organizations) ─┴→ C (depaso_web pantallas pyme)
-C (scaffold + login + admin) ← puede arrancar ya (endpoints existentes)
-D (rider screens) → E (UI pass)      ← independiente de A/B/C
-```
 
-Paralelizable: **A+B (rm/jhope)** · **C scaffold (web)** · **D (jimin)**.
+---
 
-## 4. Delegación (equipo)
+## 3. IA/ML — instrucciones (lo hace Martina, nadie más lo toca)
 
-| Workstream | Owner | Apoyo |
+El código del pipeline ya existe y está corregido. Lo único que falta es **dataset + entrenar + evaluar + copiar el modelo**. Guía completa para Colab: `depaso_rest/ml/COLAB_QUICKSTART.md` (la MacBook no tiene GPU — todo el entrenamiento va en Colab).
+
+### Paso 1 — Dataset (~1500 imágenes, 4 clases `s|m|l|xl`)
+1. `ml/dataset/download_open_images.py` — baja ~70% desde Open Images V7 vía FiftyOne (Box, Envelope, Suitcase, Furniture…).
+2. **Fotos propias (~30%, ~450-600)**: paquetes reales S/M/L/XL variando iluminación (natural/artificial/baja), ángulo (frontal/cenital/oblicuo) y fondo (liso/desordenado/exterior). Sacar **pares con y sin objeto de referencia** (celular/botella) — alimenta el flag `has_reference_object`.
+3. Etiquetar en `labels.csv`: `filename,category,lighting,angle,background,has_reference_object,source`.
+4. `ml/dataset/build_dataset.py` — dedup por hash perceptual, valida el CSV.
+5. `ml/dataset/make_splits.py` — split 70/15/15 estratificado por categoría **y** condiciones de sesgo. El test set queda congelado.
+
+### Paso 2 — Entrenamiento (Colab)
+- `ml/train_classifier.py`: Etapa A (base congelada, Adam 1e-3, 20 épocas, EarlyStopping) → Etapa B (fine-tune últimas ~30 capas, Adam 1e-5, 10 épocas). Guardar las curvas (van a la tesis).
+- Exporta `cargo_classifier_v1.keras` + `metadata.json`.
+
+### Paso 3 — Evaluación y sesgos (capítulo de la tesis)
+- `ml/evaluate_bias.py` sobre el test set: accuracy global (objetivo ≥80%, mínimo defendible 75%), precision/recall/F1 por clase, matriz de confusión, y **accuracy por grupo** (iluminación/ángulo/fondo/con-sin referencia, ⚠️ si un grupo cae >10 puntos). Los PNG + markdown salen casi directo al capítulo de sesgos.
+
+### Paso 4 — Integración (automática)
+- Copiar el modelo a `depaso_rest/ml/models/cargo_classifier_v1.keras` (path por defecto de `vision_model_path` en config; override con env `VISION_MODEL_PATH`). El backend lo carga solo en el startup; sin modelo sigue funcionando con el fallback.
+
+### Constraints que NO se pueden romper
+- `CATEGORIES = ["s", "m", "l", "xl"]` — orden fijo (la inferencia indexa por posición). Nunca `xs`.
+- El modelo tiene **dos inputs siempre**: `model.predict([img_batch, ref_batch])`.
+- `preprocess_input` se aplica **solo en el pipeline de datos**, no dentro del modelo ni en `vision/service.py` (el bug de doble preprocesado ya se corrigió una vez — no reintroducirlo).
+
+---
+
+## 4. Infraestructura y deploy — recomendación (owner: felix, cuando el código cierre)
+
+### Decisión: Render + Supabase + Vercel + EAS. **NO Kubernetes, NO AWS.**
+
+| Pieza | Dónde | Por qué |
 |---|---|---|
-| A — Backend 100% | rm | jhope (reglas C1/C2, pricing) |
-| B — organizations | rm | jhope (modelo de negocio pyme) |
-| C — depaso_web | jimin o general (decide bang-chan) | jin (review) |
-| D — Rider screens | jimin | — |
-| E — UI pass | jimin | jin (review) |
-| Coordinación | **bang-chan** | — |
-| Deploy (después) | felix | — |
-| Tests (al final, hoy NO) | jungkook | — |
+| Backend FastAPI | **Render** (Docker, free tier) | Ya está contenerizada (`Dockerfile` multi-stage listo) y `render.yaml` ya existe — es deploy por blueprint, cero config nueva. |
+| PostgreSQL | **Supabase** (free) | Postgres gestionado sin operar nada; el código ya soporta Postgres vía `DATABASE_URL`. |
+| Panel web `depaso_web` | **Vercel** (free) | Es un build estático de Vite — Vercel lo sirve gratis con deploy automático desde GitHub. Alternativa equivalente: Netlify. |
+| APK Android (defensa) | **EAS Build** | `eas build --profile preview --platform android` — `eas.json` ya está configurado. |
+| Modelo ML | Dentro de la imagen Docker (o volumen) | ~15 MB; se carga una vez en el lifespan. `VISION_MODEL_PATH` por env. |
 
-## 5. Verificación global (sin tests nuevos)
+**¿Por qué no Kubernetes?** K8s orquesta *muchos* contenedores con equipo de ops detrás. DePaso es **un** contenedor + una DB gestionada, presupuesto $0 (RNF-COST) y un equipo de una persona: K8s suma clusters, YAML y costos sin ningún beneficio para el MVP. Para la tesis se menciona como camino de escalado futuro (junto con réplicas y autoscaling), no se implementa.
+
+**¿Por qué no AWS/GCP?** Poder haría lo mismo (ECS/Cloud Run), pero con mucha más fricción (IAM, VPC, billing con riesgo de costos sorpresa, free tier que vence). Render/Supabase/Vercel dan el mismo resultado con horas menos de configuración. Si un jurado pregunta: la app es portable — es Docker + Postgres estándar, migrar a AWS es cambiar dónde corre el contenedor, no el código (RNF-PRT-02).
+
+**Sí conviene mantener Docker**: es lo que hace la app portable y es lo que Render consume. `docker-compose.yml` sigue siendo el entorno dev local con Postgres.
+
+### Pasos concretos del deploy (cuando A/C/E estén cerrados)
+1. Supabase: crear proyecto → copiar `DATABASE_URL` → `alembic upgrade head` contra esa DB → correr seed.
+2. Render: New → Blueprint → apuntar al repo (`render.yaml`). Env: `DATABASE_URL`, `JWT_SECRET_KEY` (se autogenera), `VISION_MODEL_PATH`. Verificar `GET /api/v1/health` → 200.
+3. Vercel: importar el repo, root directory `depaso_web`, build `npm run build`, env `VITE_API_URL` apuntando a Render.
+4. EAS: `eas login` → `eas build --profile preview --platform android` → APK para la defensa.
+5. ⚠️ Render free hace *spin down* tras ~15 min sin tráfico (cold start ~30-60s). Para la defensa: pegarle al health 5 min antes de la demo, o un cron ping (p. ej. cron-job.org) los días previos.
+
+---
+
+## 5. Tests — al final, explícitamente diferidos (owner: jungkook)
+- Corregir los 7 tests de `test_vision.py` cuando exista el modelo real.
+- Cobertura actual 76% (objetivo RNF-MNT-02 de 60% ya superado; meta 80%).
+- Formalizar el smoke E2E como test pytest; QA manual en dispositivo real (GPS background, conectividad intermitente).
+
+## 6. Tesis escrita (`../UADE_PFI_Template-develop`)
+- **Cap 4 (hoy vacío)**: arquitectura 4 capas, las 4 modalidades, matching (knockouts + scoring w1–w5), máquina de estados, decisiones (polling vs WebSocket, capacidad derivada, CO₂ al aceptar, argon2 vs bcrypt, scoring determinístico vs subastas), restricciones vehículo/carga. + Sub-cap IA (dataset, MobileNetV2 dual-input, métricas, sesgos — sale de §3 paso 3) + sub-cap testing.
+- **Cap 1/3**: el panel pymes materializa el ítem existente *"Herramientas básicas de monitoreo operativo para administradores"* — describir el rol B2B (personas pyme fletera / pyme de productos), **sin ampliar el alcance**.
+- **Limitaciones y trabajo futuro**: cobertura ante daños (73.4% de carriers lo pide — se documenta el diseño, no se integra aseguradora), notificaciones push, elasticidad de precios, K8s/escalado.
+- Conclusiones, abstract, summary.
+
+## 7. Cronograma restante (jul–dic 2026)
+
+| Período | Qué | Estado |
+|---|---|---|
+| **Julio (1-2)** | Workstreams A + C + E (agentes) · Dataset IA: Open Images + fotos propias | 🔄 AHORA |
+| **Agosto** | Entrenamiento v1 en Colab + evaluación de sesgos | ⏳ |
+| **Septiembre** | Modelo real integrado, QA en dispositivo, tests vision corregidos | ⏳ |
+| **Octubre** | Deploy de prueba (Render+Supabase+Vercel), pulido | ⏳ |
+| **Noviembre** | Deploy productivo + APK EAS + fix bugs | ⏳ |
+| **Diciembre** | Cap 4 + docs finales (1-2) · Defensa (3-4) | ⏳ |
+
+**Hitos GO/NO-GO:** dataset completo 31-ago · modelo v1 ≥75% accuracy 15-sep · deploy productivo + APK 30-nov · defensa lista 15-dic.
+**Riesgo #1:** el dataset es lo único que no se acelera con código — las fotos propias empiezan YA, en paralelo con todo lo demás.
+
+---
+
+## 8. Referencia rápida
 
 ```bash
-# Backend
+# Backend local
 cd depaso_rest
-DATABASE_URL="sqlite:///./depaso_test.db" RATE_LIMIT_ENABLED=false .venv/bin/python -m pytest tests/ -q -p no:warnings   # los existentes no-vision en verde
+DATABASE_URL="sqlite:///./depaso_dev.db" .venv/bin/python -m scripts.seed_demo
+DATABASE_URL="sqlite:///./depaso_dev.db" .venv/bin/uvicorn src.app.main:app --reload
 DATABASE_URL="sqlite:///./depaso_dev.db" .venv/bin/python -m scripts.smoke_test
 
 # App móvil
-cd depaso_app && npx tsc --noEmit && npx eslint .
+cd depaso_app && npx expo start        # typecheck: npx tsc --noEmit · lint: npx eslint .
 
-# Web
-cd depaso_web && npm run build
+# Panel web
+cd depaso_web && npm run dev           # build: npm run build
 ```
 
-## 6. Pendiente para la tesis (no bloquea el código, recordatorio)
+**Usuarios demo:** admin@depaso.com/admin1234 · cliente@depaso.com/cliente1234 · lucia@depaso.com/lucia1234 (cadete moto verificada) · carlos@depaso.com/carlos1234 (camión, pendiente de verificación).
 
-- Escribir Cap 4 completo + sub-cap IA + testing (dic).
-- Ampliar alcance/personas con el rol pyme (panel B2B) en Cap 1 y 3.
-- Documentar limitaciones: cobertura ante daños, push, elasticidad de precios.
-- Actualizar ARQUITECTURA.md cuando A/B/C estén mergeados (nuevo módulo + depaso_web).
+**Gotchas:**
+- `.venv/bin/pip` roto → usar `.venv/bin/python -m pip`.
+- `.env` apunta a Postgres local; para correr sin Postgres, override `DATABASE_URL` a SQLite.
+- El repo vive en iCloud Drive: ante errores raros de `node_modules` → `rm -rf node_modules && npm ci`.
+- El seed consume datos si el smoke corrió antes — re-seedear ante dudas.
+- Sin el `.keras`, el endpoint de visión usa fallback determinístico automáticamente.
