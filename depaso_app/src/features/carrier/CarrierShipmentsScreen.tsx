@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { View, ScrollView, TouchableOpacity, ActivityIndicator, Alert, RefreshControl, StyleSheet } from "react-native";
+import { View, ScrollView, TouchableOpacity, ActivityIndicator, Alert, RefreshControl } from "react-native";
 import { Text } from "react-native-paper";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -30,7 +30,9 @@ const STATUS_LABEL: Partial<Record<ShipmentStatus, { text: string; color: string
   [ShipmentStatus.IN_TRANSIT]:     { text: "EN CAMINO", color: T.forest,      bg: T.mint },
 };
 
-const NEXT_ACTION: Partial<Record<ShipmentStatus, { next: ShipmentStatus; label: string; icon: any }>> = {
+type IconName = React.ComponentProps<typeof MaterialCommunityIcons>["name"];
+
+const NEXT_ACTION: Partial<Record<ShipmentStatus, { next: ShipmentStatus; label: string; icon: IconName }>> = {
   [ShipmentStatus.ASSIGNED]:       { next: ShipmentStatus.PICKUP_ARRIVED, label: "Llegué al origen",  icon: "map-marker-check-outline" },
   [ShipmentStatus.PICKUP_ARRIVED]: { next: ShipmentStatus.IN_TRANSIT,     label: "Retiré el paquete", icon: "package-up" },
   [ShipmentStatus.IN_TRANSIT]:     { next: ShipmentStatus.DELIVERED,      label: "Entregué",          icon: "check-decagram-outline" },
@@ -80,65 +82,70 @@ function ActiveJobCard({ shipment, onAdvance, advancing, onCancel }: {
   const statusInfo = STATUS_LABEL[shipment.status];
 
   return (
-    <View style={s.card}>
-      <View style={[s.stripe, { backgroundColor: isCollab ? T.emerald : T.amber }]} />
-      <View style={s.cardInner}>
+    <View className="bg-card rounded-[18px] border border-border flex-row overflow-hidden">
+      <View className="w-1" style={{ backgroundColor: isCollab ? T.emerald : T.amber }} />
+      <View className="flex-1 p-[14px]">
         {/* Header */}
-        <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
-          <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-            <Text style={s.cardId}>DP-{String(shipment.id).padStart(4, "0")}</Text>
+        <View className="flex-row items-center justify-between mb-3">
+          <View className="flex-row items-center gap-2">
+            <Text className="text-[10px] tracking-[1.5px] text-inkMute font-bold">DP-{String(shipment.id).padStart(4, "0")}</Text>
             {statusInfo && (
-              <View style={{ borderRadius: 6, paddingHorizontal: 7, paddingVertical: 3, backgroundColor: statusInfo.bg }}>
-                <Text style={{ fontSize: 9, letterSpacing: 1, fontWeight: "700", color: statusInfo.color, textTransform: "uppercase" }}>
+              <View className="rounded-md px-[7px] py-[3px]" style={{ backgroundColor: statusInfo.bg }}>
+                <Text className="text-[9px] tracking-[1px] font-bold uppercase" style={{ color: statusInfo.color }}>
                   {statusInfo.text}
                 </Text>
               </View>
             )}
           </View>
           {shipment.estimated_price != null && (
-            <Text style={s.price}>${shipment.estimated_price.toLocaleString("es-AR")}</Text>
+            <Text className="text-[17px] font-extrabold text-ink tracking-[-0.4px]">${shipment.estimated_price.toLocaleString("es-AR")}</Text>
           )}
         </View>
 
         {/* Route */}
-        <View style={{ gap: 8, marginBottom: 12 }}>
-          <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
-            <View style={{ width: 9, height: 9, borderRadius: 5, borderWidth: 2, borderColor: T.forest, backgroundColor: T.card }} />
-            <Text style={s.addr} numberOfLines={1}>{origAddr}</Text>
+        <View className="gap-2 mb-3">
+          <View className="flex-row items-center gap-[10px]">
+            <View className="w-[9px] h-[9px] rounded-full border-2 border-forest bg-card" />
+            <Text className="flex-1 text-[13.5px] text-ink font-medium" numberOfLines={1}>{origAddr}</Text>
           </View>
-          <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
-            <View style={{ width: 9, height: 9, borderRadius: 3, backgroundColor: T.emerald, transform: [{ rotate: "45deg" }] }} />
-            <Text style={s.addr} numberOfLines={1}>{destAddr}</Text>
+          <View className="flex-row items-center gap-[10px]">
+            <View className="w-[9px] h-[9px] rounded-[3px] bg-emerald rotate-45" />
+            <Text className="flex-1 text-[13.5px] text-ink font-medium" numberOfLines={1}>{destAddr}</Text>
           </View>
         </View>
 
         {/* Chips */}
-        <View style={{ flexDirection: "row", gap: 6, marginBottom: 14 }}>
-          <View style={s.chip}>
+        <View className="flex-row gap-[6px] mb-[14px]">
+          <View className="flex-row items-center gap-[5px] bg-cardSoft border border-borderSoft rounded-lg px-2 py-1">
             <MaterialCommunityIcons name="package-variant" size={12} color={T.inkSoft} />
-            <Text style={s.chipText}>{SIZE_LABEL[shipment.package_size]} · {shipment.weight_kg} kg</Text>
+            <Text className="text-[11px] text-inkSoft font-medium">{SIZE_LABEL[shipment.package_size]} · {shipment.weight_kg} kg</Text>
           </View>
-          <View style={s.chip}>
+          <View className="flex-row items-center gap-[5px] bg-cardSoft border border-borderSoft rounded-lg px-2 py-1">
             <MaterialCommunityIcons name={isCollab ? "account-group-outline" : "lightning-bolt"} size={12} color={T.inkSoft} />
-            <Text style={s.chipText}>{isCollab ? "Colaborativa" : "Dedicada"}</Text>
+            <Text className="text-[11px] text-inkSoft font-medium">{isCollab ? "Colaborativa" : "Dedicada"}</Text>
           </View>
         </View>
 
         {/* Advance */}
         {action && (
-          <TouchableOpacity style={s.advanceBtn} onPress={() => onAdvance(action.next)} disabled={advancing} activeOpacity={0.88}>
+          <TouchableOpacity
+            className="bg-forest rounded-[14px] h-12 flex-row items-center justify-center gap-2"
+            onPress={() => onAdvance(action.next)}
+            disabled={advancing}
+            activeOpacity={0.88}
+          >
             {advancing
               ? <ActivityIndicator color="#F4EFE3" size="small" />
               : <>
                   <MaterialCommunityIcons name={action.icon} size={17} color="#F4EFE3" />
-                  <Text style={s.advanceText}>{action.label}</Text>
+                  <Text className="text-[#F4EFE3] font-bold text-sm">{action.label}</Text>
                 </>}
           </TouchableOpacity>
         )}
 
         {shipment.status === ShipmentStatus.ASSIGNED && (
-          <TouchableOpacity style={s.bailBtn} onPress={onCancel} activeOpacity={0.8}>
-            <Text style={s.bailText}>No puedo llevarlo · penaliza reputación</Text>
+          <TouchableOpacity className="items-center pt-3" onPress={onCancel} activeOpacity={0.8}>
+            <Text className="text-xs text-red font-medium">No puedo llevarlo · penaliza reputación</Text>
           </TouchableOpacity>
         )}
       </View>
@@ -218,26 +225,26 @@ export default function CarrierShipmentsScreen() {
   }
 
   return (
-    <View style={[s.container, { paddingTop: insets.top }]}>
+    <View className="flex-1 bg-bg" style={{ paddingTop: insets.top }}>
       {/* ── Forest hero with stats ── */}
-      <View style={s.hero}>
-        <View style={{ marginBottom: 16 }}>
-          <Text style={s.heroEyebrow}>MIS VIAJES</Text>
-          <Text style={s.heroTitle}>Entregas</Text>
+      <View className="bg-forest px-5 pt-3 pb-[18px]">
+        <View className="mb-4">
+          <Text className="text-[9.5px] tracking-[2.5px] text-[#F4EFE3]/45 uppercase font-bold">MIS VIAJES</Text>
+          <Text className="text-[26px] font-extrabold text-[#F4EFE3] tracking-[-0.8px] mt-[3px]">Entregas</Text>
         </View>
 
         {summary && (
-          <View style={s.statsRow}>
+          <View className="flex-row gap-2">
             {[
               { label: "Entregas",    value: String(summary.deliveries_completed), icon: "package-variant-closed" as const },
               { label: "Ganancias",   value: `$${Math.round(summary.total_earnings / 1000).toFixed(1)}k`, icon: "cash-multiple" as const },
               { label: "Reputación",  value: summary.reputation.toFixed(1),                               icon: "star-outline" as const },
               { label: "CO₂",         value: `${summary.total_co2_saved_kg.toFixed(0)} kg`,               icon: "leaf" as const },
             ].map((it, i) => (
-              <View key={i} style={s.statCard}>
+              <View key={i} className="flex-1 bg-[#F4EFE3]/[0.08] rounded-[14px] p-[10px] items-center gap-1 border border-[#F4EFE3]/10">
                 <MaterialCommunityIcons name={it.icon} size={14} color="rgba(244,239,227,0.5)" />
-                <Text style={s.statValue}>{it.value}</Text>
-                <Text style={s.statLabel}>{it.label}</Text>
+                <Text className="text-sm font-extrabold text-[#F4EFE3] tracking-[-0.4px]">{it.value}</Text>
+                <Text className="text-[8.5px] tracking-[0.5px] text-[#F4EFE3]/45 uppercase text-center">{it.label}</Text>
               </View>
             ))}
           </View>
@@ -245,7 +252,7 @@ export default function CarrierShipmentsScreen() {
       </View>
 
       {loading ? (
-        <View style={s.center}><ActivityIndicator size="large" color={T.forest} /></View>
+        <View className="items-center justify-center gap-[10px] p-10"><ActivityIndicator size="large" color={T.forest} /></View>
       ) : (
         <ScrollView
           contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 16, gap: 10, paddingBottom: insets.bottom + 32 }}
@@ -253,9 +260,9 @@ export default function CarrierShipmentsScreen() {
           showsVerticalScrollIndicator={false}
         >
           {active.length > 0 && (
-            <View style={{ flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 2, marginBottom: 2 }}>
-              <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: T.emerald }} />
-              <Text style={s.sectionLabel}>EN CURSO · TRANSMITIENDO UBICACIÓN</Text>
+            <View className="flex-row items-center gap-2 px-[2px] mb-[2px]">
+              <View className="w-[7px] h-[7px] rounded-full bg-emerald" />
+              <Text className="text-[9.5px] tracking-[2px] text-inkMute uppercase font-bold">EN CURSO · TRANSMITIENDO UBICACIÓN</Text>
             </View>
           )}
           {active.map(sh => (
@@ -269,29 +276,29 @@ export default function CarrierShipmentsScreen() {
           ))}
 
           {active.length === 0 && (
-            <View style={s.center}>
-              <View style={{ width: 72, height: 72, borderRadius: 22, backgroundColor: T.cardSoft, alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: T.border, marginBottom: 4 }}>
+            <View className="items-center justify-center gap-[10px] p-10">
+              <View className="w-[72px] h-[72px] rounded-[22px] bg-cardSoft items-center justify-center border border-border mb-1">
                 <MaterialCommunityIcons name="moped-outline" size={34} color={T.inkMute} />
               </View>
-              <Text style={s.emptyTitle}>Sin entregas activas</Text>
-              <Text style={s.emptySub}>Aceptá pedidos desde la pestaña Pedidos.</Text>
+              <Text className="text-base text-ink font-bold tracking-[-0.3px] text-center">Sin entregas activas</Text>
+              <Text className="text-[13px] text-inkMute text-center">Aceptá pedidos desde la pestaña Pedidos.</Text>
             </View>
           )}
 
           {past.length > 0 && (
             <>
-              <Text style={[s.sectionLabel, { marginTop: 10, paddingHorizontal: 2 }]}>HISTORIAL</Text>
+              <Text className="text-[9.5px] tracking-[2px] text-inkMute uppercase font-bold mt-[10px] px-[2px]">HISTORIAL</Text>
               {past.map(sh => {
                 const delivered = sh.status === ShipmentStatus.DELIVERED;
                 return (
-                  <View key={sh.id} style={s.pastRow}>
-                    <View style={[s.pastDot, { backgroundColor: delivered ? T.emerald : T.red }]} />
-                    <View style={{ flex: 1 }}>
-                      <Text style={s.cardId}>DP-{String(sh.id).padStart(4, "0")}</Text>
-                      <Text style={s.pastMeta}>{SIZE_LABEL[sh.package_size]} · {delivered ? "Entregado" : "Cancelado"}</Text>
+                  <View key={sh.id} className="flex-row items-center gap-3 bg-card rounded-[14px] border border-borderSoft p-[14px]">
+                    <View className="w-[9px] h-[9px] rounded-full shrink-0" style={{ backgroundColor: delivered ? T.emerald : T.red }} />
+                    <View className="flex-1">
+                      <Text className="text-[10px] tracking-[1.5px] text-inkMute font-bold">DP-{String(sh.id).padStart(4, "0")}</Text>
+                      <Text className="text-xs text-inkMute mt-[2px]">{SIZE_LABEL[sh.package_size]} · {delivered ? "Entregado" : "Cancelado"}</Text>
                     </View>
                     {sh.estimated_price != null && delivered && (
-                      <Text style={s.pastPrice}>+${sh.estimated_price.toLocaleString("es-AR")}</Text>
+                      <Text className="text-sm font-bold text-emeraldDeep">+${sh.estimated_price.toLocaleString("es-AR")}</Text>
                     )}
                   </View>
                 );
@@ -303,43 +310,3 @@ export default function CarrierShipmentsScreen() {
     </View>
   );
 }
-
-const s = StyleSheet.create({
-  container: { flex: 1, backgroundColor: T.bg },
-
-  hero: { backgroundColor: T.forest, paddingHorizontal: 20, paddingTop: 12, paddingBottom: 18 },
-  heroEyebrow: { fontSize: 9.5, letterSpacing: 2.5, color: "rgba(244,239,227,0.45)", textTransform: "uppercase", fontWeight: "700" },
-  heroTitle: { fontSize: 26, fontWeight: "800", color: "#F4EFE3", letterSpacing: -0.8, marginTop: 3 },
-
-  statsRow: { flexDirection: "row", gap: 8 },
-  statCard: { flex: 1, backgroundColor: "rgba(244,239,227,0.08)", borderRadius: 14, padding: 10, alignItems: "center", gap: 4, borderWidth: 1, borderColor: "rgba(244,239,227,0.1)" },
-  statValue: { fontSize: 14, fontWeight: "800", color: "#F4EFE3", letterSpacing: -0.4 },
-  statLabel: { fontSize: 8.5, letterSpacing: 0.5, color: "rgba(244,239,227,0.45)", textTransform: "uppercase", textAlign: "center" },
-
-  center: { alignItems: "center", justifyContent: "center", gap: 10, padding: 40 },
-  emptyTitle: { fontSize: 16, color: T.ink, fontWeight: "700", letterSpacing: -0.3, textAlign: "center" },
-  emptySub: { fontSize: 13, color: T.inkMute, textAlign: "center" },
-
-  sectionLabel: { fontSize: 9.5, letterSpacing: 2, color: T.inkMute, textTransform: "uppercase", fontWeight: "700" },
-
-  card: { backgroundColor: T.card, borderRadius: 18, borderWidth: 1, borderColor: T.border, flexDirection: "row", overflow: "hidden" },
-  stripe: { width: 4 },
-  cardInner: { flex: 1, padding: 14 },
-
-  cardId: { fontSize: 10, letterSpacing: 1.5, color: T.inkMute, fontWeight: "700" },
-  price: { fontSize: 17, fontWeight: "800", color: T.ink, letterSpacing: -0.4 },
-  addr: { flex: 1, fontSize: 13.5, color: T.ink, fontWeight: "500" },
-
-  chip: { flexDirection: "row", alignItems: "center", gap: 5, backgroundColor: T.cardSoft, borderWidth: 1, borderColor: T.borderSoft, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4 },
-  chipText: { fontSize: 11, color: T.inkSoft, fontWeight: "500" },
-
-  advanceBtn: { backgroundColor: T.forest, borderRadius: 14, height: 48, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8 },
-  advanceText: { color: "#F4EFE3", fontWeight: "700", fontSize: 14 },
-  bailBtn: { alignItems: "center", paddingTop: 12 },
-  bailText: { fontSize: 12, color: T.red, fontWeight: "500" },
-
-  pastRow: { flexDirection: "row", alignItems: "center", gap: 12, backgroundColor: T.card, borderRadius: 14, borderWidth: 1, borderColor: T.borderSoft, padding: 14 },
-  pastDot: { width: 9, height: 9, borderRadius: 5, flexShrink: 0 },
-  pastMeta: { fontSize: 12, color: T.inkMute, marginTop: 2 },
-  pastPrice: { fontSize: 14, fontWeight: "700", color: T.emeraldDeep },
-});

@@ -48,7 +48,7 @@ function WaypointMark({ size = 68 }: { size?: number }) {
 const FEATURES = [
   { icon: "lightning-bolt" as const, title: "Mismo día",    sub: "En 3h o menos" },
   { icon: "leaf"           as const, title: "−1.8 kg CO₂",  sub: "Por envío" },
-  { icon: "shield-outline" as const, title: "Asegurado",    sub: "Hasta $80k" },
+  { icon: "map-marker-path" as const, title: "En vivo",      sub: "Seguí tu envío" },
 ];
 
 export default function Index() {

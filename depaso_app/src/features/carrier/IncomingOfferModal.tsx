@@ -80,13 +80,13 @@ export function IncomingOfferModal({ item, accepting, onAccept, onReject }: Prop
           <View className="flex-row items-center justify-between mb-3">
             <View className="flex-row items-center gap-2">
               <View className="w-[10px] h-[10px] rounded-full bg-amber" />
-              <Text className="text-[10px] tracking-[1.5px] font-bold uppercase" style={{ color: "#8E5A0B" }}>
+              <Text className="text-amberDeep text-[10px] tracking-[1.5px] font-bold uppercase">
                 Pedido entrante
               </Text>
             </View>
             <View className="flex-row items-center gap-1 bg-amberBg px-[9px] py-1 rounded-lg">
-              <MaterialCommunityIcons name="clock-outline" size={12} color="#8E5A0B" />
-              <Text className="text-[11px] font-bold tracking-[0.5px]" style={{ color: "#8E5A0B" }}>
+              <MaterialCommunityIcons name="clock-outline" size={12} color={T.amberDeep} />
+              <Text className="text-amberDeep text-[11px] font-bold tracking-[0.5px]">
                 {isCollab ? "COLAB." : "EXPRESS"}
               </Text>
             </View>

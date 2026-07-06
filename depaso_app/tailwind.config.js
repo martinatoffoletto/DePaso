@@ -28,6 +28,7 @@ module.exports = {
         inkFaint:    "#A8B0A6",
         amber:       "#E89E2A",
         amberBg:     "#FAEEC9",
+        amberDeep:   "#8E5A0B",
         red:         "#D75A4E",
         redBg:       "#F8D9D2",
         violet:      "#7C6AE0",

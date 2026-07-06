@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { View, StyleSheet, ScrollView, TouchableOpacity, Image, Alert, ActivityIndicator } from "react-native";
+import { View, ScrollView, TouchableOpacity, Image, Alert, ActivityIndicator } from "react-native";
 import MapView, { Marker, Polyline } from "react-native-maps";
 import { Text } from "react-native-paper";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
@@ -19,22 +19,18 @@ const SIZE_LABEL: Record<string, string> = {
 
 function StepDots({ current, total }: { current: number; total: number }) {
   return (
-    <View style={dotStyles.row}>
+    <View className="flex-row gap-[6px] items-center">
       {Array.from({ length: total }).map((_, i) => (
         <View
           key={i}
-          style={[dotStyles.dot, { width: i === current - 1 ? 18 : 6, backgroundColor: i < current ? T.forest : T.border }]}
+          className="h-[6px] rounded"
+          style={{ width: i === current - 1 ? 18 : 6, backgroundColor: i < current ? T.forest : T.border }}
         />
       ))}
-      <Text style={dotStyles.counter}>{String(current).padStart(2, "0")}/{String(total).padStart(2, "0")}</Text>
+      <Text className="text-[10px] tracking-[1.5px] text-inkMute ml-1">{String(current).padStart(2, "0")}/{String(total).padStart(2, "0")}</Text>
     </View>
   );
 }
-const dotStyles = StyleSheet.create({
-  row: { flexDirection: "row", gap: 6, alignItems: "center" },
-  dot: { height: 6, borderRadius: 4 },
-  counter: { fontSize: 10, letterSpacing: 1.5, color: T.inkMute, marginLeft: 4 },
-});
 
 type SummaryScreenProps = {
   origin: string;
@@ -55,18 +51,13 @@ type SummaryScreenProps = {
 
 function Row({ icon, label, value }: { icon: IconName; label: string; value: string }) {
   return (
-    <View style={rowStyles.row}>
+    <View className="flex-row items-start gap-[10px] py-[10px]">
       <MaterialCommunityIcons name={icon} size={17} color={T.inkMute} />
-      <Text style={rowStyles.label}>{label}</Text>
-      <Text style={rowStyles.value} numberOfLines={2}>{value}</Text>
+      <Text className="text-[13px] text-inkMute w-20">{label}</Text>
+      <Text className="flex-1 text-sm text-ink font-medium text-right" numberOfLines={2}>{value}</Text>
     </View>
   );
 }
-const rowStyles = StyleSheet.create({
-  row: { flexDirection: "row", alignItems: "flex-start", gap: 10, paddingVertical: 10 },
-  label: { fontSize: 13, color: T.inkMute, width: 80 },
-  value: { flex: 1, fontSize: 14, color: T.ink, fontWeight: "500", textAlign: "right" },
-});
 
 export function SummaryScreen({
   origin, destination, originCoords, destinationCoords,
@@ -127,29 +118,33 @@ export function SummaryScreen({
   } : undefined;
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top }]}>
+    <View className="flex-1 bg-bg" style={{ paddingTop: insets.top }}>
       {/* Step header */}
-      <View style={styles.stepHeader}>
-        <TouchableOpacity style={styles.headerBtn} onPress={onBack} hitSlop={10}>
+      <View className="flex-row items-center justify-between px-5 pt-2 pb-1">
+        <TouchableOpacity
+          className="w-[38px] h-[38px] rounded-xl border border-border bg-card items-center justify-center"
+          onPress={onBack}
+          hitSlop={10}
+        >
           <MaterialCommunityIcons name="arrow-left" size={18} color={T.ink} />
         </TouchableOpacity>
         <StepDots current={4} total={4} />
 
-        <View style={styles.headerBtn}>
+        <View className="w-[38px] h-[38px] rounded-xl border border-border bg-card items-center justify-center">
           <MaterialCommunityIcons name="creation" size={16} color={T.ink} />
         </View>
       </View>
 
-      <View style={styles.stepTitleBlock}>
-        <Text style={styles.stepSub}>PASO 04 · RESUMEN</Text>
-        <Text style={styles.stepTitle}>Confirmá{"\n"}tu envío</Text>
+      <View className="px-5 pt-1 pb-[10px]">
+        <Text className="text-[10px] tracking-[2.5px] text-emeraldDeep uppercase mb-1">PASO 04 · RESUMEN</Text>
+        <Text className="text-2xl font-bold text-ink tracking-[-0.8px] leading-7">Confirmá{"\n"}tu envío</Text>
       </View>
 
       {/* Map */}
       {originCoords && destinationCoords && (
-        <View style={styles.mapWrapper}>
+        <View className="mx-4 mb-1 rounded-[18px] overflow-hidden border border-border">
           <MapView
-            style={styles.map}
+            style={{ height: 175 }}
             region={mapRegion}
             scrollEnabled={false}
             zoomEnabled={false}
@@ -169,39 +164,39 @@ export function SummaryScreen({
       )}
 
       <ScrollView
-        contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 24 }]}
+        contentContainerStyle={{ padding: 16, gap: 12, paddingBottom: insets.bottom + 24 }}
         showsVerticalScrollIndicator={false}
       >
         {/* Route card */}
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>RUTA</Text>
-          <View style={styles.routeBlock}>
-            <View style={styles.routeDotsCol}>
-              <View style={[styles.dot, { backgroundColor: T.emerald }]} />
-              <View style={styles.dotLine} />
-              <View style={[styles.dot, { backgroundColor: T.red, borderRadius: 3 }]} />
+        <View className="bg-card rounded-[18px] border border-border p-4">
+          <Text className="text-[10px] tracking-[1.5px] text-inkMute uppercase mb-3 font-semibold">RUTA</Text>
+          <View className="flex-row gap-3">
+            <View className="items-center gap-[2px] pt-1">
+              <View className="w-[10px] h-[10px] rounded-full bg-emerald" />
+              <View className="w-[2px] flex-1 bg-border min-h-[20px]" />
+              <View className="w-[10px] h-[10px] rounded-[3px] bg-red" />
             </View>
-            <View style={styles.routeTexts}>
-              <Text style={styles.routeAddr} numberOfLines={2}>{origin}</Text>
-              <View style={{ height: 12 }} />
-              <Text style={styles.routeAddr} numberOfLines={2}>{destination}</Text>
+            <View className="flex-1">
+              <Text className="text-sm text-ink font-medium" numberOfLines={2}>{origin}</Text>
+              <View className="h-3" />
+              <Text className="text-sm text-ink font-medium" numberOfLines={2}>{destination}</Text>
             </View>
           </View>
           {(recipientName || recipientPhone) && (
-            <Text style={styles.shipmentId}>
+            <Text className="text-xs text-inkMute mt-[10px]">
               Recibe: {[recipientName, recipientPhone].filter(Boolean).join(" · ")}
             </Text>
           )}
         </View>
 
         {/* Package details card */}
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>DETALLES</Text>
+        <View className="bg-card rounded-[18px] border border-border p-4">
+          <Text className="text-[10px] tracking-[1.5px] text-inkMute uppercase mb-3 font-semibold">DETALLES</Text>
 
           {photoUri && (
             <>
-              <Image source={{ uri: photoUri }} style={styles.packagePhoto} resizeMode="cover" />
-              <View style={styles.divider} />
+              <Image source={{ uri: photoUri }} className="w-full h-40 rounded-[10px] mb-1" resizeMode="cover" />
+              <View className="h-px bg-borderSoft" />
             </>
           )}
 
@@ -209,57 +204,57 @@ export function SummaryScreen({
 
           {!!description && (
             <>
-              <View style={styles.divider} />
+              <View className="h-px bg-borderSoft" />
               <Row icon="text-box-outline" label="Descripción" value={description} />
             </>
           )}
 
-          <View style={styles.divider} />
+          <View className="h-px bg-borderSoft" />
           <Row
             icon={isCollaborative ? "account-group-outline" : "lightning-bolt"}
             label="Modalidad"
             value={isCollaborative ? "Colaborativa" : "Dedicada"}
           />
-          <View style={styles.divider} />
-          <View style={rowStyles.row}>
+          <View className="h-px bg-borderSoft" />
+          <View className="flex-row items-start gap-[10px] py-[10px]">
             <MaterialCommunityIcons name="clock-fast" size={17} color={T.inkMute} />
-            <Text style={rowStyles.label}>Asignación</Text>
-            <View style={styles.modeToggle}>
+            <Text className="text-[13px] text-inkMute w-20">Asignación</Text>
+            <View className="flex-row gap-[6px] flex-1 justify-end">
               <TouchableOpacity
-                style={[styles.modeBtn, assignmentMode === AssignmentMode.ON_DEMAND && styles.modeBtnActive]}
+                className={`px-[10px] py-[5px] rounded-lg border ${assignmentMode === AssignmentMode.ON_DEMAND ? "border-forest bg-forest" : "border-border bg-card"}`}
                 onPress={() => setAssignmentMode(AssignmentMode.ON_DEMAND)}
                 activeOpacity={0.8}
               >
-                <Text style={[styles.modeBtnText, assignmentMode === AssignmentMode.ON_DEMAND && styles.modeBtnTextActive]}>
+                <Text className={`text-xs font-medium ${assignmentMode === AssignmentMode.ON_DEMAND ? "text-white" : "text-inkMute"}`}>
                   Inmediato
                 </Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={[styles.modeBtn, assignmentMode === AssignmentMode.BY_AVAILABILITY && styles.modeBtnActive]}
+                className={`px-[10px] py-[5px] rounded-lg border ${assignmentMode === AssignmentMode.BY_AVAILABILITY ? "border-forest bg-forest" : "border-border bg-card"}`}
                 onPress={() => setAssignmentMode(AssignmentMode.BY_AVAILABILITY)}
                 activeOpacity={0.8}
               >
-                <Text style={[styles.modeBtnText, assignmentMode === AssignmentMode.BY_AVAILABILITY && styles.modeBtnTextActive]}>
+                <Text className={`text-xs font-medium ${assignmentMode === AssignmentMode.BY_AVAILABILITY ? "text-white" : "text-inkMute"}`}>
                   Por ruta
                 </Text>
               </TouchableOpacity>
             </View>
           </View>
-          <View style={styles.divider} />
+          <View className="h-px bg-borderSoft" />
           <Row icon="cash" label="Precio est." value={price != null ? `$${price.toLocaleString("es-AR")} ARS` : "A confirmar"} />
         </View>
 
         {/* CO₂ hero card */}
         {isCollaborative && (
-          <View style={styles.co2Card}>
-            <View style={styles.co2IconBox}>
+          <View className="flex-row gap-3 bg-mint rounded-2xl p-4 border border-border items-start">
+            <View className="w-9 h-9 rounded-xl bg-emerald items-center justify-center shrink-0">
               <MaterialCommunityIcons name="leaf" size={20} color="#fff" />
             </View>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.co2Title}>Ahorrás CO₂</Text>
-              <Text style={styles.co2Sub}>
+            <View className="flex-1">
+              <Text className="text-sm font-semibold text-forest mb-[2px]">Ahorrás CO₂</Text>
+              <Text className="text-xs text-inkSoft leading-[17px]">
                 {"Este envío colaborativo evita hasta "}
-                <Text style={styles.co2Highlight}>
+                <Text className="text-emeraldDeep font-bold">
                   {quote?.co2_savings_estimate_kg != null
                     ? `${quote.co2_savings_estimate_kg.toFixed(1)} kg`
                     : "~1.8 kg"}{" CO₂"}
@@ -271,101 +266,26 @@ export function SummaryScreen({
         )}
 
         {/* CTAs */}
-        <TouchableOpacity style={[styles.confirmBtn, loading && { opacity: 0.7 }]} onPress={handleConfirm} activeOpacity={0.88} disabled={loading}>
+        <TouchableOpacity
+          className="flex-row bg-forest rounded-[14px] py-4 items-center justify-center gap-[10px]"
+          style={{ opacity: loading ? 0.7 : 1, shadowColor: T.forest, shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.35, shadowRadius: 16, elevation: 5 }}
+          onPress={handleConfirm}
+          activeOpacity={0.88}
+          disabled={loading}
+        >
           {loading
             ? <ActivityIndicator color="#fff" />
             : <>
                 <MaterialCommunityIcons name="check-circle-outline" size={22} color="#fff" />
-                <Text style={styles.confirmText}>Confirmar envío</Text>
+                <Text className="text-[#F4EFE3] font-bold text-[17px]">Confirmar envío</Text>
               </>
           }
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.cancelBtn} onPress={onBack} activeOpacity={0.7}>
-          <Text style={styles.cancelText}>Volver y modificar</Text>
+        <TouchableOpacity className="items-center py-[10px]" onPress={onBack} activeOpacity={0.7}>
+          <Text className="text-sm text-inkMute">Volver y modificar</Text>
         </TouchableOpacity>
       </ScrollView>
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: T.bg },
-
-  stepHeader: {
-    flexDirection: "row", alignItems: "center", justifyContent: "space-between",
-    paddingHorizontal: 20, paddingTop: 8, paddingBottom: 4,
-  },
-  headerBtn: {
-    width: 38, height: 38, borderRadius: 12,
-    borderWidth: 1, borderColor: T.border,
-    backgroundColor: T.card, alignItems: "center", justifyContent: "center",
-  },
-  stepTitleBlock: { paddingHorizontal: 20, paddingTop: 4, paddingBottom: 10 },
-  stepSub: { fontSize: 10, letterSpacing: 2.5, color: T.emeraldDeep, textTransform: "uppercase", marginBottom: 4 },
-  stepTitle: { fontSize: 24, fontWeight: "700", color: T.ink, letterSpacing: -0.8, lineHeight: 28 },
-
-  mapWrapper: { marginHorizontal: 16, marginBottom: 4, borderRadius: 18, overflow: "hidden", borderWidth: 1, borderColor: T.border },
-  map: { height: 175 },
-  packagePhoto: { width: "100%", height: 160, borderRadius: 10, marginBottom: 4 },
-
-  content: { padding: 16, gap: 12 },
-
-  card: {
-    backgroundColor: T.card, borderRadius: 18,
-    borderWidth: 1, borderColor: T.border, padding: 16,
-  },
-  cardTitle: {
-    fontSize: 10, letterSpacing: 1.5, color: T.inkMute,
-    textTransform: "uppercase", marginBottom: 12, fontWeight: "600",
-  },
-
-  routeBlock: { flexDirection: "row", gap: 12 },
-  routeDotsCol: { alignItems: "center", gap: 2, paddingTop: 4 },
-  dot: { width: 10, height: 10, borderRadius: 5 },
-  dotLine: { width: 2, flex: 1, backgroundColor: T.border, minHeight: 20 },
-  routeTexts: { flex: 1 },
-  routeAddr: { fontSize: 14, color: T.ink, fontWeight: "500" },
-  shipmentId: { fontSize: 12, color: T.inkMute, marginTop: 10 },
-
-  divider: { height: 1, backgroundColor: T.borderSoft },
-
-  co2Card: {
-    flexDirection: "row", gap: 12,
-    backgroundColor: T.mint, borderRadius: 16, padding: 16,
-    borderWidth: 1, borderColor: T.border,
-    alignItems: "flex-start",
-  },
-  co2IconBox: {
-    width: 36, height: 36, borderRadius: 12,
-    backgroundColor: T.emerald, alignItems: "center", justifyContent: "center",
-    flexShrink: 0,
-  },
-  co2Title: { fontSize: 14, fontWeight: "600", color: T.forest, marginBottom: 2 },
-  co2Sub: { fontSize: 12, color: T.inkSoft, lineHeight: 17 },
-  co2Highlight: { color: T.emeraldDeep, fontWeight: "700" },
-
-  confirmBtn: {
-    flexDirection: "row", backgroundColor: T.forest,
-    borderRadius: 14, paddingVertical: 16,
-    alignItems: "center", justifyContent: "center", gap: 10,
-    shadowColor: T.forest,
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.35,
-    shadowRadius: 16,
-    elevation: 5,
-  },
-  confirmText: { color: "#F4EFE3", fontWeight: "700", fontSize: 17 },
-  cancelBtn: { alignItems: "center", paddingVertical: 10 },
-  cancelText: { color: T.inkMute, fontSize: 14 },
-
-  modeToggle: { flexDirection: "row", gap: 6 },
-  modeBtn: {
-    paddingHorizontal: 10, paddingVertical: 5,
-    borderRadius: 8, borderWidth: 1, borderColor: T.border,
-    backgroundColor: T.card,
-  },
-  modeBtnActive: { borderColor: T.forest, backgroundColor: T.forest },
-  modeBtnText: { fontSize: 12, color: T.inkMute, fontWeight: "500" },
-  modeBtnTextActive: { color: "#fff" },
-});

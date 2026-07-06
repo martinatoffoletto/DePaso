@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import {
-  View, StyleSheet, ScrollView, RefreshControl,
+  View, ScrollView, RefreshControl,
   ActivityIndicator, TouchableOpacity, Alert,
 } from "react-native";
 import { Text } from "react-native-paper";
@@ -25,12 +25,12 @@ function MetricCard({ icon, value, label, accent = false }: {
   icon: IconName; value: string; label: string; accent?: boolean;
 }) {
   return (
-    <View style={s.metricCard}>
-      <View style={[s.metricIcon, accent && { backgroundColor: T.mint }]}>
+    <View className="flex-1 bg-card rounded-[18px] border border-border p-[14px] gap-1">
+      <View className={`w-[34px] h-[34px] rounded-[10px] items-center justify-center ${accent ? "bg-mint" : "bg-cardSoft border border-borderSoft"}`}>
         <MaterialCommunityIcons name={icon} size={18} color={accent ? T.forest : T.inkSoft} />
       </View>
-      <Text style={s.metricValue}>{value}</Text>
-      <Text style={s.metricLabel}>{label}</Text>
+      <Text className="text-[21px] font-bold text-ink tracking-[-0.5px] mt-1">{value}</Text>
+      <Text className="text-[11px] text-inkMute">{label}</Text>
     </View>
   );
 }
@@ -41,30 +41,32 @@ function PendingCarrierCard({ carrier, onModerate, busy }: {
   busy: boolean;
 }) {
   return (
-    <View style={s.carrierCard}>
-      <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
-        <View style={s.carrierIcon}>
+    <View className="bg-card rounded-2xl border border-border p-[14px]">
+      <View className="flex-row items-center gap-3">
+        <View className="w-[38px] h-[38px] rounded-[10px] bg-amberBg items-center justify-center">
           <MaterialCommunityIcons name="truck-outline" size={18} color={T.amber} />
         </View>
-        <View style={{ flex: 1, minWidth: 0 }}>
-          <Text style={s.carrierName} numberOfLines={1}>{carrier.company_name}</Text>
-          <Text style={s.carrierDetail}>
+        <View className="flex-1 min-w-0">
+          <Text className="text-sm font-bold text-ink tracking-[-0.2px]" numberOfLines={1}>{carrier.company_name}</Text>
+          <Text className="text-[11.5px] text-inkMute mt-[2px]">
             {VEHICLE_LABELS[carrier.vehicle_type] ?? carrier.vehicle_type} · {carrier.license_plate} · {carrier.capacity_kg} kg
           </Text>
         </View>
       </View>
-      <View style={{ flexDirection: "row", gap: 8, marginTop: 12 }}>
+      <View className="flex-row gap-2 mt-3">
         <TouchableOpacity
-          style={[s.modBtn, s.modBtnVerify, busy && { opacity: 0.5 }]}
+          className="flex-1 flex-row items-center justify-center gap-[6px] rounded-[11px] py-[10px] bg-forest"
+          style={busy ? { opacity: 0.5 } : undefined}
           disabled={busy}
           onPress={() => onModerate(carrier.id, "verify")}
           activeOpacity={0.8}
         >
           <MaterialCommunityIcons name="check-decagram-outline" size={15} color="#F4EFE3" />
-          <Text style={s.modBtnVerifyText}>Verificar</Text>
+          <Text className="text-[13px] font-bold text-[#F4EFE3]">Verificar</Text>
         </TouchableOpacity>
         <TouchableOpacity
-          style={[s.modBtn, s.modBtnSuspend, busy && { opacity: 0.5 }]}
+          className="flex-1 flex-row items-center justify-center gap-[6px] rounded-[11px] py-[10px] border border-border bg-cardSoft"
+          style={busy ? { opacity: 0.5 } : undefined}
           disabled={busy}
           onPress={() =>
             Alert.alert("Suspender cadete", `¿Suspender a "${carrier.company_name}"?`, [
@@ -75,7 +77,7 @@ function PendingCarrierCard({ carrier, onModerate, busy }: {
           activeOpacity={0.8}
         >
           <MaterialCommunityIcons name="cancel" size={15} color={T.red} />
-          <Text style={s.modBtnSuspendText}>Suspender</Text>
+          <Text className="text-[13px] font-semibold text-red">Suspender</Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -128,7 +130,7 @@ export default function AdminScreen() {
 
   if (loading) {
     return (
-      <View style={[s.container, { justifyContent: "center", alignItems: "center" }]}>
+      <View className="flex-1 bg-bg justify-center items-center">
         <ActivityIndicator color={T.forest} size="large" />
       </View>
     );
@@ -136,44 +138,44 @@ export default function AdminScreen() {
 
   return (
     <ScrollView
-      style={s.container}
+      className="flex-1 bg-bg"
       contentContainerStyle={{ paddingBottom: insets.bottom + 32 }}
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={T.forest} />}
       showsVerticalScrollIndicator={false}
     >
-      <View style={[s.topBar, { paddingTop: insets.top + 6 }]}>
-        <Text style={s.topTitle}>Panel de control</Text>
-        <View style={s.adminBadge}>
+      <View className="flex-row items-center justify-between px-5 pb-[6px]" style={{ paddingTop: insets.top + 6 }}>
+        <Text className="text-[22px] font-bold text-ink tracking-[-0.6px]">Panel de control</Text>
+        <View className="flex-row items-center gap-1 bg-mint px-2 py-1 rounded-lg">
           <MaterialCommunityIcons name="shield-account-outline" size={12} color={T.forest} />
-          <Text style={s.adminBadgeText}>ADMIN</Text>
+          <Text className="text-[9px] tracking-[1.2px] text-forest font-bold">ADMIN</Text>
         </View>
       </View>
 
       {error && (
-        <View style={s.errorBanner}>
+        <View className="flex-row items-center gap-2 mx-4 mt-2 bg-redBg rounded-xl p-3">
           <MaterialCommunityIcons name="wifi-off" size={16} color={T.red} />
-          <Text style={s.errorText}>No pudimos cargar los datos. Deslizá para reintentar.</Text>
+          <Text className="flex-1 text-xs text-red font-medium">No pudimos cargar los datos. Deslizá para reintentar.</Text>
         </View>
       )}
 
       {/* Operations */}
-      <Text style={s.sectionTitle}>OPERACIÓN</Text>
-      <View style={s.metricsRow}>
+      <Text className="text-[10px] font-bold tracking-[2px] text-inkMute uppercase mx-5 mt-[18px] mb-2">OPERACIÓN</Text>
+      <View className="flex-row gap-[10px] mx-4">
         <MetricCard icon="package-variant-closed" value={String(dashboard?.shipments_total ?? 0)} label="Envíos totales" />
         <MetricCard icon="truck-fast-outline" value={String(dashboard?.shipments_active ?? 0)} label="En curso" />
       </View>
-      <View style={[s.metricsRow, { marginTop: 10 }]}>
+      <View className="flex-row gap-[10px] mx-4 mt-[10px]">
         <MetricCard icon="check-circle-outline" value={String(dashboard?.shipments_delivered ?? 0)} label="Entregados" accent />
         <MetricCard icon="clock-outline" value={String(dashboard?.shipments_pending ?? 0)} label="Sin asignar" />
       </View>
 
       {/* Platform */}
-      <Text style={s.sectionTitle}>PLATAFORMA</Text>
-      <View style={s.metricsRow}>
+      <Text className="text-[10px] font-bold tracking-[2px] text-inkMute uppercase mx-5 mt-[18px] mb-2">PLATAFORMA</Text>
+      <View className="flex-row gap-[10px] mx-4">
         <MetricCard icon="account-group-outline" value={String(dashboard?.total_users ?? 0)} label="Usuarios" />
         <MetricCard icon="bike-fast" value={String(dashboard?.total_carriers ?? 0)} label="Cadetes" />
       </View>
-      <View style={[s.metricsRow, { marginTop: 10 }]}>
+      <View className="flex-row gap-[10px] mx-4 mt-[10px]">
         <MetricCard
           icon="leaf"
           value={`${(dashboard?.total_co2_saved_kg ?? 0).toFixed(1)} kg`}
@@ -188,21 +190,21 @@ export default function AdminScreen() {
       </View>
 
       {/* Pending carriers */}
-      <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginRight: 20 }}>
-        <Text style={s.sectionTitle}>CADETES PENDIENTES DE VERIFICACIÓN</Text>
+      <View className="flex-row items-center justify-between mr-5">
+        <Text className="text-[10px] font-bold tracking-[2px] text-inkMute uppercase mx-5 mt-[18px] mb-2">CADETES PENDIENTES DE VERIFICACIÓN</Text>
         {pending.length > 0 && (
-          <View style={s.countPill}>
-            <Text style={s.countPillText}>{pending.length}</Text>
+          <View className="bg-amberBg px-2 py-[2px] rounded-lg mt-[18px] mb-2">
+            <Text className="text-[11px] font-bold text-amber">{pending.length}</Text>
           </View>
         )}
       </View>
       {pending.length === 0 ? (
-        <View style={s.empty}>
+        <View className="items-center gap-[10px] py-9">
           <MaterialCommunityIcons name="check-decagram-outline" size={42} color={T.border} />
-          <Text style={s.emptyText}>No hay verificaciones pendientes</Text>
+          <Text className="text-[13px] text-inkMute font-medium">No hay verificaciones pendientes</Text>
         </View>
       ) : (
-        <View style={{ marginHorizontal: 16, gap: 10 }}>
+        <View className="mx-4 gap-[10px]">
           {pending.map((c) => (
             <PendingCarrierCard
               key={c.id}
@@ -216,37 +218,3 @@ export default function AdminScreen() {
     </ScrollView>
   );
 }
-
-const s = StyleSheet.create({
-  container: { flex: 1, backgroundColor: T.bg },
-  topBar: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 20, paddingBottom: 6 },
-  topTitle: { fontSize: 22, fontWeight: "700", color: T.ink, letterSpacing: -0.6 },
-  adminBadge: { flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: T.mint, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8 },
-  adminBadgeText: { fontSize: 9, letterSpacing: 1.2, color: T.forest, fontWeight: "700" },
-
-  errorBanner: { flexDirection: "row", alignItems: "center", gap: 8, marginHorizontal: 16, marginTop: 8, backgroundColor: T.redBg, borderRadius: 12, padding: 12 },
-  errorText: { flex: 1, fontSize: 12, color: T.red, fontWeight: "500" },
-
-  sectionTitle: { fontSize: 10, fontWeight: "700", letterSpacing: 2, color: T.inkMute, textTransform: "uppercase", marginHorizontal: 20, marginTop: 18, marginBottom: 8 },
-  metricsRow: { flexDirection: "row", gap: 10, marginHorizontal: 16 },
-  metricCard: { flex: 1, backgroundColor: T.card, borderRadius: 18, borderWidth: 1, borderColor: T.border, padding: 14, gap: 4 },
-  metricIcon: { width: 34, height: 34, borderRadius: 10, backgroundColor: T.cardSoft, borderWidth: 1, borderColor: T.borderSoft, alignItems: "center", justifyContent: "center" },
-  metricValue: { fontSize: 21, fontWeight: "700", color: T.ink, letterSpacing: -0.5, marginTop: 4 },
-  metricLabel: { fontSize: 11, color: T.inkMute },
-
-  countPill: { backgroundColor: T.amberBg, paddingHorizontal: 8, paddingVertical: 2, borderRadius: 8, marginTop: 18, marginBottom: 8 },
-  countPillText: { fontSize: 11, fontWeight: "700", color: T.amber },
-
-  carrierCard: { backgroundColor: T.card, borderRadius: 16, borderWidth: 1, borderColor: T.border, padding: 14 },
-  carrierIcon: { width: 38, height: 38, borderRadius: 10, backgroundColor: T.amberBg, alignItems: "center", justifyContent: "center" },
-  carrierName: { fontSize: 14, fontWeight: "700", color: T.ink, letterSpacing: -0.2 },
-  carrierDetail: { fontSize: 11.5, color: T.inkMute, marginTop: 2 },
-  modBtn: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, borderRadius: 11, paddingVertical: 10 },
-  modBtnVerify: { backgroundColor: T.forest },
-  modBtnVerifyText: { fontSize: 13, fontWeight: "700", color: "#F4EFE3" },
-  modBtnSuspend: { borderWidth: 1, borderColor: T.border, backgroundColor: T.cardSoft },
-  modBtnSuspendText: { fontSize: 13, fontWeight: "600", color: T.red },
-
-  empty: { alignItems: "center", gap: 10, paddingVertical: 36 },
-  emptyText: { fontSize: 13, color: T.inkMute, fontWeight: "500" },
-});

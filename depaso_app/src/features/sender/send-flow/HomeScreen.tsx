@@ -182,7 +182,7 @@ export function HomeScreen({ onStart }: HomeScreenProps) {
               <View className="flex-row items-center gap-[14px] px-5">
                 <View
                   className="w-[52px] h-[52px] rounded-2xl bg-lime items-center justify-center"
-                  style={{ shadowColor: "#A3E635", shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.4, shadowRadius: 14 }}
+                  style={{ shadowColor: T.lime, shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.4, shadowRadius: 14 }}
                 >
                   <MaterialCommunityIcons name="camera-outline" size={26} color="#1A1A1A" />
                 </View>

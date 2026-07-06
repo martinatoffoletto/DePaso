@@ -302,7 +302,7 @@ export default function RiderHomeScreen() {
               {visibleFeed.length > 0 && (
                 <View className="flex-row items-center gap-1 bg-amberBg px-[7px] py-[3px] rounded-md">
                   <View className="w-[5px] h-[5px] rounded-full bg-amber" />
-                  <Text className="text-[9px] tracking-[1px] font-bold uppercase" style={{ color: "#8E5A0B" }}>
+                  <Text className="text-amberDeep text-[9px] tracking-[1px] font-bold uppercase">
                     {visibleFeed.length} {visibleFeed.length === 1 ? "nuevo" : "nuevos"}
                   </Text>
                 </View>
