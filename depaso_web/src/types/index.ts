@@ -1,6 +1,6 @@
 /*
   Tipos espejo del backend FastAPI (depaso_rest). No inventar shapes:
-  cada tipo corresponde a un schema Pydantic real en depaso_rest/src/app/modules/*/schemas.py.
+  cada tipo corresponde a un schema Pydantic real en los modules/<nombre>/schemas.py.
 */
 
 export type UserType = "client" | "carrier" | "admin";
@@ -115,4 +115,117 @@ export interface HealthResponse {
   version: string;
   vision_model_loaded?: boolean;
   database?: string;
+}
+
+/* ---------------------------------------------------------------------------
+   Organizations (pymes B2B) — espejo de organizations/schemas.py
+--------------------------------------------------------------------------- */
+
+export type OrgKind = "fleet" | "merchant" | "both";
+export type OrgRole = "owner" | "manager";
+
+// organizations/schemas.py :: OrganizationResponse / MyOrganizationResponse
+export interface Organization {
+  id: number;
+  name: string;
+  cuit: string;
+  kind: OrgKind;
+  owner_user_id: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface MyOrganization extends Organization {
+  my_role: OrgRole;
+}
+
+// organizations/schemas.py :: OrganizationCreate
+export interface OrganizationCreate {
+  name: string;
+  cuit: string;
+  kind: OrgKind;
+}
+
+export type OrgCarrierStatus = "active" | "inactive";
+
+// organizations/schemas.py :: OrgCarrierResponse
+export interface OrgCarrier {
+  carrier_id: number;
+  company_name: string;
+  vehicle_type: string;
+  license_plate: string;
+  capacity_kg: number;
+  reputation: number;
+  is_active: boolean;
+  is_verified: boolean;
+  status: OrgCarrierStatus;
+  linked_at: string | null;
+  unlinked_at: string | null;
+}
+
+// organizations/schemas.py :: OrgShipmentResponse
+export interface OrgShipment {
+  id: number;
+  organization_id: number | null;
+  client_id: number;
+  carrier_id: number | null;
+  package_size: "s" | "m" | "l" | "xl";
+  status: ShipmentStatus;
+  modality: "dedicated" | "collaborative";
+  assignment_mode: "on_demand" | "by_availability";
+  origin_lat: number;
+  origin_lon: number;
+  destination_lat: number;
+  destination_lon: number;
+  weight_kg: number;
+  estimated_price: number | null;
+  co2_savings_kg: number | null;
+  created_at: string;
+  updated_at: string;
+}
+
+// organizations/schemas.py :: OrgShipmentCreate
+export interface OrgShipmentCreate {
+  package_size: "s" | "m" | "l" | "xl";
+  modality: "dedicated" | "collaborative";
+  assignment_mode: "on_demand" | "by_availability";
+  origin_lat: number;
+  origin_lon: number;
+  destination_lat: number;
+  destination_lon: number;
+  weight_kg: number;
+  photo_url?: string | null;
+  description?: string | null;
+}
+
+// organizations/schemas.py :: OrgDashboardResponse
+export interface OrgDashboard {
+  organization_id: number;
+  kind: OrgKind;
+  fleet_size: number;
+  shipments_total: number;
+  shipments_active: number;
+  shipments_pending: number;
+  shipments_delivered: number;
+  total_spent: number;
+  total_earned: number;
+  total_co2_saved_kg: number;
+}
+
+// organizations/schemas.py :: MonthlyAmount / FinanceSeries / OrgFinanceResponse
+export interface MonthlyAmount {
+  month: string; // "YYYY-MM"
+  amount: number;
+}
+
+export interface FinanceSeries {
+  total: number;
+  by_month: MonthlyAmount[];
+}
+
+export interface OrgFinance {
+  organization_id: number;
+  currency: string;
+  spent: FinanceSeries;
+  earned: FinanceSeries;
 }
