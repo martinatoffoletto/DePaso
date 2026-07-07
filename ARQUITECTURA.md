@@ -324,9 +324,10 @@ escalado futuro. Pasos concretos del deploy: `PLAN_MAESTRO.md` §4.
 1. **Fuentes:**
    - **Google Open Images V7**: descargar con la herramienta `openimages` o FiftyOne las clases
      `Box`, `Envelope`, `Suitcase`, `Furniture`, `Television`, `Refrigerator`, `Book`, `Parcel`.
-   - **Fotos propias del equipo** (objetivo: ≥30% del dataset): cajas reales, sobres, paquetes,
-     muebles — esto es lo que más valor le da a la defensa.
-2. **Tamaño objetivo:** ~1500 imágenes, 300 por categoría (balanceado).
+   - **Fotos propias del equipo** (~100, complemento): sobres/documentos (clase `s`, la más
+     escasa en Open Images), más algo de contexto argentino. No requieren medición: se etiqueta
+     la categoría a ojo. Menos fotos propias = más domain bias, documentado como limitación.
+2. **Tamaño objetivo:** ~1200 imágenes, ~300 por categoría desde Open Images + ~100 propias.
 3. **Etiquetado con metadata de sesgos** — clave para la sección de análisis de sesgos.
    Por cada imagen registrar en un `labels.csv`:
    ```csv

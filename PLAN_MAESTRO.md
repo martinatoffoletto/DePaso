@@ -86,9 +86,9 @@ cd depaso_web && npx tsc --noEmit && npm run build           # OK
 
 El código del pipeline ya existe y está corregido. Lo único que falta es **dataset + entrenar + evaluar + copiar el modelo**. **Guía completa paso a paso: `depaso_rest/ml/GUIA_IA.md`** + tres notebooks listos para Colab en `depaso_rest/ml/notebooks/` (`01_dataset.ipynb` · `02_entrenamiento.ipynb` · `03_evaluacion.ipynb`). Referencia corta en inglés: `COLAB_QUICKSTART.md`. La MacBook no tiene GPU — el entrenamiento va en Colab.
 
-### Paso 1 — Dataset (~1500 imágenes, 4 clases `s|m|l|xl`)
-1. `ml/dataset/download_open_images.py` — baja ~70% desde Open Images V7 vía FiftyOne (Box, Envelope, Suitcase, Furniture…).
-2. **Fotos propias (~30%, ~450-600)**: paquetes reales S/M/L/XL variando iluminación (natural/artificial/baja), ángulo (frontal/cenital/oblicuo) y fondo (liso/desordenado/exterior). Sacar **pares con y sin objeto de referencia** (celular/botella) — alimenta el flag `has_reference_object`.
+### Paso 1 — Dataset (~1200 imágenes, 4 clases `s|m|l|xl`)
+1. `ml/dataset/download_open_images.py --per-class 300` — **la mayoría del dataset (~90%)** desde Open Images V7 vía FiftyOne (Box, Envelope, Suitcase, Furniture…).
+2. **Fotos propias (~100, complemento)**: sin medir nada, se etiqueta la categoría a ojo. Priorizar la clase **`s`** (sobres/documentos, ~40-50) que Open Images casi no tiene, y algo de contexto argentino. Variar iluminación/ángulo/fondo y sacar algunos pares con/sin objeto de referencia si se puede; lo que no se cubra se declara como limitación del dataset. Trade-off: menos fotos propias = más *domain bias* (stock internacional), aceptable para el MVP y documentado.
 3. Etiquetar en `labels.csv`: `filename,category,lighting,angle,background,has_reference_object,source`.
 4. `ml/dataset/build_dataset.py` — dedup por hash perceptual, valida el CSV.
 5. `ml/dataset/make_splits.py` — split 70/15/15 estratificado por categoría **y** condiciones de sesgo. El test set queda congelado.

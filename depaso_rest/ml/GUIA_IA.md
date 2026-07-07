@@ -4,8 +4,11 @@ Esta es la **única guía que necesitás** para la parte de IA de la tesis. Te l
 tener el clasificador de tamaño de paquete entrenado, evaluado (con análisis de sesgos para el
 capítulo de IA) e integrado al backend.
 
-> **Regla de oro:** el cuello de botella de toda la tesis son **tus fotos propias**. Es lo único
-> que no se acelera con código ni con GPU. **Empezá a sacarlas ya**, en paralelo con todo lo demás.
+> **Dos aclaraciones que aligeran el trabajo:**
+> 1. **La mayoría del dataset son fotos públicas** (Open Images, ~90%). Tus fotos propias son un
+>    complemento chico (**~100**, no cientos), sobre todo de la clase `s` (sobres/documentos).
+> 2. **No tenés que medir nada.** El modelo clasifica en 4 categorías `s|m|l|xl` mirando la foto;
+>    a cada una le ponés la categoría a ojo. No hay reglas, centímetros ni volúmenes.
 
 ---
 
@@ -17,7 +20,7 @@ capítulo de IA) e integrado al backend.
   objeto de escala conocida, como un celular o una botella).
 - **Cómo:** 3 notebooks que corren en **Google Colab** (la MacBook no tiene GPU). Cada uno llama
   a los scripts del pipeline que ya están en el repo — vos solo corrés celdas.
-- **Cuánto:** ~1500 imágenes (70% de Open Images automático + 30% fotos tuyas), 2 etapas de
+- **Cuánto:** ~1200 imágenes (~90% de Open Images automático + ~100 fotos tuyas), 2 etapas de
   entrenamiento, y un reporte de sesgos que va casi directo a la tesis.
 - **Objetivo de accuracy:** ≥80% (mínimo defendible: 75%).
 
@@ -87,9 +90,9 @@ guardan el dataset y el modelo, para que no se pierdan cuando Colab reinicia).
 ### Paso 1 — Dataset (`notebooks/01_dataset.ipynb`)
 
 1. **Setup**: monta Drive, clona el repo, instala dependencias.
-2. **Open Images V7**: baja ~250 imágenes por clase (`Envelope→s`, `Box→m`, `Suitcase→l`,
-   `Furniture→xl`). Automático, ~10 min.
-3. **⭐ Tus fotos propias** (ver sección 4 — es lo importante): las subís y las etiquetás.
+2. **Open Images V7**: baja ~300 imágenes por clase (`Envelope→s`, `Box→m`, `Suitcase→l`,
+   `Furniture→xl`) — el grueso del dataset. Automático, ~10 min.
+3. **Tus fotos propias (~100)** (ver sección 4): las subís y las etiquetás. Opcional pero suma.
 4. **Limpiar**: dedup por hash perceptual, normaliza tamaño/formato.
 5. **Split 70/15/15**: estratificado por categoría y por condición de sesgo. El `test.csv` queda
    **congelado** (no se toca al entrenar).
@@ -120,22 +123,23 @@ capítulo de IA**.
 
 ---
 
-## 4. ⭐ Cómo sacar y etiquetar tus fotos (lo crítico)
+## 4. Cómo sacar y etiquetar tus fotos (~100, sin medir)
 
-Necesitás **~450 fotos propias** (≈30% del dataset). No es solo cantidad: la tesis se defiende
-por el **análisis de sesgos**, y ese análisis necesita que cada foto tuya esté etiquetada con las
-condiciones. Variá a propósito:
+Con **~100 fotos propias** alcanza. **No tenés que medir nada**: a cada foto le ponés la
+categoría a ojo. Las otras columnas son etiquetas simples de la escena (o `unknown` si no sabés).
 
 | Dimensión | Valores a usar | Por qué |
 |---|---|---|
-| **category** | `s` (sobre/documento), `m` (caja mediana), `l` (valija/caja grande), `xl` (mueble/electrodoméstico) | La clase `s` sale **casi toda de tus fotos** (Open Images casi no la tiene). |
-| **lighting** | `natural` / `artificial` / `baja` | Sesgo por iluminación. |
-| **angle** | `frontal` / `cenital` / `oblicuo` | Sesgo por ángulo de captura. |
-| **background** | `liso` / `desordenado` / `exterior` | Sesgo por fondo. |
-| **has_reference_object** | `True` / `False` | Sacá **pares** de la misma escena con y sin objeto de escala (celular, botella). Alimenta el 2º input del modelo. |
+| **category** | `s` (sobre/documento), `m` (caja mediana), `l` (valija/caja grande), `xl` (mueble/electrodoméstico) | Se pone **a ojo**. La clase `s` casi no está en Open Images → poné ahí la mayoría. |
+| **lighting** | `natural` / `artificial` / `baja` (o `unknown`) | Sesgo por iluminación. |
+| **angle** | `frontal` / `cenital` / `oblicuo` (o `unknown`) | Sesgo por ángulo de captura. |
+| **background** | `liso` / `desordenado` / `exterior` (o `unknown`) | Sesgo por fondo. |
+| **has_reference_object** | `True` / `False` | Si podés, sacá algunos **pares** con y sin un objeto de escala (celular, botella). Alimenta el 2º input del modelo. |
 
-**Meta orientativa** (para que ningún grupo quede sin muestras): ~110 fotos por clase, repartidas
-entre las 3 iluminaciones × 3 ángulos × 3 fondos, y de cada escena un par con/sin referencia.
+**Reparto sugerido de las ~100:** ~40-50 de clase `s` (lo que más falta), y el resto repartido
+entre `m`/`l`/`xl`. Variá iluminación/ángulo/fondo *en la medida que puedas* — lo que no cubras
+se declara como limitación del dataset en el capítulo de sesgos. Cuantas menos fotos propias, más
+peso tienen las de stock internacional (domain bias): es un trade-off razonable para un MVP.
 
 ### El esquema de `labels.csv`
 
@@ -201,7 +205,7 @@ Para poner el modelo en su lugar:
 
 De este pipeline sale, casi listo para pegar:
 
-- **Descripción del dataset**: tamaño, fuentes (Open Images 70% / propias 30%), distribución por
+- **Descripción del dataset**: tamaño, fuentes (Open Images ~90% / propias ~100), distribución por
   clase, condiciones de sesgo cubiertas.
 - **Arquitectura**: MobileNetV2 transfer learning, dual input, 2 etapas de entrenamiento
   (`metadata.json` tiene la provenance exacta).
@@ -217,7 +221,7 @@ De este pipeline sale, casi listo para pegar:
 
 Dataset:
 - [ ] Corrí `01_dataset.ipynb` hasta la descarga de Open Images.
-- [ ] Saqué ~450 fotos propias variando categoría / iluminación / ángulo / fondo.
+- [ ] Saqué ~100 fotos propias (la mayoría clase `s`), categoría puesta a ojo.
 - [ ] Saqué pares con y sin objeto de referencia.
 - [ ] Etiqueté todas en `labels.csv` (esquema de la sección 4).
 - [ ] Corrí limpieza + split. `test.csv` congelado.
