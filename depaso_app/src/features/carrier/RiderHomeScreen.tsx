@@ -15,13 +15,9 @@ import { RiderMap } from "./RiderMap";
 import { IncomingOfferModal } from "./IncomingOfferModal";
 import PublishTripScreen from "./PublishTripScreen";
 import { useGpsPublisher } from "./useGpsPublisher";
+import { PACKAGE_LABEL_SHORT } from "@/src/utils/packageCategory";
 
-const SIZE_LABEL: Record<PackageCategory, string> = {
-  [PackageCategory.S]:  "Chico",
-  [PackageCategory.M]:  "Mediano",
-  [PackageCategory.L]:  "Grande",
-  [PackageCategory.XL]: "Flete",
-};
+const SIZE_LABEL = PACKAGE_LABEL_SHORT;
 
 function money(n: number): string {
   return `$${Math.round(n).toLocaleString("es-AR")}`;

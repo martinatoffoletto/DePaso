@@ -6,13 +6,9 @@ import { DeliveryMode, FeedItem, PackageCategory } from "@/src/types";
 import { reverseGeocode } from "@/src/utils/geocoding";
 import { T } from "@/constants/tokens";
 import { RiderMap } from "./RiderMap";
+import { PACKAGE_LABEL_SHORT } from "@/src/utils/packageCategory";
 
-const SIZE_LABEL: Record<PackageCategory, string> = {
-  [PackageCategory.S]:  "Chico",
-  [PackageCategory.M]:  "Mediano",
-  [PackageCategory.L]:  "Grande",
-  [PackageCategory.XL]: "Flete",
-};
+const SIZE_LABEL = PACKAGE_LABEL_SHORT;
 
 function useAddress(lat: number, lon: number): string {
   const [addr, setAddr] = useState(`${lat.toFixed(3)}, ${lon.toFixed(3)}`);

@@ -34,6 +34,8 @@ class ShipmentCreate(BaseModel):
     weight_kg: float = Field(..., gt=0)
     photo_url: str | None = None
     description: str | None = None
+    recipient_name: str | None = Field(None, max_length=120)
+    recipient_phone: str | None = Field(None, max_length=30)
 
 
 class ShipmentUpdate(BaseModel):
@@ -62,6 +64,8 @@ class ShipmentResponse(ShipmentBase):
     payment_status: str = "pending"
     estimated_price: float | None = None
     co2_savings_kg: float | None = None
+    recipient_name: str | None = None
+    recipient_phone: str | None = None
     created_at: datetime
     updated_at: datetime
 

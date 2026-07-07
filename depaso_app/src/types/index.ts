@@ -156,6 +156,8 @@ export interface Shipment {
   estimated_price?: number;
   payment_status: PaymentStatus;
   co2_savings_kg?: number;
+  recipient_name?: string | null;
+  recipient_phone?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -188,6 +190,8 @@ export interface ShipmentCreatePayload {
   weight_kg: number;
   photo_url?: string;
   description?: string;
+  recipient_name?: string;
+  recipient_phone?: string;
 }
 
 export interface Quote {

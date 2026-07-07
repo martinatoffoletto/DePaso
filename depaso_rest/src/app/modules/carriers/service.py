@@ -5,6 +5,7 @@ Business logic for carrier management.
 from src.app.modules.carriers.repository import CarrierRepository
 from src.app.modules.carriers.models import Carrier
 from src.app.modules.carriers.exceptions import CarrierNotFoundError
+from src.app.modules.shipments import pricing
 
 
 class CarrierService:
@@ -13,6 +14,26 @@ class CarrierService:
     def __init__(self, repository: CarrierRepository) -> None:
         """Initialize with repository."""
         self.repository = repository
+
+    def summary(self, carrier_id: int, shipment_repo) -> dict:
+        """Carrier history: deliveries, net earnings, reputation, CO2 (RF-CAR-06).
+
+        Earnings are net of the platform commission. Uses targeted queries
+        (delivered + active) instead of loading the full shipment history.
+        """
+        carrier = self.get_carrier_by_id(carrier_id)  # raises if missing
+        delivered = shipment_repo.list_delivered_by_carriers([carrier_id])
+        active = shipment_repo.list_active_by_carrier(carrier_id)
+        return {
+            "carrier_id": carrier.id,
+            "reputation": carrier.reputation or 5.0,
+            "deliveries_completed": len(delivered),
+            "active_shipments": len(active),
+            "total_earnings": round(
+                sum(pricing.carrier_payout(s.estimated_price or 0) for s in delivered), 2
+            ),
+            "total_co2_saved_kg": round(sum(s.co2_savings_kg or 0 for s in delivered), 3),
+        }
 
     def create_carrier(self, user_id: int, company_name: str, vehicle_type: str,
                        license_plate: str, capacity_kg: float,

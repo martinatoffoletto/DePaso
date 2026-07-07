@@ -38,6 +38,7 @@ def get_shipment_service(db: Session = Depends(get_db)) -> ShipmentService:
         ShipmentRepository(db),
         carrier_repo=CarrierRepository(db),
         route_repo=RouteRepository(db),
+        user_repo=UserRepository(db),
     )
 
 
@@ -80,6 +81,8 @@ async def create_shipment(
             weight_kg=data.weight_kg,
             photo_url=data.photo_url,
             description=data.description,
+            recipient_name=data.recipient_name,
+            recipient_phone=data.recipient_phone,
         )
         return ShipmentResponse.model_validate(shipment)
     except DomainException as e:
@@ -164,34 +167,20 @@ async def get_shipment_events(
 async def get_assigned_carrier(
     shipment_id: int,
     current_user_id: CurrentUserId,
-    db: Session = Depends(get_db),
     service: ShipmentService = Depends(get_shipment_service),
 ):
     """Contact info of the carrier assigned to the shipment. Only the shipment's
     client or the carrier themselves may read it (the phone is private)."""
     try:
-        shipment = service.get_shipment_by_id(shipment_id)
+        contact = service.get_assigned_carrier_contact(shipment_id, current_user_id)
+    except PermissionError as e:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
     except DomainException as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=e.message)
-    if shipment.carrier_id is None:
+    if contact is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
                             detail="No carrier assigned yet")
-    carrier = CarrierRepository(db).get_by_id(shipment.carrier_id)
-    if not carrier:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Carrier not found")
-    if current_user_id not in (shipment.client_id, carrier.user_id):
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN,
-                            detail="Not allowed to view this carrier")
-    user = UserRepository(db).get_by_id(carrier.user_id)
-    trips = len(ShipmentRepository(db).list_delivered_by_carriers([carrier.id]))
-    name = f"{user.first_name} {user.last_name}".strip() if user else None
-    return AssignedCarrierResponse(
-        carrier_id=carrier.id,
-        name=name or carrier.company_name or "Cadete",
-        phone=user.phone_number if user else None,
-        rating=round(carrier.reputation or 5.0, 1),
-        trips=trips,
-    )
+    return AssignedCarrierResponse(**contact)
 
 
 @router.post("/{shipment_id}/status", response_model=ShipmentResponse)

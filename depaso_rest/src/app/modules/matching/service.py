@@ -307,10 +307,12 @@ class MatchingService:
         now = _naive_utcnow()
 
         results: list[CarrierScoreResponse] = []
-        for route in self.route_repo.list_active_in_window(now):
-            if route.kind != "collaborative_route":
-                continue
-            carrier = self.carrier_repo.get_by_id(route.carrier_id)
+        routes = [r for r in self.route_repo.list_active_in_window(now)
+                  if r.kind == "collaborative_route"]
+        # Batch-fetch the carriers of all candidate routes in one query (no N+1).
+        carriers = self.carrier_repo.get_by_ids([r.carrier_id for r in routes])
+        for route in routes:
+            carrier = carriers.get(route.carrier_id)
             if carrier is None or not self._passes_common_knockouts(carrier, shipment):
                 continue
 
@@ -398,10 +400,12 @@ class MatchingService:
         # if they don't have is_available=True in their carrier profile — their
         # commitment is the window itself (spec 3.3, RF-CAR-02).
         if self.route_repo is not None:
-            for route in self.route_repo.list_active_in_window(now):
-                if route.kind != "dedicated_window":
-                    continue
-                carrier = self.carrier_repo.get_by_id(route.carrier_id)
+            windows = [r for r in self.route_repo.list_active_in_window(now)
+                       if r.kind == "dedicated_window"]
+            # Batch-fetch the carriers of all windows in one query (no N+1).
+            window_carriers = self.carrier_repo.get_by_ids([r.carrier_id for r in windows])
+            for route in windows:
+                carrier = window_carriers.get(route.carrier_id)
                 if carrier is None or not self._passes_common_knockouts(carrier, shipment):
                     continue
                 if carrier.id in seen_carrier_ids:

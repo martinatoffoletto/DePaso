@@ -9,14 +9,12 @@ import { T } from "@/constants/tokens";
 import type { Coords } from "./FlowNavigator";
 import { shipmentsService } from "@/src/services/shipments";
 import { co2EquivalenceLabel } from "@/src/utils/co2";
+import { PACKAGE_LABEL } from "@/src/utils/packageCategory";
 import { DeliveryMode, AssignmentMode, PackageCategory, Quote } from "@/src/types";
 
 type IconName = React.ComponentProps<typeof MaterialCommunityIcons>["name"];
 
-const SIZE_LABEL: Record<string, string> = {
-  s: "Pequeño / Documentos", m: "Carga mediana",
-  l: "Grande / Voluminoso", xl: "Mudanza / Flete",
-};
+const SIZE_LABEL = PACKAGE_LABEL;
 
 function StepDots({ current, total }: { current: number; total: number }) {
   return (
@@ -95,6 +93,8 @@ export function SummaryScreen({
         destination_lon: destinationCoords.longitude,
         weight_kg: weightKg,
         description: description || undefined,
+        recipient_name: recipientName || undefined,
+        recipient_phone: recipientPhone || undefined,
       });
       // Open the simulated payment sheet for the freshly created shipment.
       setPayShipmentId(shipment.id);

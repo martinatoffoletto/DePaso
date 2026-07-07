@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { View, ScrollView, TouchableOpacity, ActivityIndicator, Alert, RefreshControl } from "react-native";
+import { View, ScrollView, TouchableOpacity, ActivityIndicator, Alert, RefreshControl, Linking } from "react-native";
 import { Text } from "react-native-paper";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -10,13 +10,9 @@ import { shipmentsService } from "@/src/services/shipments";
 import { CarrierSummary, DeliveryMode, PackageCategory, Shipment, ShipmentStatus } from "@/src/types";
 import { reverseGeocode } from "@/src/utils/geocoding";
 import { T } from "@/constants/tokens";
+import { PACKAGE_LABEL_SHORT } from "@/src/utils/packageCategory";
 
-const SIZE_LABEL: Record<PackageCategory, string> = {
-  [PackageCategory.S]:  "Pequeño",
-  [PackageCategory.M]:  "Mediano",
-  [PackageCategory.L]:  "Grande",
-  [PackageCategory.XL]: "Flete",
-};
+const SIZE_LABEL = PACKAGE_LABEL_SHORT;
 
 const ACTIVE: ShipmentStatus[] = [
   ShipmentStatus.ASSIGNED,
@@ -125,6 +121,29 @@ function ActiveJobCard({ shipment, onAdvance, advancing, onCancel }: {
             <Text className="text-[11px] text-inkSoft font-medium">{isCollab ? "Colaborativa" : "Dedicada"}</Text>
           </View>
         </View>
+
+        {/* Recipient contact — so the carrier can coordinate the drop-off */}
+        {shipment.recipient_name || shipment.recipient_phone ? (
+          <View className="flex-row items-center gap-[10px] bg-cardSoft border border-borderSoft rounded-xl px-3 py-[10px] mb-[14px]">
+            <MaterialCommunityIcons name="account-outline" size={16} color={T.inkSoft} />
+            <View className="flex-1">
+              <Text className="text-[9px] tracking-[1.5px] text-inkMute uppercase font-bold">RECIBE</Text>
+              <Text className="text-[13px] text-ink font-semibold" numberOfLines={1}>
+                {shipment.recipient_name || "Destinatario"}
+              </Text>
+            </View>
+            {shipment.recipient_phone && (
+              <TouchableOpacity
+                className="flex-row items-center gap-[6px] bg-forest rounded-lg px-3 py-2"
+                onPress={() => Linking.openURL(`tel:${shipment.recipient_phone}`)}
+                activeOpacity={0.85}
+              >
+                <MaterialCommunityIcons name="phone" size={14} color="#F4EFE3" />
+                <Text className="text-[12px] text-[#F4EFE3] font-semibold">Llamar</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        ) : null}
 
         {/* Advance */}
         {action && (

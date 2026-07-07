@@ -12,6 +12,7 @@ import { AssignedCarrier, Shipment, ShipmentStatus, PackageCategory, DeliveryMod
 import { co2EquivalenceLabel } from "@/src/utils/co2";
 import { T } from "@/constants/tokens";
 import { reverseGeocode } from "@/src/utils/geocoding";
+import { PACKAGE_LABEL_SHORT } from "@/src/utils/packageCategory";
 
 function useAddress(lat: number, lon: number): string {
   const [addr, setAddr] = useState(`${lat.toFixed(3)}, ${lon.toFixed(3)}`);
@@ -51,12 +52,7 @@ function timelineSteps(status: ShipmentStatus) {
   }));
 }
 
-const SIZE_LABEL: Record<PackageCategory, string> = {
-  [PackageCategory.S]:  "Pequeño",
-  [PackageCategory.M]:  "Mediano",
-  [PackageCategory.L]:  "Grande",
-  [PackageCategory.XL]: "Flete",
-};
+const SIZE_LABEL = PACKAGE_LABEL_SHORT;
 
 const CADETE_COLORS = [T.amber, T.violet, T.emerald, T.sky];
 

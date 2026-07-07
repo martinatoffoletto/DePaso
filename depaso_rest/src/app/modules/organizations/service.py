@@ -118,9 +118,12 @@ class OrganizationService:
 
     def list_fleet(self, org: Organization) -> list[dict]:
         """Carrier profiles + link metadata for the org's fleet."""
+        links = self.org_repo.list_carrier_links(org.id)
+        # Batch-fetch all carriers in one query instead of one per link (no N+1).
+        carriers = self.carrier_repo.get_by_ids([link.carrier_id for link in links])
         rows: list[dict] = []
-        for link in self.org_repo.list_carrier_links(org.id):
-            carrier = self.carrier_repo.get_by_id(link.carrier_id)
+        for link in links:
+            carrier = carriers.get(link.carrier_id)
             if carrier is None:
                 continue
             rows.append({

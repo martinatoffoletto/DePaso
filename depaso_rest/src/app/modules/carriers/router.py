@@ -21,12 +21,10 @@ from src.app.modules.carriers.service import CarrierService
 from src.app.modules.carriers.repository import CarrierRepository
 from src.app.modules.matching.schemas import FeedItemResponse
 from src.app.modules.matching.service import MatchingService
-from src.app.modules.shipments import pricing
 from src.app.modules.shipments.repository import ShipmentRepository
 from src.app.modules.routes.repository import RouteRepository
 from src.app.modules.routes.schemas import RouteCreateRequest, RouteResponse
 from src.app.modules.routes.service import RouteService
-from src.app.shared.enums import ShipmentStatus
 
 router = APIRouter(prefix="/carriers", tags=["carriers"])
 
@@ -159,20 +157,8 @@ async def my_summary(
 ) -> CarrierSummaryResponse:
     """Carrier history: deliveries, earnings, reputation, CO2 (RF-CAR-06)."""
     carrier = _my_carrier(current_user_id, db)
-    shipments, _ = ShipmentRepository(db).list_by_carrier(carrier.id, skip=0, limit=1000)
-    delivered = [s for s in shipments if s.status == ShipmentStatus.DELIVERED]
-    active = [s for s in shipments if s.status in (
-        ShipmentStatus.ASSIGNED, ShipmentStatus.PICKUP_ARRIVED, ShipmentStatus.IN_TRANSIT
-    )]
-    return CarrierSummaryResponse(
-        carrier_id=carrier.id,
-        reputation=carrier.reputation or 5.0,
-        deliveries_completed=len(delivered),
-        active_shipments=len(active),
-        # Net of the platform commission — this is what the carrier actually earns.
-        total_earnings=round(sum(pricing.carrier_payout(s.estimated_price or 0) for s in delivered), 2),
-        total_co2_saved_kg=round(sum(s.co2_savings_kg or 0 for s in delivered), 3),
-    )
+    summary = CarrierService(CarrierRepository(db)).summary(carrier.id, ShipmentRepository(db))
+    return CarrierSummaryResponse(**summary)
 
 
 @router.post("/me/availability", response_model=RouteResponse, status_code=status.HTTP_201_CREATED)

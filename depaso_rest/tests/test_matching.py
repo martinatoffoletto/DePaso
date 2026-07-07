@@ -32,6 +32,9 @@ class FakeRepo:
     def get_by_id(self, entity_id):
         return self._items.get(entity_id)
 
+    def get_by_ids(self, entity_ids):
+        return {i: self._items[i] for i in entity_ids if i in self._items}
+
     def list_available_with_location(self, min_capacity_kg):
         return [c for c in self._items.values() if c.capacity_kg >= min_capacity_kg]
 

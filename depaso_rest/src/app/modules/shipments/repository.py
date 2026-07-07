@@ -69,6 +69,13 @@ class ShipmentRepository(BaseRepository[Shipment]):
             Shipment.status == ShipmentStatus.DELIVERED,
         ).all()
 
+    def count_delivered_by_carrier(self, carrier_id: int) -> int:
+        """Number of delivered shipments for a carrier (COUNT, not load-all)."""
+        return self.db.query(Shipment).filter(
+            Shipment.carrier_id == carrier_id,
+            Shipment.status == ShipmentStatus.DELIVERED,
+        ).count()
+
     def list_active_by_carrier(self, carrier_id: int) -> list[Shipment]:
         """Shipments the carrier is currently working on."""
         return self.db.query(Shipment).filter(

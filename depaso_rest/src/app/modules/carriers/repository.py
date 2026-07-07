@@ -17,6 +17,13 @@ class CarrierRepository(BaseRepository[Carrier]):
         """Get carrier profile by user ID."""
         return self.db.query(Carrier).filter(Carrier.user_id == user_id).first()
 
+    def get_by_ids(self, carrier_ids: list[int]) -> dict[int, Carrier]:
+        """Batch-fetch carriers by id, keyed by id (avoids N+1 in loops)."""
+        if not carrier_ids:
+            return {}
+        carriers = self.db.query(Carrier).filter(Carrier.id.in_(carrier_ids)).all()
+        return {c.id: c for c in carriers}
+
     def list_active(self, skip: int = 0, limit: int = 20) -> tuple[list[Carrier], int]:
         """List all active and verified carriers."""
         query = self.db.query(Carrier).filter(

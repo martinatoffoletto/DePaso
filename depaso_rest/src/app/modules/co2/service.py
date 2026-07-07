@@ -12,8 +12,19 @@ This per-shipment quantification, fed back to the user on completion, is one
 of the five differentiators identified in the state-of-the-art review: no
 local platform nor reviewed academic work reports it.
 """
-from src.app.shared.enums import VehicleType
+from sqlalchemy import func
+from sqlalchemy.orm import Session
+
+from src.app.modules.shipments.models import Shipment
+from src.app.shared.enums import ShipmentModality, ShipmentStatus, VehicleType
 from src.app.shared.geo import Point, insertion_detour, road_km
+
+# Everyday equivalences of saved CO2 (for the impact screen).
+# - average car: 0.18 kg CO2/km · one urban tree: ~21 kg/year (FAO/EPA)
+# - one full smartphone charge: ~8 g CO2 (EPA greenhouse-gas equivalencies)
+CAR_KG_PER_KM = 0.18
+TREE_KG_PER_YEAR = 21.0
+SMARTPHONE_KG_PER_CHARGE = 0.008
 
 # Emission factors (kg CO2/km), IPCC 2019 Refinement + Argentine factors (spec 5.3).
 EMISSION_FACTORS: dict[str, float] = {
@@ -106,3 +117,34 @@ class CO2Service:
         result["detour_km"] = detour.detour_km
         result["dedicated_distance_km"] = round(dedicated_km, 3)
         return result
+
+    # -- accumulated client impact (RF-CO2-02) ----------------------------------
+
+    def equivalences(self, total_kg: float) -> dict:
+        """Everyday equivalences of a CO2 saving (car km, tree months, charges)."""
+        return {
+            "car_km": round(total_kg / CAR_KG_PER_KM, 1),
+            "tree_months": round(total_kg / TREE_KG_PER_YEAR * 12, 1),
+            "smartphone_charges": int(total_kg / SMARTPHONE_KG_PER_CHARGE),
+        }
+
+    def client_impact(self, db: Session, client_id: int) -> dict:
+        """Accumulated CO2 savings of a client over their delivered shipments."""
+        delivered = Shipment.status == ShipmentStatus.DELIVERED
+        mine = Shipment.client_id == client_id
+        total_kg = float(
+            db.query(func.coalesce(func.sum(Shipment.co2_savings_kg), 0.0))
+            .filter(mine, delivered).scalar()
+        )
+        delivered_count = db.query(func.count(Shipment.id)).filter(mine, delivered).scalar() or 0
+        collaborative_count = (
+            db.query(func.count(Shipment.id))
+            .filter(mine, delivered, Shipment.modality == ShipmentModality.COLLABORATIVE)
+            .scalar() or 0
+        )
+        return {
+            "total_co2_saved_kg": round(total_kg, 3),
+            "shipments_delivered": delivered_count,
+            "shipments_collaborative": collaborative_count,
+            "equivalences": self.equivalences(total_kg),
+        }

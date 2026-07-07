@@ -44,10 +44,12 @@ class ShipmentService:
         repository: ShipmentRepository,
         carrier_repo: CarrierRepository | None = None,
         route_repo: RouteRepository | None = None,
+        user_repo=None,
     ) -> None:
         self.repository = repository
         self.carrier_repo = carrier_repo
         self.route_repo = route_repo
+        self.user_repo = user_repo
         self.co2 = CO2Service()
 
     # -- creation & queries -----------------------------------------------------
@@ -57,7 +59,9 @@ class ShipmentService:
                         origin_lat: float, origin_lon: float,
                         destination_lat: float, destination_lon: float,
                         weight_kg: float, photo_url: str | None = None,
-                        description: str | None = None) -> Shipment:
+                        description: str | None = None,
+                        recipient_name: str | None = None,
+                        recipient_phone: str | None = None) -> Shipment:
         """Create a new shipment with its estimated price (RF-SHP-01)."""
         estimated_price = pricing.price_for(
             Point(origin_lat, origin_lon),
@@ -76,6 +80,8 @@ class ShipmentService:
             weight_kg=weight_kg,
             photo_url=photo_url,
             description=description,
+            recipient_name=recipient_name,
+            recipient_phone=recipient_phone,
             estimated_price=estimated_price,
             status=ShipmentStatus.PENDING,
         )
@@ -165,6 +171,28 @@ class ShipmentService:
                     shipment_id, payment_status=PaymentStatus.REFUNDED
                 )
         return updated
+
+    def get_assigned_carrier_contact(self, shipment_id: int, requester_user_id: int) -> dict | None:
+        """Public contact of the carrier assigned to a shipment. Returns None if
+        no carrier is assigned yet. Raises PermissionError if the requester is
+        neither the shipment's client nor the assigned carrier (privacy)."""
+        shipment = self.get_shipment_by_id(shipment_id)  # raises ShipmentNotFoundError
+        if shipment.carrier_id is None or not self.carrier_repo:
+            return None
+        carrier = self.carrier_repo.get_by_id(shipment.carrier_id)
+        if not carrier:
+            return None
+        if requester_user_id not in (shipment.client_id, carrier.user_id):
+            raise PermissionError("Not allowed to view this carrier")
+        user = self.user_repo.get_by_id(carrier.user_id) if self.user_repo else None
+        name = f"{user.first_name} {user.last_name}".strip() if user else None
+        return {
+            "carrier_id": carrier.id,
+            "name": name or carrier.company_name or "Cadete",
+            "phone": user.phone_number if user else None,
+            "rating": round(carrier.reputation or 5.0, 1),
+            "trips": self.repository.count_delivered_by_carrier(carrier.id),
+        }
 
     # -- payment (simulated pasarela, RF-SHP) ------------------------------------
 
