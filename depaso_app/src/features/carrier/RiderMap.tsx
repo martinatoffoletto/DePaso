@@ -3,7 +3,7 @@ import { T } from "@/constants/tokens";
 
 /**
  * Decorative stylised city map used as the background of the online rider home
- * and the incoming-offer screen. Ported from screens/rider.jsx (RiderMap).
+ * and the incoming-offer screen.
  * Purely visual — no interaction, no data.
  */
 export function RiderMap() {

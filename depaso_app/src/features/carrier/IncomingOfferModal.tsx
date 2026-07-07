@@ -32,7 +32,7 @@ type Props = {
 };
 
 /**
- * Full-screen incoming offer (screens/rider.jsx · RiderIncomingOffer).
+ * Full-screen incoming offer for the carrier.
  * Wired to the real feed item — accept hits shipments/accept, reject dismisses it.
  */
 export function IncomingOfferModal({ item, accepting, onAccept, onReject }: Props) {

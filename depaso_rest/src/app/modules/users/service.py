@@ -53,7 +53,7 @@ class UserService:
                     last_name: str | None = None, phone_number: str | None = None,
                     user_type: str | None = None) -> User:
         """Update user information."""
-        user = self.get_user_by_id(user_id)
+        self.get_user_by_id(user_id)  # validates existence (raises if missing)
         updates = {}
         if first_name:
             updates["first_name"] = first_name

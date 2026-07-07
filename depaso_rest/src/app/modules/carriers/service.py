@@ -54,7 +54,7 @@ class CarrierService:
 
     def update_reputation(self, carrier_id: int, new_rating: float) -> Carrier:
         """Update carrier reputation score."""
-        carrier = self.get_carrier_by_id(carrier_id)
+        self.get_carrier_by_id(carrier_id)  # validates existence (raises if missing)
         # Simple running average (can be improved with weighted average)
         updated = self.repository.update(carrier_id, reputation=new_rating)
         if not updated:
