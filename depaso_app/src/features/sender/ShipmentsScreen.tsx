@@ -31,6 +31,17 @@ const ACTIVE_STATUSES = [
 ];
 
 const SIZE_LABEL = PACKAGE_LABEL_SHORT;
+const PAGE_SIZE = 20;
+
+/** Active shipments first, then newest first. */
+function sortShipments(data: Shipment[]): Shipment[] {
+  return [...data].sort((a, b) => {
+    const aA = ACTIVE_STATUSES.includes(a.status) ? 1 : 0;
+    const bA = ACTIVE_STATUSES.includes(b.status) ? 1 : 0;
+    if (aA !== bA) return bA - aA;
+    return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+  });
+}
 
 function LiveShipmentCard({ shipment, onPress }: { shipment: Shipment; onPress: () => void }) {
   const isCollab = shipment.modality === DeliveryMode.COLLABORATIVE;
@@ -572,6 +583,8 @@ export default function MisEnviosScreen() {
   const [shipments, setShipments] = useState<Shipment[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
   const [error, setError] = useState(false);
   const [tab, setTab] = useState<Tab>("active");
   const [query, setQuery] = useState("");
@@ -583,14 +596,9 @@ export default function MisEnviosScreen() {
     if (!isRefresh) setLoading(true);
     setError(false);
     try {
-      const data = await shipmentsService.getMyShipments(0, 50);
-      const sorted = [...data].sort((a, b) => {
-        const aA = ACTIVE_STATUSES.includes(a.status) ? 1 : 0;
-        const bA = ACTIVE_STATUSES.includes(b.status) ? 1 : 0;
-        if (aA !== bA) return bA - aA;
-        return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
-      });
-      setShipments(sorted);
+      const data = await shipmentsService.getMyShipments(0, PAGE_SIZE);
+      setShipments(sortShipments(data));
+      setHasMore(data.length === PAGE_SIZE);
     } catch {
       setError(true);
     } finally {
@@ -598,6 +606,20 @@ export default function MisEnviosScreen() {
       setRefreshing(false);
     }
   }
+
+  const loadMore = useCallback(async () => {
+    if (loadingMore || !hasMore || loading) return;
+    setLoadingMore(true);
+    try {
+      const data = await shipmentsService.getMyShipments(shipments.length, PAGE_SIZE);
+      if (data.length) setShipments(prev => sortShipments([...prev, ...data]));
+      setHasMore(data.length === PAGE_SIZE);
+    } catch {
+      // best-effort: a failed page-load just stops loading more
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [loadingMore, hasMore, loading, shipments.length]);
 
   const onRefresh = () => { setRefreshing(true); load(true); };
 
@@ -701,6 +723,12 @@ export default function MisEnviosScreen() {
           contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 14, gap: 10, paddingBottom: insets.bottom + 32 }}
           showsVerticalScrollIndicator={false}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={T.forest} />}
+          scrollEventThrottle={400}
+          onScroll={(e) => {
+            if (q) return; // pagination pauses while searching
+            const { layoutMeasurement, contentOffset, contentSize } = e.nativeEvent;
+            if (layoutMeasurement.height + contentOffset.y >= contentSize.height - 400) loadMore();
+          }}
         >
           {/* Section header for Entregados / Cancelados */}
           {tab !== "active" && tabList.length > 0 && (
@@ -755,6 +783,13 @@ export default function MisEnviosScreen() {
                   )}
                 </Text>
               </View>
+            </View>
+          )}
+
+          {/* Infinite-scroll footer */}
+          {loadingMore && (
+            <View className="py-4 items-center">
+              <ActivityIndicator color={T.forest} />
             </View>
           )}
         </ScrollView>

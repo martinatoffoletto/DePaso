@@ -6,6 +6,7 @@ import { useFocusEffect } from "@react-navigation/native";
 import { carriersService } from "@/src/services/carriers";
 import { shipmentsService } from "@/src/services/shipments";
 import { CarrierSummary, PackageCategory, Shipment, ShipmentStatus } from "@/src/types";
+import { EmptyState } from "@/src/components/EmptyState";
 import { T } from "@/constants/tokens";
 import { PACKAGE_LABEL_SHORT } from "@/src/utils/packageCategory";
 
@@ -21,10 +22,12 @@ export default function RiderEarningsScreen() {
   const [delivered, setDelivered] = useState<Shipment[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState(false);
 
   const load = useCallback(async (asRefresh = false) => {
     if (asRefresh) setRefreshing(true);
     else setLoading(true);
+    setError(false);
     try {
       const [sum, list] = await Promise.all([
         carriersService.getSummary(),
@@ -34,6 +37,7 @@ export default function RiderEarningsScreen() {
       setDelivered(list.filter((s) => s.status === ShipmentStatus.DELIVERED));
     } catch {
       setSummary(null);
+      setError(true);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -46,6 +50,20 @@ export default function RiderEarningsScreen() {
     return (
       <View className="flex-1 bg-bg items-center justify-center" style={{ paddingTop: insets.top }}>
         <ActivityIndicator size="large" color={T.forest} />
+      </View>
+    );
+  }
+
+  if (error) {
+    return (
+      <View className="flex-1 bg-bg" style={{ paddingTop: insets.top }}>
+        <EmptyState
+          icon="wifi-off"
+          title="Sin conexión"
+          description="No pudimos cargar tus ganancias."
+          ctaLabel="Reintentar"
+          onCta={() => load()}
+        />
       </View>
     );
   }

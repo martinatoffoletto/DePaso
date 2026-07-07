@@ -50,6 +50,8 @@ export function RouteOfferScreen({ origin, destination, originCoords, destinatio
   const [mode, setMode] = useState<DeliveryMode>(initialMode ?? "colaborativa");
   const [quote, setQuote] = useState<Quote | null>(null);
   const [quoteLoading, setQuoteLoading] = useState(true);
+  const [quoteError, setQuoteError] = useState(false);
+  const [retryTick, setRetryTick] = useState(0);
 
   const hasCoords = !!originCoords && !!destinationCoords;
   const isCollab = mode === "colaborativa";
@@ -58,6 +60,7 @@ export function RouteOfferScreen({ origin, destination, originCoords, destinatio
     if (!hasCoords) { setQuoteLoading(false); return; }
     let alive = true;
     setQuoteLoading(true);
+    setQuoteError(false);
     shipmentsService
       .getQuote({
         origin_lat: originCoords!.latitude,
@@ -67,10 +70,10 @@ export function RouteOfferScreen({ origin, destination, originCoords, destinatio
         package_size: categoryId,
       })
       .then(q => { if (alive) setQuote(q); })
-      .catch(() => {})
+      .catch(() => { if (alive) setQuoteError(true); })
       .finally(() => { if (alive) setQuoteLoading(false); });
     return () => { alive = false; };
-  }, [hasCoords, originCoords, destinationCoords, categoryId]);
+  }, [hasCoords, originCoords, destinationCoords, categoryId, retryTick]);
 
   const mapRegion = hasCoords ? {
     latitude: (originCoords!.latitude + destinationCoords!.latitude) / 2,
@@ -187,6 +190,16 @@ export function RouteOfferScreen({ origin, destination, originCoords, destinatio
           >
             <Text className="text-[10px] tracking-[2.5px] text-emeraldDeep uppercase">PASO 03 · ELEGÍ EL VIAJE</Text>
             <Text className="text-[22px] font-bold text-ink tracking-[-0.7px] leading-6 mb-[2px]">¿Cómo lo enviamos?</Text>
+
+            {quoteError && (
+              <View className="flex-row items-center gap-2 bg-redBg border border-red/30 rounded-xl px-3 py-[10px]">
+                <MaterialCommunityIcons name="wifi-off" size={15} color={T.red} />
+                <Text className="flex-1 text-[12px] text-red font-medium">No pudimos calcular el precio.</Text>
+                <TouchableOpacity onPress={() => setRetryTick(t => t + 1)} className="bg-red rounded-lg px-3 py-[6px]" activeOpacity={0.85}>
+                  <Text className="text-[11px] text-white font-bold">Reintentar</Text>
+                </TouchableOpacity>
+              </View>
+            )}
 
             {/* Dedicada card */}
             <TouchableOpacity

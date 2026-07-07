@@ -11,8 +11,10 @@ import { CarrierSummary, DeliveryMode, PackageCategory, Shipment, ShipmentStatus
 import { reverseGeocode } from "@/src/utils/geocoding";
 import { T } from "@/constants/tokens";
 import { PACKAGE_LABEL_SHORT } from "@/src/utils/packageCategory";
+import { EmptyState } from "@/src/components/EmptyState";
 
 const SIZE_LABEL = PACKAGE_LABEL_SHORT;
+const PAGE_SIZE = 20;
 
 const ACTIVE: ShipmentStatus[] = [
   ShipmentStatus.ASSIGNED,
@@ -178,6 +180,9 @@ export default function CarrierShipmentsScreen() {
   const [summary, setSummary] = useState<CarrierSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
+  const [error, setError] = useState(false);
   const [advancingId, setAdvancingId] = useState<number | null>(null);
 
   const active = shipments.filter(sh => ACTIVE.includes(sh.status));
@@ -188,19 +193,36 @@ export default function CarrierShipmentsScreen() {
   async function load(asRefresh = false) {
     if (asRefresh) setRefreshing(true);
     else setLoading(true);
+    setError(false);
     try {
       const [list, sum] = await Promise.all([
-        shipmentsService.getAssignedShipments(),
+        shipmentsService.getAssignedShipments(0, PAGE_SIZE),
         carriersService.getSummary(),
       ]);
       setShipments(list);
       setSummary(sum);
-    } catch {}
-    finally {
+      setHasMore(list.length === PAGE_SIZE);
+    } catch {
+      setError(true);
+    } finally {
       setLoading(false);
       setRefreshing(false);
     }
   }
+
+  const loadMore = useCallback(async () => {
+    if (loadingMore || !hasMore || loading) return;
+    setLoadingMore(true);
+    try {
+      const more = await shipmentsService.getAssignedShipments(shipments.length, PAGE_SIZE);
+      if (more.length) setShipments(prev => [...prev, ...more]);
+      setHasMore(more.length === PAGE_SIZE);
+    } catch {
+      // best-effort
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [loadingMore, hasMore, loading, shipments.length]);
 
   useFocusEffect(useCallback(() => { load(); }, []));
 
@@ -272,11 +294,24 @@ export default function CarrierShipmentsScreen() {
 
       {loading ? (
         <View className="items-center justify-center gap-[10px] p-10"><ActivityIndicator size="large" color={T.forest} /></View>
+      ) : error ? (
+        <EmptyState
+          icon="wifi-off"
+          title="Sin conexión"
+          description="No pudimos cargar tus viajes."
+          ctaLabel="Reintentar"
+          onCta={() => load()}
+        />
       ) : (
         <ScrollView
           contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 16, gap: 10, paddingBottom: insets.bottom + 32 }}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => load(true)} tintColor={T.forest} />}
           showsVerticalScrollIndicator={false}
+          scrollEventThrottle={400}
+          onScroll={(e) => {
+            const { layoutMeasurement, contentOffset, contentSize } = e.nativeEvent;
+            if (layoutMeasurement.height + contentOffset.y >= contentSize.height - 400) loadMore();
+          }}
         >
           {active.length > 0 && (
             <View className="flex-row items-center gap-2 px-[2px] mb-[2px]">
@@ -323,6 +358,12 @@ export default function CarrierShipmentsScreen() {
                 );
               })}
             </>
+          )}
+
+          {loadingMore && (
+            <View className="py-4 items-center">
+              <ActivityIndicator color={T.forest} />
+            </View>
           )}
         </ScrollView>
       )}
