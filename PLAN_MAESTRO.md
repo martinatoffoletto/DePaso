@@ -1,6 +1,6 @@
 # DePaso — PLAN MAESTRO
 
-**Actualizado:** 6 de julio de 2026
+**Actualizado:** 7 de julio de 2026
 **Qué es este documento:** la única fuente de verdad de *qué falta para terminar el MVP*. Integra y reemplaza a `AUDITORIA_BACKEND.md` y `TODO_COMPLETO.md` (eliminados — su historia queda en git). La referencia técnica de *cómo está construido* el sistema es `ARQUITECTURA.md`.
 
 ---
@@ -34,39 +34,42 @@
 - ✅ **Rider screens rehechas desde los mockups** (`screens/rider.jsx`): RiderHomeScreen (offline/online), PublishTripScreen, IncomingOfferModal, RiderEarningsScreen + tab Pagos, MotoIcon SVG, riderStore. NativeWind, tsc 0 / eslint 0.
 - ✅ Pantalla Impacto CO₂, perfil, tabs por rol, admin.
 
-### Panel web (`depaso_web`) — ~40%
+### Panel web (`depaso_web`) — ~100% (código; falta solo deploy → §4)
 - ✅ Scaffold Vite + infraestructura: `lib/api.ts` (axios + refresh), `queryClient`, `stores/auth`, `types`, tokens en `index.css`, componentes shadcn/ui (button, card, table, dialog, tabs, badge, toast, select, input, label, skeleton).
-- ❌ Falta: entry point, routing, y todas las páginas (ver §2).
+- ✅ Entry point (`main.tsx`), routing con guard de auth (`App.tsx`), layout con sidebar (`AppShell`), login.
+- ✅ Páginas completas wired a endpoints reales: **Dashboard** (`/organizations/me/dashboard`), **Flota** (alta/baja de carriers vía `/organizations/me/carriers`), **Envíos** (`/organizations/me/shipments`), **Finanzas** (puesto vs ganado, `/organizations/me/finance`, Recharts), **Admin** (dashboard global, moderación de carriers, matching weights, health del API + estado del modelo de visión).
+- ✅ `npx tsc --noEmit` limpio + `npm run build` OK. Flujo E2E verificado en vivo (registro → crear org → dashboard/finanzas/carriers 200).
 
 ### IA/ML — ~45% (código listo, falta dataset + entrenar → §3)
 
 ---
 
-## 2. QUÉ FALTA — código (en ejecución AHORA por el equipo de agentes)
+## 2. QUÉ FALTA — código
 
-### A. Backend al 100% — owner: **rm** 🔄
-- [ ] Verificar `organizations` end-to-end en ejecución (boot, migración, flujo curl completo) y arreglar bugs.
-- [ ] Publicar `ORGANIZATIONS_API_CONTRACT.md` (contrato para el panel web).
-- [ ] Gap C1: knockout movilidad suave (peatón/bici <5km) en **todos** los paths de matching, incluido `_rank_dedicated`.
-- [ ] `datetime.utcnow()` → `datetime.now(timezone.utc)` en todo el backend.
-- [ ] Hardening: `JWT_SECRET` sin default inseguro en prod; CORS configurable por env (no `*` en prod).
-- [ ] Consolidar overlap `packages`/`freight` vs `shipments` sin romper el frontend.
+> **Estado 7-jul: los tres workstreams de código (A/C/E) están CERRADOS y verificados.** No queda código pendiente para el MVP salvo lo que depende del modelo IA (§3) y del deploy (§4). Detalle de lo hecho abajo, marcado ✅.
 
-### C. Panel web `depaso_web` completo — owner: **depaso-web** 🔄
-- [ ] `main.tsx` + `App.tsx` + react-router + guard de auth.
-- [ ] Login (`POST /auth/login`), layout con sidebar.
-- [ ] **Dashboard** (KPIs de la org) · **Flota** (alta/baja de carriers con badges) · **Envíos** (tabla + crear/programar) · **Finanzas** (puesto vs ganado, Recharts).
-- [ ] **Admin** = el ítem de alcance de la tesis *"Herramientas básicas de monitoreo operativo para administradores"*: envíos activos en vivo (polling), moderación de carriers (aprobar/suspender/reactivar), matching weights, KPIs globales, health del API + estado del modelo de visión (cargado/fallback). Es la UI con la que Martina opera todo en producción sin tocar nada a mano.
-- [ ] `npx tsc --noEmit` limpio + `npm run build` OK.
+### A. Backend al 100% — owner: **rm** ✅ (commit 04c49b8)
+- [x] `organizations` verificado end-to-end (boot, migración `002`, flujo curl completo: registro → crear org → dashboard/finanzas/carriers 200). Re-verificado en vivo el 7-jul.
+- [x] `ORGANIZATIONS_API_CONTRACT.md` publicado (contrato para el panel web).
+- [x] Gap C1 cerrado: knockout movilidad suave (peatón/bici <5km) en el check compartido de **todos** los paths de matching, incluido `_rank_dedicated`.
+- [x] `datetime.utcnow()` → `datetime.now(timezone.utc)` (0 llamadas reales restantes).
+- [x] Hardening: guard de producción que rechaza `JWT_SECRET` default inseguro y CORS `*`.
+- [~] Overlap `packages`/`freight` vs `shipments`: convive sin romper el frontend (limpieza opcional, no bloquea MVP).
 
-### E. UI quality pass del app móvil — owner: **jimin** 🔄
-- [ ] **Crítico (alcance tesis):** eliminar la card falsa "Asegurado / Hasta $80k" de `app/index.tsx` (la cobertura ante daños está fuera del MVP).
-- [ ] Borrar `OfferSelectionScreen.tsx` huérfano.
-- [ ] Migrar los `StyleSheet.create` restantes a NativeWind (SummaryScreen, CarrierShipmentsScreen, ImpactScreen, ShipmentsScreen, AdminScreen, RouteOfferScreen, ProfileScreen).
-- [ ] Hex hardcodeados (`#8E5A0B` en IncomingOfferModal, etc.) → tokens.
-- [ ] Pase general: estados vacíos/carga, feedback en mutaciones, contraste AA, micro-animaciones Reanimated. Referencia: mockups de `screens/`.
+### C. Panel web `depaso_web` completo — owner: **depaso-web** ✅ (commit 18010fe)
+- [x] `main.tsx` + `App.tsx` + react-router + guard de auth, login (`POST /auth/login`), layout con sidebar (`AppShell`).
+- [x] **Dashboard** (KPIs org) · **Flota** (alta/baja de carriers con badges) · **Envíos** (tabla + crear/programar) · **Finanzas** (puesto vs ganado, Recharts) — todo wired a endpoints reales.
+- [x] **Admin** = ítem de alcance de la tesis *"Herramientas básicas de monitoreo operativo para administradores"*: KPIs globales, moderación de carriers, matching weights, health del API + estado del modelo de visión (cargado/fallback). Es la UI con la que Martina opera todo en producción.
+- [x] `npx tsc --noEmit` limpio + `npm run build` OK.
 
-**Verificación global al cerrar A/C/E:**
+### E. UI quality pass del app móvil — owner: **jimin** ✅ (commit dc03003)
+- [x] Eliminada la card falsa "Asegurado / Hasta $80k" de `app/index.tsx` (cobertura ante daños fuera del MVP).
+- [x] Borrado `OfferSelectionScreen.tsx` huérfano.
+- [x] `StyleSheet.create` restantes migrados a NativeWind (SummaryScreen, CarrierShipmentsScreen, ImpactScreen, ShipmentsScreen, AdminScreen, RouteOfferScreen, ProfileScreen).
+- [x] Hex hardcodeados (`#8E5A0B` etc.) → tokens.
+- [x] Pase general de estados vacíos/carga, feedback en mutaciones, contraste. tsc 0 / eslint 0.
+
+**Verificación global (corrida 7-jul, todo en verde):**
 ```bash
 cd depaso_rest && DATABASE_URL="sqlite:///./depaso_test.db" RATE_LIMIT_ENABLED=false \
   .venv/bin/python -m pytest tests/ -q -p no:warnings        # existentes en verde
@@ -146,7 +149,7 @@ El código del pipeline ya existe y está corregido. Lo único que falta es **da
 
 | Período | Qué | Estado |
 |---|---|---|
-| **Julio (1-2)** | Workstreams A + C + E (agentes) · Dataset IA: Open Images + fotos propias | 🔄 AHORA |
+| **Julio (1-2)** | ✅ Workstreams A + C + E cerrados (7-jul) · 🔄 Dataset IA: Open Images + fotos propias (empezar YA) | 🔄 |
 | **Agosto** | Entrenamiento v1 en Colab + evaluación de sesgos | ⏳ |
 | **Septiembre** | Modelo real integrado, QA en dispositivo, tests vision corregidos | ⏳ |
 | **Octubre** | Deploy de prueba (Render+Supabase+Vercel), pulido | ⏳ |
