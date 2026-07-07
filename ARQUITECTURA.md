@@ -4,6 +4,8 @@
 > arquitectura backend/frontend/web, organización del código, pantallas, y el plan completo
 > del modelo de visión). Basado en los requerimientos de `proy.txt` y `PROYECTO.txt`.
 > **Qué falta hacer y en qué orden vive en `PLAN_MAESTRO.md`** (única fuente de verdad del backlog).
+> **Diagramas (C4 alto/medio/bajo, secuencia, despliegue) + justificación de infra
+> (Terraform/Jenkins/CI-CD): `ARQUITECTURA_DIAGRAMAS.md`.**
 > Actualizado: julio 2026 — incluye el panel web `depaso_web` y el módulo `organizations`.
 
 ---
