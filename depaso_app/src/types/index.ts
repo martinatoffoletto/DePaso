@@ -43,6 +43,13 @@ export enum ShipmentStatus {
   CANCELLED = "cancelled",
 }
 
+export enum PaymentStatus {
+  PENDING = "pending",
+  PAID = "paid",
+  RELEASED = "released",
+  REFUNDED = "refunded",
+}
+
 export interface User {
   id: number;
   first_name: string;
@@ -147,9 +154,19 @@ export interface Shipment {
   photo_url?: string;
   description?: string;
   estimated_price?: number;
+  payment_status: PaymentStatus;
   co2_savings_kg?: number;
   created_at: string;
   updated_at: string;
+}
+
+export interface PaymentBreakdown {
+  shipment_id: number;
+  payment_status: PaymentStatus;
+  amount: number;
+  platform_fee: number;
+  carrier_payout: number;
+  platform_commission_rate: number;
 }
 
 export interface ShipmentCreatePayload {

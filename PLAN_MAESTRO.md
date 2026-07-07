@@ -26,13 +26,16 @@
 - ✅ Modalidad 2 (`BY_AVAILABILITY`): wiring completo en `_rank_dedicated` (consulta ventanas `dedicated_window` activas) + toggle real en `SummaryScreen`. **Gap C2: cerrado.**
 - ✅ Routes (trayecto colaborativo + ventana dedicada), Tracking (GPS polling 15s, privacidad), CO₂ (factores IPCC, real vs contrafactual), Ratings, Capacidad derivada, Admin (dashboard, moderación de carriers, weights).
 - ✅ Vision: `POST /vision/classify` con carga del modelo en startup y **fallback determinístico** si el `.keras` no está — la API nunca se rompe sin modelo.
-- ✅ **Módulo `organizations` (pymes)**: models + service + router + migración `002_organizations` registrados. Dos tipos: fletera (gestiona flota: alta/baja de carriers, baja = inactivo, nunca borra el user) y de productos (crea/programa envíos con `organization_id`). Finanzas: dinero puesto (gastado en envíos) vs ganado (por la flota), mensual + acumulado.
+- ✅ **Módulo `organizations` (pymes)**: models + service + router + migración `002_organizations` registrados. Dos tipos: fletera (gestiona flota: alta/baja de carriers, baja = inactivo, nunca borra el user) y de productos (crea/programa envíos con `organization_id`). Finanzas: dinero puesto (gastado en envíos) vs ganado (por la flota, **neto de comisión**), mensual + acumulado.
+- ✅ **Pago simulado + comisión de plataforma** (migración `003_payment_status`): `POST /shipments/{id}/pay` (escrow simulado `pending → paid → released`/`refunded`). Comisión definida en `shipments/pricing.py` (`PLATFORM_COMMISSION_RATE = 0.15`, con `platform_fee()` / `carrier_payout()`), justificada por la brecha WTP/WTA de la encuesta. El cliente paga el precio completo (dinero puesto); el cadete cobra neto de comisión (ganado). Aplicada consistentemente en el desglose de pago, el summary del cadete (`/carriers/me/summary`) y las finanzas de la org.
 - ✅ Seed demo idempotente + smoke test E2E completo.
 
 ### App móvil (`depaso_app`) — ~95%
 - ✅ Flujos cliente y cadete completos y wired a la API real (crear envío con foto+IA, tracking con polling, calificación, feed, hitos de estado, GPS publisher).
 - ✅ **Rider screens rehechas desde los mockups** (`screens/rider.jsx`): RiderHomeScreen (offline/online), PublishTripScreen, IncomingOfferModal, RiderEarningsScreen + tab Pagos, MotoIcon SVG, riderStore. NativeWind, tsc 0 / eslint 0.
 - ✅ Pantalla Impacto CO₂, perfil, tabs por rol, admin.
+- ✅ **Pago simulado en el flujo de envío**: al confirmar se abre una hoja de pago (`SummaryScreen`) que muestra el total y, al pagar, el desglose transparente (monto · comisión DePaso · payout al cadete).
+- ✅ **Notificaciones locales** (`expo-notifications`): hook `useShipmentNotifications` montado en `(main)/_layout`. Cliente: aviso en cada cambio de estado de su envío (asignado / en retiro / en tránsito / entregado / cancelado). Cadete: aviso de nuevas ofertas que le quedan de paso. Sin infra de push (se disparan desde el polling del cliente) — atacan el pain point #1 de la encuesta (demoras/seguimiento/coordinación).
 
 ### Panel web (`depaso_web`) — ~100% (código; falta solo deploy → §4)
 - ✅ Scaffold Vite + infraestructura: `lib/api.ts` (axios + refresh), `queryClient`, `stores/auth`, `types`, tokens en `index.css`, componentes shadcn/ui (button, card, table, dialog, tabs, badge, toast, select, input, label, skeleton).

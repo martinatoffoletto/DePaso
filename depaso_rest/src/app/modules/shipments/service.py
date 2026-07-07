@@ -3,7 +3,7 @@ Shipments module service.
 Business logic: lifecycle state machine, accept/reject, ratings, capacity,
 pricing and CO2 persistence.
 """
-from src.app.shared.enums import ShipmentStatus, ShipmentModality
+from src.app.shared.enums import ShipmentStatus, ShipmentModality, PaymentStatus
 from src.app.shared.geo import Point
 from src.app.modules.shipments import pricing
 from src.app.modules.shipments.repository import ShipmentRepository
@@ -156,9 +156,31 @@ class ShipmentService:
 
         if new_status == ShipmentStatus.DELIVERED:
             self._on_delivered(updated)
-        elif new_status == ShipmentStatus.CANCELLED and shipment.carrier_id is not None:
-            self._release_capacity(shipment)
+        elif new_status == ShipmentStatus.CANCELLED:
+            if shipment.carrier_id is not None:
+                self._release_capacity(shipment)
+            # Refund a simulated payment when the shipment is cancelled.
+            if updated.payment_status == PaymentStatus.PAID:
+                updated = self.repository.update(
+                    shipment_id, payment_status=PaymentStatus.REFUNDED
+                )
         return updated
+
+    # -- payment (simulated pasarela, RF-SHP) ------------------------------------
+
+    def pay_shipment(self, shipment_id: int, client_id: int) -> Shipment:
+        """Client pays for the shipment (simulated). Money is held by the
+        platform until delivery, when the carrier's share is released."""
+        shipment = self.get_shipment_by_id(shipment_id)
+        if shipment.client_id != client_id:
+            raise ValueError("Only the shipment owner can pay for it.")
+        if shipment.status == ShipmentStatus.CANCELLED:
+            raise ValidationError("Cannot pay a cancelled shipment.", "SHIPMENT_CANCELLED")
+        if shipment.payment_status != PaymentStatus.PENDING:
+            raise ValidationError(
+                "Shipment is not awaiting payment.", "PAYMENT_NOT_PENDING"
+            )
+        return self.repository.update(shipment_id, payment_status=PaymentStatus.PAID)
 
     def cancel_shipment(self, shipment_id: int, client_id: int) -> Shipment:
         """Client cancels before pickup (RF-SHP-07)."""
@@ -276,5 +298,8 @@ class ShipmentService:
 
     def _on_delivered(self, shipment: Shipment) -> None:
         """Post-delivery side effects: capacity release is implicit; CO2 was
-        computed at accept time for collaborative shipments."""
+        computed at accept time for collaborative shipments. If the client paid,
+        release the carrier's payout (simulated escrow)."""
         self._release_capacity(shipment)
+        if shipment.payment_status == PaymentStatus.PAID:
+            self.repository.update(shipment.id, payment_status=PaymentStatus.RELEASED)

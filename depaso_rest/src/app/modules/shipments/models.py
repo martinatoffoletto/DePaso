@@ -20,6 +20,8 @@ class Shipment(Base, TimestampMixin):
     organization_id = Column(Integer, ForeignKey("organizations.id"), nullable=True, index=True)
     package_size = Column(String(20), nullable=False)
     status = Column(String(20), default=ShipmentStatus.PENDING)
+    # Simulated payment lifecycle (pending -> paid -> released / refunded).
+    payment_status = Column(String(20), nullable=False, default="pending", server_default="pending")
     modality = Column(String(20), nullable=False)  # dedicated / collaborative
     assignment_mode = Column(String(20), nullable=False)  # on_demand / by_availability
     origin_lat = Column(Float, nullable=False)

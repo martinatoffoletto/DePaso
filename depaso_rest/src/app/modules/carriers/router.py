@@ -21,6 +21,7 @@ from src.app.modules.carriers.service import CarrierService
 from src.app.modules.carriers.repository import CarrierRepository
 from src.app.modules.matching.schemas import FeedItemResponse
 from src.app.modules.matching.service import MatchingService
+from src.app.modules.shipments import pricing
 from src.app.modules.shipments.repository import ShipmentRepository
 from src.app.modules.routes.repository import RouteRepository
 from src.app.modules.routes.schemas import RouteCreateRequest, RouteResponse
@@ -168,7 +169,8 @@ async def my_summary(
         reputation=carrier.reputation or 5.0,
         deliveries_completed=len(delivered),
         active_shipments=len(active),
-        total_earnings=round(sum(s.estimated_price or 0 for s in delivered), 2),
+        # Net of the platform commission — this is what the carrier actually earns.
+        total_earnings=round(sum(pricing.carrier_payout(s.estimated_price or 0) for s in delivered), 2),
         total_co2_saved_kg=round(sum(s.co2_savings_kg or 0 for s in delivered), 3),
     )
 

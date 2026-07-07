@@ -11,6 +11,7 @@ from src.app.shared.geo import Point
 from src.app.modules.shipments import pricing
 from src.app.modules.shipments.schemas import (
     AcceptRequest,
+    PaymentResponse,
     QuoteRequest,
     QuoteResponse,
     RatingCreate,
@@ -176,6 +177,31 @@ async def update_status(
                                         actor_user_id=current_user_id,
                                         lat=data.lat, lon=data.lon)
         return ShipmentResponse.model_validate(updated)
+    except DomainException as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=e.message)
+
+
+@router.post("/{shipment_id}/pay", response_model=PaymentResponse)
+async def pay_shipment(
+    shipment_id: int,
+    current_user_id: CurrentUserId,
+    service: ShipmentService = Depends(get_shipment_service),
+):
+    """Client pays for the shipment (simulated pasarela). Returns the breakdown
+    with the platform commission shown transparently (no hidden charges)."""
+    try:
+        shipment = service.pay_shipment(shipment_id, current_user_id)
+        amount = shipment.estimated_price or 0.0
+        return PaymentResponse(
+            shipment_id=shipment.id,
+            payment_status=shipment.payment_status,
+            amount=round(amount, 2),
+            platform_fee=pricing.platform_fee(amount),
+            carrier_payout=pricing.carrier_payout(amount),
+            platform_commission_rate=pricing.PLATFORM_COMMISSION_RATE,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
     except DomainException as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=e.message)
 

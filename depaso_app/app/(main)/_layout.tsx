@@ -6,6 +6,7 @@ import { useAuthStore } from "@/src/stores/authStore";
 import { UserType } from "@/src/types";
 import { T } from "@/constants/tokens";
 import { MotoIcon } from "@/src/components/MotoIcon";
+import { useShipmentNotifications } from "@/src/hooks/useShipmentNotifications";
 
 type IconName = React.ComponentProps<typeof MaterialCommunityIcons>["name"];
 
@@ -15,6 +16,8 @@ function TabIcon({ name, color, size }: { name: IconName; color: ColorValue; siz
 
 export default function TabLayout() {
   const { user } = useAuthStore();
+  // Local notifications for shipment status changes (client) / new offers (carrier).
+  useShipmentNotifications();
   const isCarrier = user?.user_type === UserType.CARRIER;
   const isAdmin = user?.user_type === UserType.ADMIN;
   const isClient = !isCarrier && !isAdmin;

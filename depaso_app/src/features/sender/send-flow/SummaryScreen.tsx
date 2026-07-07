@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { View, ScrollView, TouchableOpacity, Image, Alert, ActivityIndicator } from "react-native";
+import { View, ScrollView, TouchableOpacity, Image, Alert, ActivityIndicator, Modal } from "react-native";
 import MapView, { Marker, Polyline } from "react-native-maps";
 import { Text } from "react-native-paper";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
@@ -68,16 +68,23 @@ export function SummaryScreen({
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [assignmentMode, setAssignmentMode] = useState<AssignmentMode>(AssignmentMode.ON_DEMAND);
+  const [payShipmentId, setPayShipmentId] = useState<number | null>(null);
+  const [paying, setPaying] = useState(false);
   const isCollaborative = mode === "colaborativa";
   const price = quote
     ? (isCollaborative ? quote.price_collaborative : quote.price_dedicated)
     : null;
 
+  const finish = () => {
+    setPayShipmentId(null);
+    onConfirm();
+  };
+
   const handleConfirm = async () => {
     if (!originCoords || !destinationCoords) return;
     setLoading(true);
     try {
-      await shipmentsService.createShipment({
+      const shipment = await shipmentsService.createShipment({
         package_size: categoryId as PackageCategory,
         modality: mode === "dedicada" ? DeliveryMode.DEDICATED : DeliveryMode.COLLABORATIVE,
         assignment_mode: assignmentMode,
@@ -88,25 +95,37 @@ export function SummaryScreen({
         weight_kg: weightKg,
         description: description || undefined,
       });
-      Alert.alert(
-        "Envío creado",
-        "Tu pedido está pendiente. Te avisamos cuando se asigne un cadete.",
-        [
-          {
-            text: "Ver mis envíos",
-            onPress: () => { onConfirm(); router.push("/(main)/envios"); },
-          },
-          {
-            text: "Seguir enviando",
-            style: "cancel",
-            onPress: onConfirm,
-          },
-        ],
-      );
+      // Open the simulated payment sheet for the freshly created shipment.
+      setPayShipmentId(shipment.id);
     } catch (err: any) {
       Alert.alert("Error", err?.response?.data?.detail ?? "No se pudo crear el envío. Intentá de nuevo.");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handlePay = async () => {
+    if (payShipmentId == null) return;
+    setPaying(true);
+    try {
+      const b = await shipmentsService.paySimulated(payShipmentId);
+      setPayShipmentId(null);
+      Alert.alert(
+        "Pago confirmado",
+        `Pagaste $${b.amount.toLocaleString("es-AR")} ARS.\n` +
+          `El cadete recibirá $${b.carrier_payout.toLocaleString("es-AR")} ` +
+          `(comisión DePaso ${Math.round(b.platform_commission_rate * 100)}%: ` +
+          `$${b.platform_fee.toLocaleString("es-AR")}).\n\n` +
+          "Te avisamos cuando se asigne un cadete.",
+        [
+          { text: "Ver mis envíos", onPress: () => { onConfirm(); router.push("/(main)/envios"); } },
+          { text: "Seguir enviando", style: "cancel", onPress: onConfirm },
+        ],
+      );
+    } catch (err: any) {
+      Alert.alert("Error", err?.response?.data?.detail ?? "No se pudo procesar el pago. Intentá de nuevo.");
+    } finally {
+      setPaying(false);
     }
   };
 
@@ -286,6 +305,65 @@ export function SummaryScreen({
           <Text className="text-sm text-inkMute">Volver y modificar</Text>
         </TouchableOpacity>
       </ScrollView>
+
+      {/* Simulated payment sheet */}
+      <Modal
+        visible={payShipmentId != null}
+        transparent
+        animationType="slide"
+        onRequestClose={() => { if (!paying) finish(); }}
+      >
+        <View className="flex-1 justify-end bg-black/40">
+          <View className="bg-bg rounded-t-[28px] px-5 pt-4" style={{ paddingBottom: insets.bottom + 20 }}>
+            <View className="items-center mb-3">
+              <View className="w-10 h-[5px] rounded-full bg-border" />
+            </View>
+
+            <View className="flex-row items-center gap-[10px] mb-1">
+              <View className="w-9 h-9 rounded-xl bg-forest items-center justify-center">
+                <MaterialCommunityIcons name="lock-check" size={20} color="#fff" />
+              </View>
+              <Text className="text-lg font-bold text-ink tracking-[-0.4px]">Pago del envío</Text>
+            </View>
+            <Text className="text-[13px] text-inkMute mb-4 leading-[18px]">
+              Pago simulado — no se cobra dinero real. El monto queda retenido y se libera al cadete al completar la entrega.
+            </Text>
+
+            <View className="bg-card rounded-2xl border border-border p-4 mb-4">
+              <View className="flex-row items-center justify-between">
+                <Text className="text-sm text-inkMute">Total a pagar</Text>
+                <Text className="text-2xl font-bold text-ink tracking-[-0.8px]">
+                  {price != null ? `$${price.toLocaleString("es-AR")}` : "—"}
+                  <Text className="text-sm text-inkMute font-medium"> ARS</Text>
+                </Text>
+              </View>
+              <Text className="text-[11px] text-inkMute mt-1">
+                Incluye la comisión de la plataforma. El desglose se muestra al confirmar.
+              </Text>
+            </View>
+
+            <TouchableOpacity
+              className="flex-row bg-forest rounded-[14px] py-4 items-center justify-center gap-[10px]"
+              style={{ opacity: paying ? 0.7 : 1 }}
+              onPress={handlePay}
+              activeOpacity={0.88}
+              disabled={paying}
+            >
+              {paying
+                ? <ActivityIndicator color="#fff" />
+                : <>
+                    <MaterialCommunityIcons name="credit-card-check-outline" size={20} color="#fff" />
+                    <Text className="text-[#F4EFE3] font-bold text-[16px]">Pagar (simulado)</Text>
+                  </>
+              }
+            </TouchableOpacity>
+
+            <TouchableOpacity className="items-center py-[12px]" onPress={finish} activeOpacity={0.7} disabled={paying}>
+              <Text className="text-sm text-inkMute">Pagar más tarde</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }

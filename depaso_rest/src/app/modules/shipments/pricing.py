@@ -33,6 +33,23 @@ COLLABORATIVE_TIME_FACTOR = 1.9
 # Reference vehicle for ETA quoting before a carrier is assigned.
 QUOTE_VEHICLE = "motorcycle"
 
+# Platform commission (take rate). The client pays the full quoted price; the
+# platform keeps this share and the carrier receives the rest. Kept deliberately
+# low: the survey (n=145) shows a narrow margin between sender WTP ($3.000-6.000)
+# and carrier WTA ($2.500-5.000), and warns the model "no tolera comisiones altas
+# en etapas tempranas" (hallazgo 5). ~15% sits inside that WTP/WTA gap.
+PLATFORM_COMMISSION_RATE = 0.15
+
+
+def platform_fee(price: float) -> float:
+    """Platform's cut of a shipment price (ARS, rounded)."""
+    return round((price or 0.0) * PLATFORM_COMMISSION_RATE, 2)
+
+
+def carrier_payout(price: float) -> float:
+    """What the carrier actually earns: price minus the platform commission."""
+    return round((price or 0.0) - platform_fee(price), 2)
+
 
 def quote(origin: Point, destination: Point, package_size: str) -> dict:
     """Price and ETA for both modalities over a route (shown pre-confirmation)."""

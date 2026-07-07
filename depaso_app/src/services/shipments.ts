@@ -1,5 +1,6 @@
 import { apiClient } from "./api";
 import {
+  PaymentBreakdown,
   Quote,
   Rating,
   Shipment,
@@ -54,6 +55,12 @@ export const shipmentsService = {
       new_status: status,
       ...coords,
     });
+    return response.data;
+  },
+
+  /** Pay for a shipment (simulated pasarela). Returns the commission breakdown. */
+  async paySimulated(id: number): Promise<PaymentBreakdown> {
+    const response = await apiClient.post<PaymentBreakdown>(`/shipments/${id}/pay`);
     return response.data;
   },
 

@@ -109,6 +109,7 @@ routes (id, carrier_id, kind[collab_route|dedicated_window], origin GEOGRAPHY(Po
         destination GEOGRAPHY(Point), path GEOGRAPHY(LineString), zone GEOGRAPHY(Polygon),
         window_start, window_end, recurrence, active)
 shipments (id, client_id, carrier_id?, origin Point, destination Point, status,
+           payment_status[pending|paid|released|refunded],
            modality[dedicated|collaborative], assignment[on_demand|by_space],
            category[S|M|L|XL], volume_est, price, window_start, window_end,
            photo_url, co2_saved_kg, created_at)
@@ -127,8 +128,15 @@ shipments.organization_id (FK nullable — envíos creados por la pyme)
 ```
 Reglas del dominio pyme: el rol org se **deriva de la membresía** (no va en el JWT); la baja de un
 carrier es `status=inactive` + `unlinked_at` (nunca borra el user); las finanzas son
-**dinero puesto** (Σ price de envíos de la org) vs **dinero ganado** (Σ ganancias de envíos
+**dinero puesto** (Σ price de envíos de la org) vs **dinero ganado** (Σ ganancias netas de envíos
 DELIVERED de la flota), por mes + acumulado. Contrato completo: `ORGANIZATIONS_API_CONTRACT.md`.
+
+**Pago simulado + comisión (RF-SHP):** la pasarela se simula (alcance). `POST /shipments/{id}/pay`
+mueve `payment_status` por un escrow `pending → paid → released` (al entregar) / `refunded` (al
+cancelar). La comisión de plataforma vive en `shipments/pricing.py` (`PLATFORM_COMMISSION_RATE = 0.15`
++ `platform_fee()` / `carrier_payout()`): el cliente paga el precio completo (**puesto**), el cadete
+cobra neto (**ganado**), la plataforma retiene la comisión. Aplica en el desglose de pago, el summary
+del cadete y las finanzas de la org.
 
 Índices clave: GIST sobre todas las columnas GEOGRAPHY; índice compuesto sobre
 `gps_traces(carrier_id, timestamp DESC)`; índice sobre `shipments(status)`.
@@ -180,6 +188,7 @@ GET/PATCH /users/me                   RF-USR-05
 POST   /classify                      RF-VIS-01 (multipart image + has_reference_object)
 POST   /shipments                     RF-SHP-01
 GET    /shipments/{id} /shipments     RF-SHP-06, historial
+POST   /shipments/{id}/pay            RF-SHP (pago simulado + comisión 15%)
 POST   /shipments/{id}/cancel         RF-SHP-07
 POST   /shipments/{id}/rating         RF-SHP-08
 POST   /shipments/{id}/status         RF-CAR-05 (transiciones, solo carrier asignado)
@@ -513,3 +522,8 @@ Determinístico, factores IPCC 2019 (moto 0.09 / auto 0.18 / camioneta 0.25 / ca
 - **Scoring determinístico vs mecanismos de mercado:** sin datos históricos al arranque, subastas y
   elasticidades no tienen con qué calibrarse (Akamatsu & Oyama); el scoring explicable con pesos
   editables es la decisión correcta para cold-start.
+- **Pago simulado con comisión de escrow:** la pasarela real está fuera del alcance, pero el
+  prototipo modela el flujo de dinero completo (escrow `paid → released`/`refunded`) y una comisión
+  de plataforma del 15% derivada de la brecha WTP/WTA medida en la encuesta (cliente $3.000-6.000 vs
+  cadete $2.500-5.000, hallazgo 5: "no tolera comisiones altas"). Esto hace explícito y defendible el
+  modelo de negocio sin integrar un proveedor de pagos.

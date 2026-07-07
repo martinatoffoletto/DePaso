@@ -19,6 +19,7 @@ from src.app.modules.organizations.exceptions import (
 )
 from src.app.modules.organizations.models import Organization, OrganizationMember
 from src.app.modules.organizations.repository import OrganizationRepository
+from src.app.modules.shipments import pricing
 from src.app.modules.shipments.models import Shipment
 from src.app.modules.shipments.repository import ShipmentRepository
 from src.app.modules.shipments.service import ShipmentService
@@ -170,7 +171,8 @@ class OrganizationService:
             "shipments_pending": sum(1 for s in shipments if s.status == ShipmentStatus.PENDING),
             "shipments_delivered": sum(1 for s in shipments if s.status == ShipmentStatus.DELIVERED),
             "total_spent": round(sum(s.estimated_price or 0.0 for s in shipments), 2),
-            "total_earned": round(sum(s.estimated_price or 0.0 for s in earned_shipments), 2),
+            # Earned by the fleet is net of the platform commission (payout).
+            "total_earned": round(sum(pricing.carrier_payout(s.estimated_price or 0.0) for s in earned_shipments), 2),
             "total_co2_saved_kg": round(
                 sum(s.co2_savings_kg or 0.0 for s in shipments
                     if s.status == ShipmentStatus.DELIVERED), 3
@@ -193,7 +195,7 @@ class OrganizationService:
             [(s.created_at, s.estimated_price or 0.0) for s in spent_shipments]
         )
         earned = self._series(
-            [(s.updated_at, s.estimated_price or 0.0) for s in earned_shipments]
+            [(s.updated_at, pricing.carrier_payout(s.estimated_price or 0.0)) for s in earned_shipments]
         )
         return {
             "organization_id": org.id,

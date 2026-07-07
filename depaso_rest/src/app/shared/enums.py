@@ -44,6 +44,19 @@ class ShipmentStatus(str, Enum):
     CANCELLED = "cancelled"
 
 
+class PaymentStatus(str, Enum):
+    """Simulated payment lifecycle for a shipment (scope: la pasarela de pagos
+    se simula en el prototipo). Escrow model that mirrors the 'dinero puesto vs
+    ganado' narrative: the client pays up front (PAID = money held), and on
+    delivery the carrier's share is released (RELEASED); a cancellation of an
+    already-paid shipment is refunded (REFUNDED)."""
+
+    PENDING = "pending"      # created, not yet paid
+    PAID = "paid"            # client paid; platform holds the amount (simulated)
+    RELEASED = "released"    # delivered; carrier payout released (minus commission)
+    REFUNDED = "refunded"    # cancelled after payment; amount returned to client
+
+
 class ShipmentModality(str, Enum):
     """Shipment modality (section 3)."""
 

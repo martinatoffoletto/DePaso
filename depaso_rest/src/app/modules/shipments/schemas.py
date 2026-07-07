@@ -59,10 +59,23 @@ class ShipmentResponse(ShipmentBase):
     id: int
     carrier_id: int | None = None
     status: str
+    payment_status: str = "pending"
     estimated_price: float | None = None
     co2_savings_kg: float | None = None
     created_at: datetime
     updated_at: datetime
+
+
+class PaymentResponse(BaseModel):
+    """Breakdown returned after a simulated payment, so the UI can show the
+    platform commission transparently (survey finding #1: no hidden charges)."""
+
+    shipment_id: int
+    payment_status: str
+    amount: float                    # what the client pays (gross price)
+    platform_fee: float              # platform commission
+    carrier_payout: float            # what the carrier receives
+    platform_commission_rate: float  # e.g. 0.15
 
 
 class QuoteRequest(BaseModel):
