@@ -8,6 +8,8 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as ImagePicker from "expo-image-picker";
 import * as ImageManipulator from "expo-image-manipulator";
 import { visionService } from "@/src/services/vision";
+import { DimensioningModal } from "./DimensioningModal";
+import type { DimensionEstimate } from "@/src/utils/dimensioning";
 import { T } from "@/constants/tokens";
 
 type IconName = React.ComponentProps<typeof MaterialCommunityIcons>["name"];
@@ -86,6 +88,7 @@ export function PackageScreen({ initial, onBack, onNext }: Props) {
   const [classificationId, setClassificationId] = useState<number | null>(null);
   const [aiConfidence, setAiConfidence] = useState<number | null>(null);
   const [selected, setSelected] = useState<string>(initial?.categoryId ?? "m");
+  const [showDim, setShowDim] = useState(false);
   const [dimL, setDimL] = useState("24");
   const [dimW, setDimW] = useState("18");
   const [dimH, setDimH] = useState("12");
@@ -147,6 +150,14 @@ export function PackageScreen({ initial, onBack, onNext }: Props) {
     } finally {
       setClassifying(false);
     }
+  }
+
+  function applyDimEstimate(est: DimensionEstimate) {
+    // Dimensioning suggests a category and fills the visible-face dimensions.
+    setSelected(est.category);
+    setDimL(String(Math.max(est.widthCm, est.heightCm)));
+    setDimW(String(Math.min(est.widthCm, est.heightCm)));
+    setShowDim(false);
   }
 
   function handlePhoto() {
@@ -265,7 +276,27 @@ export function PackageScreen({ initial, onBack, onNext }: Props) {
               )}
             </View>
           )}
+
+          {/* Dimensionado por objeto de referencia (asistencia a la categoría) */}
+          {photoUri && (
+            <TouchableOpacity
+              onPress={() => setShowDim(true)}
+              className="flex-row items-center justify-center gap-2 mt-3 py-3 rounded-xl border border-forest bg-mint"
+              activeOpacity={0.85}
+            >
+              <MaterialCommunityIcons name="ruler-square" size={18} color={T.forest} />
+              <Text className="text-[13px] font-semibold text-forest">Medir con objeto de referencia</Text>
+            </TouchableOpacity>
+          )}
         </View>
+
+        {showDim && photoUri && (
+          <DimensioningModal
+            photoUri={photoUri}
+            onClose={() => setShowDim(false)}
+            onResult={applyDimEstimate}
+          />
+        )}
 
         {/* Confirmá la categoría */}
         <View>

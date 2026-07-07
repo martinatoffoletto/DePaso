@@ -9,6 +9,7 @@ import { useRouter } from "expo-router";
 import { shipmentsService } from "@/src/services/shipments";
 import { trackingService } from "@/src/services/carriers";
 import { Shipment, ShipmentStatus, PackageCategory, DeliveryMode, TrackedPosition } from "@/src/types";
+import { co2EquivalenceLabel } from "@/src/utils/co2";
 import { T } from "@/constants/tokens";
 import { reverseGeocode } from "@/src/utils/geocoding";
 
@@ -426,11 +427,16 @@ function ShipmentDetailModal({ shipment, onClose, onCancel }: { shipment: Shipme
             {isCollab && (shipment.co2_savings_kg ?? 0) > 0 && (
               <>
                 <View className="h-px bg-borderSoft" />
-                <View className="flex-row items-center gap-[10px] py-3">
+                <View className="flex-row items-start gap-[10px] py-3">
                   <MaterialCommunityIcons name="leaf" size={16} color={T.forest} />
-                  <Text className="text-[13px] text-forest font-semibold">
-                    Ahorraste {shipment.co2_savings_kg} kg de CO₂
-                  </Text>
+                  <View className="flex-1">
+                    <Text className="text-[13px] text-forest font-semibold">
+                      Ahorraste {shipment.co2_savings_kg} kg de CO₂
+                    </Text>
+                    <Text className="text-[11px] text-emeraldDeep font-medium mt-[2px]">
+                      {co2EquivalenceLabel(shipment.co2_savings_kg ?? 0)}
+                    </Text>
+                  </View>
                 </View>
               </>
             )}

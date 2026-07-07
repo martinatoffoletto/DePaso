@@ -8,6 +8,7 @@ import { useRouter } from "expo-router";
 import { T } from "@/constants/tokens";
 import type { Coords } from "./FlowNavigator";
 import { shipmentsService } from "@/src/services/shipments";
+import { co2EquivalenceLabel } from "@/src/utils/co2";
 import { DeliveryMode, AssignmentMode, PackageCategory, Quote } from "@/src/types";
 
 type IconName = React.ComponentProps<typeof MaterialCommunityIcons>["name"];
@@ -279,6 +280,9 @@ export function SummaryScreen({
                     : "~1.8 kg"}{" CO₂"}
                 </Text>
                 {" de emisiones"}
+              </Text>
+              <Text className="text-[11px] text-emeraldDeep font-semibold mt-[3px]">
+                {co2EquivalenceLabel(quote?.co2_savings_estimate_kg ?? 1.8)}
               </Text>
             </View>
           </View>

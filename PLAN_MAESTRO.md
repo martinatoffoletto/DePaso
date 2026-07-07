@@ -36,6 +36,7 @@
 - ✅ Pantalla Impacto CO₂, perfil, tabs por rol, admin.
 - ✅ **Pago simulado en el flujo de envío**: al confirmar se abre una hoja de pago (`SummaryScreen`) que muestra el total y, al pagar, el desglose transparente (monto · comisión DePaso · payout al cadete).
 - ✅ **Notificaciones locales** (`expo-notifications`): hook `useShipmentNotifications` montado en `(main)/_layout`. Cliente: aviso en cada cambio de estado de su envío (asignado / en retiro / en tránsito / entregado / cancelado). Cadete: aviso de nuevas ofertas que le quedan de paso. Sin infra de push (se disparan desde el polling del cliente) — atacan el pain point #1 de la encuesta (demoras/seguimiento/coordinación).
+- ✅ **Mejoras disruptivas** (ver `MEJORAS_DISRUPTIVAS.md`): (1) **dimensionado por objeto de referencia** — `DimensioningModal` estima el tamaño real 2D del paquete con una tarjeta/A4 de escala (`utils/dimensioning.ts`, fotogrametría monocular, no 3D → coherente con Naumann) y sugiere la categoría; (2) **CO₂ protagonista** — equivalencias ("≈ X km en auto") en el momento de confirmar y de entregar el envío (`utils/co2.ts`, factores consistentes con el backend), no solo en el tab Impacto.
 
 ### Panel web (`depaso_web`) — ~100% (código; falta solo deploy → §4)
 - ✅ Scaffold Vite + infraestructura: `lib/api.ts` (axios + refresh), `queryClient`, `stores/auth`, `types`, tokens en `index.css`, componentes shadcn/ui (button, card, table, dialog, tabs, badge, toast, select, input, label, skeleton).
