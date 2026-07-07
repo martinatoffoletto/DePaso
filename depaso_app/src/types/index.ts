@@ -160,6 +160,14 @@ export interface Shipment {
   updated_at: string;
 }
 
+export interface AssignedCarrier {
+  carrier_id: number;
+  name: string;
+  phone: string | null;
+  rating: number;
+  trips: number;
+}
+
 export interface PaymentBreakdown {
   shipment_id: number;
   payment_status: PaymentStatus;

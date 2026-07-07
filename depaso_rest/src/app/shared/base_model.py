@@ -5,7 +5,7 @@ Having one Base ensures Alembic can auto-detect all tables.
 """
 from datetime import datetime, timezone
 
-from sqlalchemy import Column, Integer, DateTime
+from sqlalchemy import Column, DateTime
 from sqlalchemy.orm import DeclarativeBase
 
 

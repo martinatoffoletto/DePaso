@@ -8,7 +8,7 @@ type MotoIconProps = {
 
 /**
  * Custom motorcycle glyph — more characteristic of the cadete than a generic truck.
- * Ported from the rider mockup (screens/rider.jsx) to react-native-svg.
+ * Custom motorcycle glyph drawn with react-native-svg.
  */
 export function MotoIcon({ size = 22, color = "currentColor", strokeWidth = 2 }: MotoIconProps) {
   return (

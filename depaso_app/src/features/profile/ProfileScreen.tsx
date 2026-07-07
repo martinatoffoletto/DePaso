@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   View, TouchableOpacity, ScrollView,
   Modal, TextInput as RNTextInput, Alert,
@@ -9,13 +9,13 @@ import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAuthStore } from "@/src/stores/authStore";
 import { useAddressBookStore } from "@/src/stores/addressBookStore";
+import { co2Service } from "@/src/services";
+import { carriersService } from "@/src/services/carriers";
 import { UserType } from "@/src/types";
 import PublishTripScreen from "@/src/features/carrier/PublishTripScreen";
 import { T } from "@/constants/tokens";
 
 type IconName = React.ComponentProps<typeof MaterialCommunityIcons>["name"];
-
-const MOCK = { shipments: 12, co2: 21, reputation: 4.9 };
 
 // ── Small helpers ─────────────────────────────────────────────────────────────
 
@@ -315,6 +315,24 @@ export default function ProfileScreen() {
 
   const isCarrier = user?.user_type === UserType.CARRIER;
 
+  // Real stats: client → CO2 impact; carrier → delivery summary.
+  const [stats, setStats] = useState({ shipments: 0, co2: 0, reputation: user?.rating ?? 5.0 });
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        if (isCarrier) {
+          const s = await carriersService.getSummary();
+          if (alive) setStats({ shipments: s.deliveries_completed, co2: Math.round(s.total_co2_saved_kg), reputation: s.reputation });
+        } else {
+          const i = await co2Service.getMyImpact();
+          if (alive) setStats(prev => ({ shipments: i.shipments_delivered, co2: Math.round(i.total_co2_saved_kg), reputation: prev.reputation }));
+        }
+      } catch { /* keep defaults on failure */ }
+    })();
+    return () => { alive = false; };
+  }, [isCarrier]);
+
   const handleLogout = async () => { await logout(); };
 
   const firstName  = user?.first_name ?? "";
@@ -322,7 +340,7 @@ export default function ProfileScreen() {
   const initials   = `${firstName[0] ?? ""}${lastName[0] ?? ""}`.toUpperCase() || "?";
   const fullName   = `${firstName} ${lastName}`.trim() || "Usuario";
   const email      = user?.email ?? "";
-  const reputation = user?.rating ?? MOCK.reputation;
+  const reputation = stats.reputation;
 
   return (
     <>
@@ -369,11 +387,11 @@ export default function ProfileScreen() {
           </View>
           <View className="flex-row mt-[22px]">
             <View className="flex-1 border-r border-[#F4EFE3]/[0.12] pr-[10px] mr-[14px]">
-              <Text className="text-[22px] font-bold text-[#F4EFE3] tracking-[-0.5px]">{MOCK.shipments}</Text>
+              <Text className="text-[22px] font-bold text-[#F4EFE3] tracking-[-0.5px]">{stats.shipments}</Text>
               <Text className="text-[9px] tracking-[1.5px] text-[#F4EFE3]/55 uppercase mt-[2px]">ENVÍOS</Text>
             </View>
             <View className="flex-1 border-r border-[#F4EFE3]/[0.12] pr-[10px] mr-[14px]">
-              <Text className="text-[22px] font-bold text-lime tracking-[-0.5px]">{MOCK.co2}<Text className="text-xs font-normal text-[#F4EFE3]">kg</Text></Text>
+              <Text className="text-[22px] font-bold text-lime tracking-[-0.5px]">{stats.co2}<Text className="text-xs font-normal text-[#F4EFE3]">kg</Text></Text>
               <Text className="text-[9px] tracking-[1.5px] text-[#F4EFE3]/55 uppercase mt-[2px]">CO₂ AHORRADO</Text>
             </View>
             <View className="flex-1">
@@ -426,7 +444,7 @@ export default function ProfileScreen() {
         )}
 
         <ProfileSection title="ACTIVIDAD" rows={[
-          <ProfileRow key="hist"  icon="history"      label="Historial de envíos"    value={`${MOCK.shipments} envíos · este año`} onPress={() => router.push("/(main)/envios")} />,
+          <ProfileRow key="hist"  icon="history"      label="Historial de envíos"    value={`${stats.shipments} envíos · este año`} onPress={() => router.push("/(main)/envios")} />,
           <ProfileRow key="eco"   icon="leaf"         label="Mi impacto eco"         value="CO₂ ahorrado y equivalencias" accent onPress={() => router.push("/(main)/impacto")} />,
           <ProfileRow key="stars" icon="star-outline" label="Reseñas y calificación" value={`${reputation.toFixed(1)} · 11 reseñas`} onPress={() => Alert.alert("Reseñas", "Las reseñas y calificaciones no están disponibles en esta versión.")} />,
         ]} />

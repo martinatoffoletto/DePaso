@@ -81,9 +81,10 @@ async def lifespan(app: FastAPI):
 
     yield
 
-    # Shutdown
+    # Shutdown: release the loaded model and dispose the DB connection pool.
     logger.info("🛑 Shutting down DePaso REST API")
-    # TODO: Cleanup model and database connections
+    app.state.classifier = None
+    engine.dispose()
 
 
 def create_app() -> FastAPI:

@@ -8,7 +8,7 @@ import { useFocusEffect } from "@react-navigation/native";
 import { useRouter } from "expo-router";
 import { shipmentsService } from "@/src/services/shipments";
 import { trackingService } from "@/src/services/carriers";
-import { Shipment, ShipmentStatus, PackageCategory, DeliveryMode, TrackedPosition } from "@/src/types";
+import { AssignedCarrier, Shipment, ShipmentStatus, PackageCategory, DeliveryMode, TrackedPosition } from "@/src/types";
 import { co2EquivalenceLabel } from "@/src/utils/co2";
 import { T } from "@/constants/tokens";
 import { reverseGeocode } from "@/src/utils/geocoding";
@@ -111,7 +111,10 @@ function MiniRouteLine({ origin, destination }: { origin: string; destination: s
   );
 }
 
-const MOCK_PHONE = "+541156789012";
+function carrierInitials(name?: string): string {
+  if (!name) return "CA";
+  return name.split(" ").filter(Boolean).slice(0, 2).map(w => w[0]).join("").toUpperCase() || "CA";
+}
 
 function liveMapRegion(s: Shipment) {
   const lat1 = s.origin_lat, lat2 = s.destination_lat;
@@ -265,13 +268,27 @@ function ShipmentDetailModal({ shipment, onClose, onCancel }: { shipment: Shipme
     return () => { alive = false; clearInterval(interval); };
   }, [shipment.id, trackable]);
 
-  function callCarrier() { Linking.openURL(`tel:${MOCK_PHONE}`); }
+  // Assigned carrier contact + reputation (once a carrier is assigned).
+  const [carrier, setCarrier] = useState<AssignedCarrier | null>(null);
+  useEffect(() => {
+    if (shipment.carrier_id == null) { setCarrier(null); return; }
+    let alive = true;
+    shipmentsService.getAssignedCarrier(shipment.id)
+      .then(c => { if (alive) setCarrier(c); })
+      .catch(() => {});
+    return () => { alive = false; };
+  }, [shipment.id, shipment.carrier_id]);
+
+  function callCarrier() {
+    if (!carrier?.phone) return;
+    Linking.openURL(`tel:${carrier.phone}`);
+  }
   function messageCarrier() {
-    const phone = MOCK_PHONE.replace(/\D/g, "");
+    if (!carrier?.phone) return;
+    const phone = carrier.phone.replace(/\D/g, "");
     Alert.alert("Enviar mensaje", "¿Por qué servicio?", [
-      { text: "Mensaje de texto", onPress: () => Linking.openURL(`sms:${MOCK_PHONE}`) },
+      { text: "Mensaje de texto", onPress: () => Linking.openURL(`sms:${carrier.phone}`) },
       { text: "WhatsApp",         onPress: () => Linking.openURL(`https://wa.me/${phone}`) },
-      { text: "Telegram",         onPress: () => Linking.openURL(`https://t.me/+${phone}`) },
       { text: "Cancelar", style: "cancel" },
     ]);
   }
@@ -461,16 +478,18 @@ function ShipmentDetailModal({ shipment, onClose, onCancel }: { shipment: Shipme
             ) : (
               <>
                 <View className="flex-row items-center gap-3 mb-[14px]">
-                  <AvatarBubble initials="CA" color={T.amber} size={46} />
+                  <AvatarBubble initials={carrierInitials(carrier?.name)} color={T.amber} size={46} />
                   <View className="flex-1">
-                    <Text className="text-[15px] font-semibold text-ink">Cadete asignado</Text>
+                    <Text className="text-[15px] font-semibold text-ink">{carrier?.name ?? "Cadete asignado"}</Text>
                     <View className="flex-row items-center gap-1 mt-[3px]">
                       <MaterialCommunityIcons name="star" size={12} color={T.amber} />
-                      <Text className="text-[11px] text-inkSoft font-semibold">5.0 · 38 viajes</Text>
+                      <Text className="text-[11px] text-inkSoft font-semibold">
+                        {carrier ? `${carrier.rating.toFixed(1)} · ${carrier.trips} ${carrier.trips === 1 ? "viaje" : "viajes"}` : "—"}
+                      </Text>
                     </View>
                   </View>
                 </View>
-                {ACTIVE_STATUSES.includes(shipment.status) && (
+                {ACTIVE_STATUSES.includes(shipment.status) && carrier?.phone && (
                   <View className="flex-row gap-2">
                     <TouchableOpacity className="flex-1 flex-row items-center justify-center gap-2 bg-cardSoft border border-border rounded-xl py-[13px]" onPress={callCarrier} activeOpacity={0.8}>
                       <MaterialCommunityIcons name="phone-outline" size={17} color={T.forest} />

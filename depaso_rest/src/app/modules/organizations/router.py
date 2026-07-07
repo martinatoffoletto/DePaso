@@ -13,7 +13,6 @@ from src.app.core.dependencies import CurrentUserId
 from src.app.modules.carriers.repository import CarrierRepository
 from src.app.modules.organizations.exceptions import (
     NotAnOrgMemberError,
-    OrganizationNotFoundError,
 )
 from src.app.modules.organizations.models import Organization
 from src.app.modules.organizations.repository import OrganizationRepository

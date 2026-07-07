@@ -193,6 +193,7 @@ GET    /shipments/{id} /shipments     RF-SHP-06, historial
 POST   /shipments/{id}/pay            RF-SHP (pago simulado + comisión 15%)
 POST   /shipments/{id}/cancel         RF-SHP-07
 POST   /shipments/{id}/rating         RF-SHP-08
+GET    /shipments/{id}/carrier        contacto del cadete asignado (solo el cliente — privacidad)
 POST   /shipments/{id}/status         RF-CAR-05 (transiciones, solo carrier asignado)
 POST   /routes                        RF-CAR-01/02 (trayecto o ventana dedicada)
 GET    /carriers/me/feed              RF-CAR-03 / RF-MAT-03

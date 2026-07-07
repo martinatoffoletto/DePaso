@@ -1,5 +1,6 @@
 import { apiClient } from "./api";
 import {
+  AssignedCarrier,
   PaymentBreakdown,
   Quote,
   Rating,
@@ -43,6 +44,12 @@ export const shipmentsService = {
 
   async getEvents(id: number): Promise<ShipmentEvent[]> {
     const response = await apiClient.get<ShipmentEvent[]>(`/shipments/${id}/events`);
+    return response.data;
+  },
+
+  /** Contact info of the carrier assigned to a shipment (client-only). */
+  async getAssignedCarrier(id: number): Promise<AssignedCarrier> {
+    const response = await apiClient.get<AssignedCarrier>(`/shipments/${id}/carrier`);
     return response.data;
   },
 

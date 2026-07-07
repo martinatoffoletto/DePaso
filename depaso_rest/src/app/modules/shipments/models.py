@@ -4,7 +4,7 @@ Shipments module - Core shipment management.
 from sqlalchemy import Column, Integer, String, Float, ForeignKey, UniqueConstraint
 
 from src.app.shared.base_model import Base, TimestampMixin
-from src.app.shared.enums import ShipmentStatus, ShipmentModality, AssignmentMode
+from src.app.shared.enums import ShipmentStatus
 
 
 class Shipment(Base, TimestampMixin):

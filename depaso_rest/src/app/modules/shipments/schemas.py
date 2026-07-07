@@ -78,6 +78,18 @@ class PaymentResponse(BaseModel):
     platform_commission_rate: float  # e.g. 0.15
 
 
+class AssignedCarrierResponse(BaseModel):
+    """Public contact info of the carrier assigned to a shipment. Only the
+    shipment's client (or the carrier themselves) may read it — the phone is
+    not exposed to anyone else (privacy)."""
+
+    carrier_id: int
+    name: str
+    phone: str | None = None
+    rating: float
+    trips: int
+
+
 class QuoteRequest(BaseModel):
     """Price quote before creating the shipment (price shown upfront)."""
 

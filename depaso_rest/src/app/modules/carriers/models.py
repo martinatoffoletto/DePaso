@@ -4,7 +4,6 @@ Carriers module - Transportation providers management.
 from sqlalchemy import Column, Integer, String, Float, Boolean, ForeignKey
 
 from src.app.shared.base_model import Base, TimestampMixin
-from src.app.shared.enums import VehicleType
 
 
 class Carrier(Base, TimestampMixin):

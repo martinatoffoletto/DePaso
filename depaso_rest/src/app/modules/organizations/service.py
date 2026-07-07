@@ -24,7 +24,6 @@ from src.app.modules.shipments.models import Shipment
 from src.app.modules.shipments.repository import ShipmentRepository
 from src.app.modules.shipments.service import ShipmentService
 from src.app.shared.enums import (
-    OrganizationCarrierStatus,
     OrganizationKind,
     OrganizationMemberRole,
     ShipmentStatus,

@@ -4,7 +4,6 @@ Packages module - Package size catalog.
 from sqlalchemy import Column, Integer, String, Float, Boolean
 
 from src.app.shared.base_model import Base, TimestampMixin
-from src.app.shared.enums import PackageSize
 
 
 class Package(Base, TimestampMixin):
