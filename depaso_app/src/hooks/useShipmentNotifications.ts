@@ -1,10 +1,16 @@
 import { useEffect, useRef } from "react";
 
 import { useAuthStore } from "../stores";
+import { useSettingsStore } from "../stores/settingsStore";
 import { carriersService } from "../services/carriers";
 import { shipmentsService } from "../services/shipments";
 import { ensureNotificationSetup, notifyLocal } from "../services/notifications";
 import { Shipment, ShipmentStatus, UserType } from "../types";
+
+/** Fire a local notification only if the user has notifications enabled. */
+function notifyIfEnabled(title: string, body: string) {
+  if (useSettingsStore.getState().notificationsEnabled) notifyLocal(title, body);
+}
 
 const POLL_MS = 20_000;
 
@@ -53,7 +59,7 @@ export function useShipmentNotifications() {
         const prev = statusRef.current.get(s.id);
         if (primedRef.current && prev !== undefined && prev !== s.status) {
           const msg = CLIENT_MESSAGES[s.status];
-          if (msg) notifyLocal(msg.title, msg.body(s.id));
+          if (msg) notifyIfEnabled(msg.title, msg.body(s.id));
         }
         statusRef.current.set(s.id, s.status);
       }
@@ -67,7 +73,7 @@ export function useShipmentNotifications() {
           if (primedRef.current) {
             const fresh = feed.filter((f) => !seenOffersRef.current.has(f.shipment_id));
             if (fresh.length > 0) {
-              notifyLocal(
+              notifyIfEnabled(
                 "Nueva oferta cerca",
                 fresh.length === 1
                   ? "Tenés un pedido que te queda de paso."

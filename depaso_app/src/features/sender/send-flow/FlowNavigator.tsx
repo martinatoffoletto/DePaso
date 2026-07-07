@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { MD3LightTheme, PaperProvider } from "react-native-paper";
+import { useSettingsStore } from "@/src/stores/settingsStore";
 
 import { HomeScreen }        from "./HomeScreen";
 import { PackageScreen }     from "./PackageScreen";
@@ -33,8 +34,9 @@ export function FlowNavigator() {
   const [recipientName, setRecipientName]       = useState("");
   const [recipientPhone, setRecipientPhone]     = useState("");
 
-  // Offer state
-  const [mode, setMode] = useState<DeliveryMode>("colaborativa");
+  // Offer state — default modality follows the user's saved preference (#5/#6).
+  const preferCollaborative = useSettingsStore((s) => s.preferCollaborative);
+  const [mode, setMode] = useState<DeliveryMode>(preferCollaborative ? "colaborativa" : "dedicada");
   const [quote, setQuote] = useState<Quote | null>(null);
 
   function resetAll() {

@@ -58,6 +58,14 @@ export const authService = {
     return response.data;
   },
 
+  /** Update the current user's profile (name / phone). */
+  async updateProfile(
+    payload: { first_name?: string; last_name?: string; phone_number?: string },
+  ): Promise<User> {
+    const response = await apiClient.patch<User>("/users/me", payload);
+    return response.data;
+  },
+
   async logout(): Promise<void> {
     // JWT is stateless — just clear the token client-side
     // No server-side endpoint needed

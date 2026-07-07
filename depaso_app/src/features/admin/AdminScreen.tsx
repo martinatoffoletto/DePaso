@@ -7,7 +7,7 @@ import { Text } from "react-native-paper";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { adminService } from "@/src/services/admin";
-import { AdminDashboard, Carrier, ModerationAction } from "@/src/types";
+import { AdminActivity, AdminDashboard, Carrier, ModerationAction, SystemStatus } from "@/src/types";
 import { T } from "@/constants/tokens";
 
 type IconName = React.ComponentProps<typeof MaterialCommunityIcons>["name"];
@@ -84,10 +84,22 @@ function PendingCarrierCard({ carrier, onModerate, busy }: {
   );
 }
 
+function StatusRow({ label, ok, value }: { label: string; ok: boolean; value: string }) {
+  return (
+    <View className="flex-row items-center gap-3 px-4 py-[13px]">
+      <View className="w-[9px] h-[9px] rounded-full" style={{ backgroundColor: ok ? T.emerald : T.red }} />
+      <Text className="flex-1 text-[13px] text-ink font-medium">{label}</Text>
+      <Text className="text-[12px] font-semibold" style={{ color: ok ? T.forest : T.red }}>{value}</Text>
+    </View>
+  );
+}
+
 export default function AdminScreen() {
   const insets = useSafeAreaInsets();
   const [dashboard, setDashboard] = useState<AdminDashboard | null>(null);
   const [pending, setPending] = useState<Carrier[]>([]);
+  const [status, setStatus] = useState<SystemStatus | null>(null);
+  const [activity, setActivity] = useState<AdminActivity | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(false);
@@ -96,12 +108,16 @@ export default function AdminScreen() {
   const load = useCallback(async () => {
     try {
       setError(false);
-      const [dash, carriers] = await Promise.all([
+      const [dash, carriers, sys, act] = await Promise.all([
         adminService.getDashboard(),
         adminService.getPendingCarriers(),
+        adminService.getStatus().catch(() => null),
+        adminService.getActivity(10).catch(() => null),
       ]);
       setDashboard(dash);
       setPending(carriers);
+      setStatus(sys);
+      setActivity(act);
     } catch {
       setError(true);
     } finally {
@@ -214,6 +230,45 @@ export default function AdminScreen() {
             />
           ))}
         </View>
+      )}
+
+      {/* System health + vision model */}
+      {status && (
+        <>
+          <Text className="text-[10px] font-bold tracking-[2px] text-inkMute uppercase mx-5 mt-[22px] mb-2">ESTADO DEL SISTEMA</Text>
+          <View className="mx-4 bg-card rounded-[18px] border border-border overflow-hidden">
+            <StatusRow label="API" ok={status.api === "ok"} value={status.api === "ok" ? "Operativa" : "Caída"} />
+            <View className="h-px bg-borderSoft ml-4" />
+            <StatusRow label="Base de datos" ok={status.database === "ok"} value={status.database === "ok" ? "Conectada" : "Error"} />
+            <View className="h-px bg-borderSoft ml-4" />
+            <StatusRow
+              label="Modelo de visión"
+              ok={status.vision_model_loaded}
+              value={status.vision_model_loaded ? "Cargado" : "Fallback (stub)"}
+            />
+            <View className="h-px bg-borderSoft ml-4" />
+            <StatusRow label="Entorno" ok value={status.environment} />
+          </View>
+        </>
+      )}
+
+      {/* Recent activity */}
+      {activity && (activity.recent_events.length > 0 || activity.recent_classifications.length > 0) && (
+        <>
+          <Text className="text-[10px] font-bold tracking-[2px] text-inkMute uppercase mx-5 mt-[22px] mb-2">ACTIVIDAD RECIENTE</Text>
+          <View className="mx-4 bg-card rounded-[18px] border border-border overflow-hidden">
+            {activity.recent_events.slice(0, 6).map((e, i) => (
+              <View key={`e${e.id}`}>
+                {i > 0 && <View className="h-px bg-borderSoft ml-4" />}
+                <View className="flex-row items-center gap-3 px-4 py-[11px]">
+                  <MaterialCommunityIcons name="timeline-clock-outline" size={16} color={T.inkSoft} />
+                  <Text className="flex-1 text-[12.5px] text-ink">Envío #{e.shipment_id} → {e.status}</Text>
+                  <Text className="text-[10px] text-inkMute">{new Date(e.created_at).toLocaleDateString("es-AR", { day: "numeric", month: "short" })}</Text>
+                </View>
+              </View>
+            ))}
+          </View>
+        </>
       )}
     </ScrollView>
   );

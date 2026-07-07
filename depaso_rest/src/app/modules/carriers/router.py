@@ -13,6 +13,7 @@ from src.app.modules.carriers.schemas import (
     AvailabilityWindowRequest,
     CarrierCreate,
     CarrierProfileCreate,
+    CarrierRatingResponse,
     CarrierResponse,
     CarrierSummaryResponse,
     CarrierUpdate,
@@ -159,6 +160,17 @@ async def my_summary(
     carrier = _my_carrier(current_user_id, db)
     summary = CarrierService(CarrierRepository(db)).summary(carrier.id, ShipmentRepository(db))
     return CarrierSummaryResponse(**summary)
+
+
+@router.get("/me/ratings", response_model=list[CarrierRatingResponse])
+async def my_ratings(
+    current_user_id: CurrentUserId,
+    db: Session = Depends(get_db),
+) -> list[CarrierRatingResponse]:
+    """Reviews received by the current carrier (RF-SHP-08), newest first."""
+    carrier = _my_carrier(current_user_id, db)
+    ratings = ShipmentRepository(db).list_ratings_by_carrier(carrier.id)
+    return [CarrierRatingResponse.model_validate(r) for r in ratings]
 
 
 @router.post("/me/availability", response_model=RouteResponse, status_code=status.HTTP_201_CREATED)

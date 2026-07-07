@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { View, ScrollView, TouchableOpacity, ActivityIndicator, Modal, Linking, Alert, Image } from "react-native";
+import { View, ScrollView, TouchableOpacity, ActivityIndicator, Modal, Linking, Alert, Image, Share, TextInput } from "react-native";
 import MapView, { Marker, Polyline } from "react-native-maps";
 import { Text } from "react-native-paper";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
@@ -13,16 +13,12 @@ import { co2EquivalenceLabel } from "@/src/utils/co2";
 import { T } from "@/constants/tokens";
 import { reverseGeocode } from "@/src/utils/geocoding";
 import { PACKAGE_LABEL_SHORT } from "@/src/utils/packageCategory";
-
-function useAddress(lat: number, lon: number): string {
-  const [addr, setAddr] = useState(`${lat.toFixed(3)}, ${lon.toFixed(3)}`);
-  useEffect(() => {
-    let alive = true;
-    reverseGeocode(lat, lon).then(r => { if (alive) setAddr(r); });
-    return () => { alive = false; };
-  }, [lat, lon]);
-  return addr;
-}
+import { EmptyState } from "@/src/components/EmptyState";
+import { SkeletonCard } from "@/src/components/Skeleton";
+import {
+  AvatarBubble, CADETE_COLORS, MiniRouteLine, PackageThumb, StatusTimeline,
+  carrierInitials, formatDate, liveMapRegion, timelineSteps, useAddress,
+} from "./shipmentsUi";
 
 type IconName = React.ComponentProps<typeof MaterialCommunityIcons>["name"];
 type Tab = "active" | "delivered" | "cancelled";
@@ -34,128 +30,7 @@ const ACTIVE_STATUSES = [
   ShipmentStatus.IN_TRANSIT,
 ];
 
-// Timeline driven by the real shipment status
-const STATUS_ORDER = [
-  ShipmentStatus.ASSIGNED,
-  ShipmentStatus.PICKUP_ARRIVED,
-  ShipmentStatus.IN_TRANSIT,
-  ShipmentStatus.DELIVERED,
-];
-const STEP_LABELS = ["Asignado", "Retiro", "En viaje", "Entrega"];
-
-function timelineSteps(status: ShipmentStatus) {
-  const idx = STATUS_ORDER.indexOf(status);
-  return STEP_LABELS.map((label, i) => ({
-    label,
-    done: idx > i || status === ShipmentStatus.DELIVERED,
-    active: idx === i && status !== ShipmentStatus.DELIVERED,
-  }));
-}
-
 const SIZE_LABEL = PACKAGE_LABEL_SHORT;
-
-const CADETE_COLORS = [T.amber, T.violet, T.emerald, T.sky];
-
-function formatDate(iso: string): string {
-  const d = new Date(iso);
-  return d.toLocaleDateString("es-AR", { day: "numeric", month: "short" }).toUpperCase();
-}
-
-function thumbIcon(cat: PackageCategory): IconName {
-  if (cat === PackageCategory.S) return "email-outline";
-  if (cat === PackageCategory.L || cat === PackageCategory.XL) return "cube-outline";
-  return "package-variant";
-}
-
-function PackageThumb({ category, size = 56 }: { category?: PackageCategory; size?: number }) {
-  return (
-    <View className="rounded-xl bg-cardSoft border border-borderSoft items-center justify-center shrink-0" style={{ width: size, height: size }}>
-      <MaterialCommunityIcons
-        name={category ? thumbIcon(category) : "package-variant"}
-        size={Math.round(size * 0.45)}
-        color="rgba(11,59,46,0.28)"
-      />
-    </View>
-  );
-}
-
-function AvatarBubble({ initials, color, size = 32 }: { initials: string; color: string; size?: number }) {
-  return (
-    <View className="items-center justify-center shrink-0" style={{ width: size, height: size, borderRadius: size, backgroundColor: color }}>
-      <Text style={{ fontSize: Math.round(size * 0.38), fontWeight: "700", color: "#F4EFE3" }}>{initials}</Text>
-    </View>
-  );
-}
-
-function MiniRouteLine({ origin, destination }: { origin: string; destination: string }) {
-  return (
-    <View className="flex-row items-center">
-      <View className="flex-row items-center gap-[6px] flex-1 overflow-hidden">
-        <View className="w-2 h-2 rounded-full border-[1.8px] border-forest bg-card shrink-0" />
-        <Text className="text-[12.5px] text-ink font-medium" numberOfLines={1}>{origin}</Text>
-      </View>
-      <View className="flex-row items-center gap-[2px] px-2">
-        {[0.4, 0.7, 1.0].map((op, i) => (
-          <View key={i} className="w-[3px] h-[3px] rounded-full bg-inkFaint" style={{ opacity: op }} />
-        ))}
-      </View>
-      <View className="flex-row items-center gap-[6px] flex-1 justify-end overflow-hidden">
-        <Text className="text-[12.5px] text-ink font-medium" numberOfLines={1}>{destination}</Text>
-        <View className="w-2 h-2 rounded-[2px] bg-emerald rotate-45 shrink-0" />
-      </View>
-    </View>
-  );
-}
-
-function carrierInitials(name?: string): string {
-  if (!name) return "CA";
-  return name.split(" ").filter(Boolean).slice(0, 2).map(w => w[0]).join("").toUpperCase() || "CA";
-}
-
-function liveMapRegion(s: Shipment) {
-  const lat1 = s.origin_lat, lat2 = s.destination_lat;
-  const lon1 = s.origin_lon, lon2 = s.destination_lon;
-  return {
-    latitude: (lat1 + lat2) / 2,
-    longitude: (lon1 + lon2) / 2,
-    latitudeDelta: Math.abs(lat1 - lat2) * 2.5 + 0.02,
-    longitudeDelta: Math.abs(lon1 - lon2) * 2.5 + 0.02,
-  };
-}
-
-// Shared progress-timeline row (used by the live card and the detail modal)
-function StatusTimeline({ steps, dotBase }: { steps: ReturnType<typeof timelineSteps>; dotBase: number }) {
-  const doneCount = steps.filter(st => st.done).length;
-  return (
-    <View className="flex-row items-start relative">
-      <View className="absolute left-[22px] right-[22px] h-[2px] bg-border rounded-[2px]" style={{ top: dotBase / 2 + 1 }} />
-      <View className="absolute left-[22px] h-[2px] bg-emerald rounded-[2px]" style={{ top: dotBase / 2 + 1, width: `${Math.max(0, doneCount * 30)}%` }} />
-      {steps.map((step, i) => (
-        <View key={i} className="flex-1 items-center" style={{ gap: dotBase <= 10 ? 4 : 6 }}>
-          <View
-            className="items-center justify-center"
-            style={{
-              width: step.active ? dotBase + 4 : dotBase, height: step.active ? dotBase + 4 : dotBase,
-              borderRadius: (dotBase + 4) / 2,
-              backgroundColor: step.done ? T.emerald : step.active ? T.card : T.bg,
-              borderWidth: step.active ? 2.5 : step.done ? 0 : 2,
-              borderColor: step.active ? T.emerald : T.border,
-            }}
-          >
-            {step.done && <MaterialCommunityIcons name="check" size={dotBase <= 10 ? 6 : 7} color="#F4EFE3" />}
-          </View>
-          <Text
-            className="text-center"
-            style={{ fontSize: dotBase <= 10 ? 10.5 : 11, color: step.active ? T.ink : step.done ? T.inkSoft : T.inkFaint, fontWeight: step.active ? "700" : step.done ? "500" : "400" }}
-            numberOfLines={1}
-          >
-            {step.label}
-          </Text>
-        </View>
-      ))}
-    </View>
-  );
-}
 
 function LiveShipmentCard({ shipment, onPress }: { shipment: Shipment; onPress: () => void }) {
   const isCollab = shipment.modality === DeliveryMode.COLLABORATIVE;
@@ -314,6 +189,18 @@ function ShipmentDetailModal({ shipment, onClose, onCancel }: { shipment: Shipme
     );
   }
 
+  const STATUS_ES: Record<string, string> = {
+    pending: "pendiente de asignación", assigned: "asignado a un cadete",
+    pickup_arrived: "el cadete está retirando", in_transit: "en camino",
+    delivered: "entregado", cancelled: "cancelado",
+  };
+  function shareTracking() {
+    const code = `DP-${String(shipment.id).padStart(4, "0")}`;
+    Share.share({
+      message: `📦 Seguí mi envío ${code} en DePaso.\nEstado: ${STATUS_ES[shipment.status] ?? shipment.status}.`,
+    }).catch(() => {});
+  }
+
   return (
     <Modal visible animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
       <View className="flex-1 bg-bg">
@@ -339,6 +226,14 @@ function ShipmentDetailModal({ shipment, onClose, onCancel }: { shipment: Shipme
           style={{ top: insets.top + 12 }}
         >
           <MaterialCommunityIcons name="close" size={18} color="#fff" />
+        </TouchableOpacity>
+        <TouchableOpacity
+          onPress={shareTracking}
+          hitSlop={10}
+          className="absolute right-[58px] w-[34px] h-[34px] rounded-full bg-black/45 items-center justify-center"
+          style={{ top: insets.top + 12 }}
+        >
+          <MaterialCommunityIcons name="share-variant" size={16} color="#fff" />
         </TouchableOpacity>
         <View className="absolute left-4 bg-[#F4EFE3]/95 rounded-lg px-[10px] py-[6px]" style={{ top: insets.top + 12 }}>
           <Text className="text-[10px] tracking-[1.5px] font-bold text-ink">DP-{String(shipment.id).padStart(4, "0")}</Text>
@@ -673,10 +568,13 @@ function PastShipmentCard({ item, onPress, onRate }: { item: Shipment; onPress: 
 
 export default function MisEnviosScreen() {
   const insets = useSafeAreaInsets();
+  const router = useRouter();
   const [shipments, setShipments] = useState<Shipment[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const [tab, setTab] = useState<Tab>("active");
+  const [query, setQuery] = useState("");
+  const [showSearch, setShowSearch] = useState(false);
   const [selectedShipment, setSelectedShipment] = useState<Shipment | null>(null);
   const [ratingShipment, setRatingShipment] = useState<Shipment | null>(null);
 
@@ -712,6 +610,15 @@ export default function MisEnviosScreen() {
 
   const tabList = tab === "active" ? activeShipments : tab === "delivered" ? deliveredShipments : cancelledShipments;
 
+  // Search over id / category / recipient.
+  const q = query.trim().toLowerCase();
+  const visibleList = q
+    ? tabList.filter(s =>
+        `dp-${String(s.id).padStart(4, "0")}`.includes(q) ||
+        (SIZE_LABEL[s.package_size] ?? "").toLowerCase().includes(q) ||
+        (s.recipient_name ?? "").toLowerCase().includes(q))
+    : tabList;
+
   const TABS: { key: Tab; label: string; count: number }[] = [
     { key: "active",    label: "En curso",   count: activeShipments.length },
     { key: "delivered", label: "Entregados", count: deliveredShipments.length },
@@ -728,10 +635,24 @@ export default function MisEnviosScreen() {
           <Text className="text-[10px] tracking-[2.5px] text-inkMute uppercase">HISTORIAL</Text>
           <Text className="text-[26px] font-bold text-ink tracking-[-0.8px] mt-1">Mis envíos</Text>
         </View>
-        <TouchableOpacity className="w-[38px] h-[38px] rounded-xl border border-border bg-card items-center justify-center" activeOpacity={0.75} onPress={() => Alert.alert("Búsqueda", "La búsqueda estará disponible en una próxima versión.")}>
-          <MaterialCommunityIcons name="magnify" size={18} color={T.ink} />
+        <TouchableOpacity className="w-[38px] h-[38px] rounded-xl border border-border bg-card items-center justify-center" activeOpacity={0.75} onPress={() => { setShowSearch(v => !v); setQuery(""); }}>
+          <MaterialCommunityIcons name={showSearch ? "close" : "magnify"} size={18} color={T.ink} />
         </TouchableOpacity>
       </View>
+
+      {showSearch && (
+        <View className="mx-5 mt-3 flex-row items-center gap-2 bg-card border border-border rounded-xl px-3">
+          <MaterialCommunityIcons name="magnify" size={16} color={T.inkMute} />
+          <TextInput
+            className="flex-1 text-[14px] text-ink py-[9px]"
+            value={query}
+            onChangeText={setQuery}
+            placeholder="Buscar por código, tipo o destinatario"
+            placeholderTextColor={T.inkMute}
+            autoFocus
+          />
+        </View>
+      )}
 
       {/* Tab bar */}
       <View className="px-4 pt-4 pb-1">
@@ -757,17 +678,19 @@ export default function MisEnviosScreen() {
       </View>
 
       {loading ? (
-        <View className="flex-1 items-center justify-center gap-3 p-10">
-          <ActivityIndicator size="large" color={T.forest} />
+        <View className="flex-1 gap-[10px] px-4 pt-4">
+          <SkeletonCard />
+          <SkeletonCard />
+          <SkeletonCard />
         </View>
       ) : error ? (
-        <View className="flex-1 items-center justify-center gap-3 p-10">
-          <MaterialCommunityIcons name="wifi-off" size={48} color={T.border} />
-          <Text className="text-[15px] text-inkMute font-semibold">Sin conexión</Text>
-          <TouchableOpacity className="bg-forest rounded-[10px] px-5 py-[10px]" onPress={load}>
-            <Text className="text-[#F4EFE3] font-bold text-sm">Reintentar</Text>
-          </TouchableOpacity>
-        </View>
+        <EmptyState
+          icon="wifi-off"
+          title="Sin conexión"
+          description="No pudimos cargar tus envíos."
+          ctaLabel="Reintentar"
+          onCta={load}
+        />
       ) : (
         <ScrollView
           className="flex-1"
@@ -783,17 +706,26 @@ export default function MisEnviosScreen() {
           )}
 
           {/* List */}
-          {tabList.length === 0 ? (
-            <View className="items-center gap-3 py-12">
-              <MaterialCommunityIcons name="truck-delivery-outline" size={56} color={T.border} />
-              <Text className="text-[15px] text-inkMute font-semibold">{emptyLabel}</Text>
-            </View>
+          {visibleList.length === 0 ? (
+            q ? (
+              <EmptyState icon="magnify" title="Sin resultados" description={`No encontramos envíos para "${query}".`} />
+            ) : tab === "active" ? (
+              <EmptyState
+                icon="truck-delivery-outline"
+                title={emptyLabel}
+                description="Creá tu primer envío y hacé seguimiento acá."
+                ctaLabel="Crear envío"
+                onCta={() => router.push("/(main)/enviar")}
+              />
+            ) : (
+              <EmptyState icon="truck-delivery-outline" title={emptyLabel} />
+            )
           ) : tab === "active" ? (
-            activeShipments.map(item => (
+            visibleList.map(item => (
               <LiveShipmentCard key={item.id} shipment={item} onPress={() => setSelectedShipment(item)} />
             ))
           ) : (
-            tabList.map(item => (
+            visibleList.map(item => (
               <PastShipmentCard
                 key={item.id}
                 item={item}

@@ -1,6 +1,7 @@
 import axios, { AxiosError, AxiosInstance } from "axios";
 import * as SecureStore from "expo-secure-store";
 import Constants from "expo-constants";
+import { useConnectionStore } from "../stores/connectionStore";
 
 const debuggerHost = Constants.expoConfig?.hostUri;
 const localIp = debuggerHost ? debuggerHost.split(":")[0] : "localhost";
@@ -59,8 +60,13 @@ class ApiClient {
     });
 
     this.instance.interceptors.response.use(
-      (response) => response,
+      (response) => {
+        useConnectionStore.getState().setOnline(true);
+        return response;
+      },
       async (error: AxiosError) => {
+        // No HTTP response = network/connectivity failure -> mark offline.
+        if (!error.response) useConnectionStore.getState().setOnline(false);
         const original = error.config as any;
         if (error.response?.status === 401 && original && !original._retried) {
           original._retried = true;

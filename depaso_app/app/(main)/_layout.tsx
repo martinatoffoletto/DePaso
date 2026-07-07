@@ -1,5 +1,5 @@
 import React from "react";
-import { ColorValue } from "react-native";
+import { ColorValue, View } from "react-native";
 import { Tabs } from "expo-router";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useAuthStore } from "@/src/stores/authStore";
@@ -7,6 +7,8 @@ import { UserType } from "@/src/types";
 import { T } from "@/constants/tokens";
 import { MotoIcon } from "@/src/components/MotoIcon";
 import { useShipmentNotifications } from "@/src/hooks/useShipmentNotifications";
+import { OfflineBanner } from "@/src/components/OfflineBanner";
+import { OnboardingOverlay } from "@/src/features/onboarding/OnboardingOverlay";
 
 type IconName = React.ComponentProps<typeof MaterialCommunityIcons>["name"];
 
@@ -23,7 +25,9 @@ export default function TabLayout() {
   const isClient = !isCarrier && !isAdmin;
 
   return (
-    <Tabs
+    <View style={{ flex: 1, backgroundColor: T.bg }}>
+      <OfflineBanner />
+      <Tabs
       screenOptions={{
         headerShown: false,
         tabBarActiveTintColor: T.forest,
@@ -50,6 +54,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="enviar"
         options={{
+          href: isAdmin ? null : undefined,
           title: isCarrier ? "Inicio" : "Enviar",
           tabBarIcon: ({ color, size }) => (
             <TabIcon
@@ -63,6 +68,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="envios"
         options={{
+          href: isAdmin ? null : undefined,
           title: isCarrier ? "Viajes" : "Mis Envíos",
           tabBarIcon: ({ color, size }) =>
             isCarrier ? (
@@ -111,6 +117,8 @@ export default function TabLayout() {
           ),
         }}
       />
-    </Tabs>
+      </Tabs>
+      <OnboardingOverlay />
+    </View>
   );
 }

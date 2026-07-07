@@ -9,10 +9,14 @@ import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAuthStore } from "@/src/stores/authStore";
 import { useAddressBookStore } from "@/src/stores/addressBookStore";
+import { useSettingsStore } from "@/src/stores/settingsStore";
 import { co2Service } from "@/src/services";
 import { carriersService } from "@/src/services/carriers";
 import { UserType } from "@/src/types";
 import PublishTripScreen from "@/src/features/carrier/PublishTripScreen";
+import { EditProfileModal } from "./EditProfileModal";
+import { ChangePasswordModal } from "./ChangePasswordModal";
+import { CarrierReviewsModal } from "./CarrierReviewsModal";
 import { T } from "@/constants/tokens";
 
 type IconName = React.ComponentProps<typeof MaterialCommunityIcons>["name"];
@@ -310,10 +314,17 @@ export default function ProfileScreen() {
   const [addrModal, setAddrModal]       = useState(false);
   const [contactModal, setContactModal] = useState(false);
   const [routeModal, setRouteModal]     = useState(false);
-  const [notifOn, setNotifOn]           = useState(true);
-  const [collabOn, setCollabOn]         = useState(true);
+  const [editModal, setEditModal]       = useState(false);
+  const [pwdModal, setPwdModal]         = useState(false);
+  const [reviewsModal, setReviewsModal] = useState(false);
+
+  // Persisted preferences (real toggles, not cosmetic).
+  const notifOn = useSettingsStore((s) => s.notificationsEnabled);
+  const collabOn = useSettingsStore((s) => s.preferCollaborative);
+  const updateSettings = useSettingsStore((s) => s.update);
 
   const isCarrier = user?.user_type === UserType.CARRIER;
+  const memberSince = user?.created_at ? new Date(user.created_at).getFullYear() : null;
 
   // Real stats: client → CO2 impact; carrier → delivery summary.
   const [stats, setStats] = useState({ shipments: 0, co2: 0, reputation: user?.rating ?? 5.0 });
@@ -341,6 +352,8 @@ export default function ProfileScreen() {
   const fullName   = `${firstName} ${lastName}`.trim() || "Usuario";
   const email      = user?.email ?? "";
   const reputation = stats.reputation;
+  // Eco level derived from real CO2 saved (1 base, +1 every 20 kg).
+  const ecoLevel = Math.max(1, Math.floor(stats.co2 / 20) + 1);
 
   return (
     <>
@@ -379,9 +392,9 @@ export default function ProfileScreen() {
               <View className="flex-row items-center gap-[6px] mt-[6px]">
                 <View className="flex-row items-center gap-[3px] bg-lime/15 border border-lime/30 px-[7px] py-[2px] rounded-md">
                   <MaterialCommunityIcons name="leaf" size={10} color={T.lime} />
-                  <Text className="text-[9px] tracking-[1px] text-lime font-bold uppercase">ECO · NIVEL 2</Text>
+                  <Text className="text-[9px] tracking-[1px] text-lime font-bold uppercase">ECO · NIVEL {ecoLevel}</Text>
                 </View>
-                <Text className="text-[9px] tracking-[1px] text-[#F4EFE3]/45 uppercase">DESDE 2025</Text>
+                {memberSince && <Text className="text-[9px] tracking-[1px] text-[#F4EFE3]/45 uppercase">DESDE {memberSince}</Text>}
               </View>
             </View>
           </View>
@@ -424,10 +437,10 @@ export default function ProfileScreen() {
 
         {/* ── Sections ── */}
         <ProfileSection title="CUENTA" rows={[
-          <ProfileRow key="datos" icon="account-outline"    label="Datos personales"  value="Nombre, email, celular" onPress={() => Alert.alert("Datos personales", "La edición de tus datos no está disponible en esta versión.")} />,
+          <ProfileRow key="datos" icon="account-outline"    label="Datos personales"  value="Nombre y teléfono" onPress={() => setEditModal(true)} />,
+          <ProfileRow key="pwd"   icon="lock-outline"       label="Cambiar contraseña" onPress={() => setPwdModal(true)} />,
           <ProfileRow key="dirs"  icon="map-marker-outline" label="Mis direcciones"   value={`${addresses.length} guardada${addresses.length !== 1 ? "s" : ""}`} onPress={() => setAddrModal(true)} />,
           <ProfileRow key="pers"  icon="account-multiple-outline" label="Mis personas" value={`${contacts.length} guardada${contacts.length !== 1 ? "s" : ""}`} onPress={() => setContactModal(true)} />,
-          <ProfileRow key="pago"  icon="wallet-outline"     label="Métodos de pago"   value="Mercado Pago ··· 4821" onPress={() => Alert.alert("Métodos de pago", "Los métodos de pago no están disponibles en esta versión.")} />,
         ]} />
 
         {isCarrier && (
@@ -444,15 +457,15 @@ export default function ProfileScreen() {
         )}
 
         <ProfileSection title="ACTIVIDAD" rows={[
-          <ProfileRow key="hist"  icon="history"      label="Historial de envíos"    value={`${stats.shipments} envíos · este año`} onPress={() => router.push("/(main)/envios")} />,
-          <ProfileRow key="eco"   icon="leaf"         label="Mi impacto eco"         value="CO₂ ahorrado y equivalencias" accent onPress={() => router.push("/(main)/impacto")} />,
-          <ProfileRow key="stars" icon="star-outline" label="Reseñas y calificación" value={`${reputation.toFixed(1)} · 11 reseñas`} onPress={() => Alert.alert("Reseñas", "Las reseñas y calificaciones no están disponibles en esta versión.")} />,
+          <ProfileRow key="hist"  icon="history"      label="Historial de envíos"    value={`${stats.shipments} ${stats.shipments === 1 ? "envío" : "envíos"}`} onPress={() => router.push("/(main)/envios")} />,
+          ...(isCarrier
+            ? [<ProfileRow key="stars" icon="star-outline" label="Mis calificaciones" value={`${reputation.toFixed(1)} ★`} onPress={() => setReviewsModal(true)} />]
+            : [<ProfileRow key="eco" icon="leaf" label="Mi impacto eco" value="CO₂ ahorrado y equivalencias" accent onPress={() => router.push("/(main)/impacto")} />]),
         ]} />
 
         <ProfileSection title="PREFERENCIAS" rows={[
-          <ProfileRow key="notif" icon="bell-outline" label="Notificaciones"                  trailing={notifOn ? "toggle-on" : "toggle-off"} onPress={() => setNotifOn(v => !v)} />,
-          <ProfileRow key="colab" icon="leaf"         label="Preferir envíos colaborativos"   trailing={collabOn ? "toggle-on" : "toggle-off"} onPress={() => setCollabOn(v => !v)} />,
-          <ProfileRow key="lang"  icon="translate"    label="Idioma"                          trailing="ES-AR" onPress={() => Alert.alert("Idioma", "Solo disponible en español (AR) por ahora.")} />,
+          <ProfileRow key="notif" icon="bell-outline" label="Notificaciones"                  trailing={notifOn ? "toggle-on" : "toggle-off"} onPress={() => updateSettings({ notificationsEnabled: !notifOn })} />,
+          <ProfileRow key="colab" icon="leaf"         label="Preferir envíos colaborativos"   trailing={collabOn ? "toggle-on" : "toggle-off"} onPress={() => updateSettings({ preferCollaborative: !collabOn })} />,
         ]} />
 
         <ProfileSection title="AYUDA Y LEGAL" rows={[
@@ -471,6 +484,9 @@ export default function ProfileScreen() {
       <AddressModal visible={addrModal}   onClose={() => setAddrModal(false)} />
       <ContactModal visible={contactModal} onClose={() => setContactModal(false)} />
       {routeModal && <PublishTripScreen onClose={() => setRouteModal(false)} />}
+      <EditProfileModal visible={editModal} onClose={() => setEditModal(false)} />
+      <ChangePasswordModal visible={pwdModal} onClose={() => setPwdModal(false)} />
+      <CarrierReviewsModal visible={reviewsModal} onClose={() => setReviewsModal(false)} />
     </>
   );
 }

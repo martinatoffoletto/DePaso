@@ -61,6 +61,17 @@ class CarrierSummaryResponse(BaseModel):
     total_co2_saved_kg: float
 
 
+class CarrierRatingResponse(BaseModel):
+    """A single review received by the carrier (client identity omitted)."""
+
+    stars: int
+    comment: str | None
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
 class AvailabilityWindowRequest(BaseModel):
     """Register or update the carrier's habitual availability window (BY_AVAILABILITY, RF-CAR-02).
 

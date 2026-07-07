@@ -2,6 +2,7 @@ import { apiClient } from "./api";
 import {
   Carrier,
   CarrierCreatePayload,
+  CarrierRating,
   CarrierRoute,
   CarrierSummary,
   FeedItem,
@@ -29,6 +30,12 @@ export const carriersService = {
   /** Deliveries, earnings, reputation, CO2 (RF-CAR-06). */
   async getSummary(): Promise<CarrierSummary> {
     const response = await apiClient.get<CarrierSummary>("/carriers/me/summary");
+    return response.data;
+  },
+
+  /** Reviews received by the current carrier (RF-SHP-08), newest first. */
+  async getMyRatings(): Promise<CarrierRating[]> {
+    const response = await apiClient.get<CarrierRating[]>("/carriers/me/ratings");
     return response.data;
   },
 };

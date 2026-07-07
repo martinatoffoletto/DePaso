@@ -1,9 +1,11 @@
 import { apiClient } from "./api";
 import {
+  AdminActivity,
   AdminDashboard,
   Carrier,
   MatchingWeights,
   ModerationAction,
+  SystemStatus,
 } from "../types";
 
 export const adminService = {
@@ -28,6 +30,18 @@ export const adminService = {
       `/admin/carriers/${carrierId}`,
       { action },
     );
+    return response.data;
+  },
+
+  /** Operational health: API/DB + whether the vision model is loaded or on stub. */
+  async getStatus(): Promise<SystemStatus> {
+    const response = await apiClient.get<SystemStatus>("/admin/status");
+    return response.data;
+  },
+
+  /** Latest classifications + shipment status changes (monitoring). */
+  async getActivity(limit = 15): Promise<AdminActivity> {
+    const response = await apiClient.get<AdminActivity>(`/admin/activity?limit=${limit}`);
     return response.data;
   },
 

@@ -59,6 +59,7 @@ export interface User {
   user_type: UserType;
   rating: number;
   is_active: boolean;
+  created_at?: string;
 }
 
 export interface UserSummary {
@@ -312,6 +313,44 @@ export interface AdminDashboard {
 }
 
 export type ModerationAction = "verify" | "suspend" | "reactivate";
+
+export interface SystemStatus {
+  api: string;
+  environment: string;
+  debug: boolean;
+  database: string;
+  vision_model_loaded: boolean;
+  vision_model_path: string;
+}
+
+export interface ClassificationActivityItem {
+  id: number;
+  shipment_id?: number | null;
+  predicted_category: string;
+  confidence: number;
+  model_loaded: boolean;
+  accepted?: boolean | null;
+  manual_category?: string | null;
+  created_at: string;
+}
+
+export interface ShipmentEventActivityItem {
+  id: number;
+  shipment_id: number;
+  status: string;
+  created_at: string;
+}
+
+export interface AdminActivity {
+  recent_classifications: ClassificationActivityItem[];
+  recent_events: ShipmentEventActivityItem[];
+}
+
+export interface CarrierRating {
+  stars: number;
+  comment: string | null;
+  created_at: string;
+}
 
 export interface MatchingWeights {
   geo: number;

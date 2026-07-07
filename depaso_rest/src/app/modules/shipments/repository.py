@@ -136,6 +136,16 @@ class ShipmentRepository(BaseRepository[Shipment]):
     def get_rating_by_shipment(self, shipment_id: int) -> Rating | None:
         return self.db.query(Rating).filter(Rating.shipment_id == shipment_id).first()
 
+    def list_ratings_by_carrier(self, carrier_id: int, limit: int = 50) -> list[Rating]:
+        """Ratings received by a carrier, newest first (for the reviews screen)."""
+        return (
+            self.db.query(Rating)
+            .filter(Rating.carrier_id == carrier_id)
+            .order_by(Rating.created_at.desc())
+            .limit(limit)
+            .all()
+        )
+
     def carrier_rating_avg(self, carrier_id: int) -> float | None:
         """Average stars for a carrier across all ratings."""
         from sqlalchemy import func

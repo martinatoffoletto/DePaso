@@ -7,6 +7,7 @@ import "react-native-reanimated";
 
 import { Providers } from "@/src/components/Providers";
 import { useAuthStore } from "@/src/stores/authStore";
+import { useSettingsStore } from "@/src/stores/settingsStore";
 
 export default function RootLayout() {
   // Route gating uses Stack.Protected (Expo Router's recommended pattern):
@@ -14,10 +15,12 @@ export default function RootLayout() {
   // effect racing with the navigation state.
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   const restoreToken = useAuthStore((s) => s.restoreToken);
+  const hydrateSettings = useSettingsStore((s) => s.hydrate);
 
   useEffect(() => {
     restoreToken();
-  }, [restoreToken]);
+    hydrateSettings();
+  }, [restoreToken, hydrateSettings]);
 
   return (
     <Providers>
