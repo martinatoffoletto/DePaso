@@ -81,7 +81,7 @@ cd depaso_web && npx tsc --noEmit && npm run build           # OK
 
 ## 3. IA/ML — instrucciones (lo hace Martina, nadie más lo toca)
 
-El código del pipeline ya existe y está corregido. Lo único que falta es **dataset + entrenar + evaluar + copiar el modelo**. Guía completa para Colab: `depaso_rest/ml/COLAB_QUICKSTART.md` (la MacBook no tiene GPU — todo el entrenamiento va en Colab).
+El código del pipeline ya existe y está corregido. Lo único que falta es **dataset + entrenar + evaluar + copiar el modelo**. **Guía completa paso a paso: `depaso_rest/ml/GUIA_IA.md`** + tres notebooks listos para Colab en `depaso_rest/ml/notebooks/` (`01_dataset.ipynb` · `02_entrenamiento.ipynb` · `03_evaluacion.ipynb`). Referencia corta en inglés: `COLAB_QUICKSTART.md`. La MacBook no tiene GPU — el entrenamiento va en Colab.
 
 ### Paso 1 — Dataset (~1500 imágenes, 4 clases `s|m|l|xl`)
 1. `ml/dataset/download_open_images.py` — baja ~70% desde Open Images V7 vía FiftyOne (Box, Envelope, Suitcase, Furniture…).
