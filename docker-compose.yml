@@ -29,11 +29,29 @@ services:
         condition: service_healthy
     environment:
       DATABASE_URL: postgresql+psycopg://depaso:depaso123@db:5432/depaso_dev
-      JWT_SECRET_KEY: ${JWT_SECRET_KEY:-change-this-in-production}
+      # Dev local: se autogenera un secreto por arranque si no pasás JWT_SECRET_KEY.
+      # En prod (Render) se setea uno real por env — nunca este default.
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:-dev-only-secret-do-not-use-in-prod-0192837465}
       DEBUG: "false"
-      ENVIRONMENT: production
+      ENVIRONMENT: development
     ports:
       - "8000:8000"
+
+  web:
+    # Panel web (build estático servido por nginx). Parte del stack completo.
+    # Levantar todo junto: docker compose --profile full up --build
+    profiles: ["full"]
+    build:
+      context: ./depaso_web
+      args:
+        # El navegador corre en el host, así que apunta al puerto publicado de la API.
+        VITE_API_URL: http://localhost:8000/api/v1
+    container_name: depaso_web
+    restart: unless-stopped
+    depends_on:
+      - api
+    ports:
+      - "5173:80"
 
 volumes:
   depaso_pgdata:

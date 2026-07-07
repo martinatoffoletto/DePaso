@@ -178,6 +178,12 @@ cd depaso_app && npx expo start        # typecheck: npx tsc --noEmit · lint: np
 
 # Panel web
 cd depaso_web && npm run dev           # build: npm run build
+
+# Stack completo dockerizado (Postgres + API + panel web, todo junto)
+docker compose --profile full up --build
+#   → API   http://localhost:8000/api/v1/health
+#   → Web   http://localhost:5173   (usuarios demo abajo)
+# La app móvil NO se dockeriza (Expo/Metro corre en tu máquina + teléfono): npx expo start
 ```
 
 **Usuarios demo:** admin@depaso.com/admin1234 · cliente@depaso.com/cliente1234 · lucia@depaso.com/lucia1234 (cadete moto verificada) · carlos@depaso.com/carlos1234 (camión, pendiente de verificación).
