@@ -2,6 +2,7 @@ import { useState } from "react";
 import {
   View, ScrollView, TouchableOpacity,
   TextInput, ActivityIndicator, Text,
+  KeyboardAvoidingView, Platform,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
@@ -132,7 +133,7 @@ export default function RegisterScreen() {
   };
 
   return (
-    <View style={{ flex: 1, backgroundColor: T.bg }}>
+    <KeyboardAvoidingView style={{ flex: 1, backgroundColor: T.bg }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
       {/* ── Hero ── */}
       <View style={{ backgroundColor: T.forest, paddingTop: insets.top + 12, paddingHorizontal: 24, paddingBottom: 28 }}>
         <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 24 }}>
@@ -404,6 +405,6 @@ export default function RegisterScreen() {
           </TouchableOpacity>
         </View>
       </View>
-    </View>
+    </KeyboardAvoidingView>
   );
 }

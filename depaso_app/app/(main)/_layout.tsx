@@ -1,7 +1,8 @@
-import React from "react";
+import React, { useEffect } from "react";
 import { ColorValue, View } from "react-native";
-import { Tabs } from "expo-router";
+import { Tabs, useRouter } from "expo-router";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
+import * as Notifications from "expo-notifications";
 import { useAuthStore } from "@/src/stores/authStore";
 import { UserType } from "@/src/types";
 import { T } from "@/constants/tokens";
@@ -23,6 +24,15 @@ export default function TabLayout() {
   const isCarrier = user?.user_type === UserType.CARRIER;
   const isAdmin = user?.user_type === UserType.ADMIN;
   const isClient = !isCarrier && !isAdmin;
+
+  // Tapping a local notification opens the relevant tab.
+  const router = useRouter();
+  useEffect(() => {
+    const sub = Notifications.addNotificationResponseReceivedListener(() => {
+      router.push(isCarrier ? "/(main)/enviar" : "/(main)/envios");
+    });
+    return () => sub.remove();
+  }, [router, isCarrier]);
 
   return (
     <View style={{ flex: 1, backgroundColor: T.bg }}>

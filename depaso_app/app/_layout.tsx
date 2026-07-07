@@ -6,6 +6,8 @@ import { StatusBar } from "expo-status-bar";
 import "react-native-reanimated";
 
 import { Providers } from "@/src/components/Providers";
+import { AppErrorBoundary } from "@/src/components/AppErrorBoundary";
+import { Toast } from "@/src/components/Toast";
 import { useAuthStore } from "@/src/stores/authStore";
 import { useSettingsStore } from "@/src/stores/settingsStore";
 
@@ -23,19 +25,22 @@ export default function RootLayout() {
   }, [restoreToken, hydrateSettings]);
 
   return (
-    <Providers>
-      <ThemeProvider value={DarkTheme}>
-        <Stack screenOptions={{ headerShown: false }}>
-          <Stack.Protected guard={isAuthenticated}>
-            <Stack.Screen name="(main)" />
-          </Stack.Protected>
-          <Stack.Protected guard={!isAuthenticated}>
-            <Stack.Screen name="index" />
-            <Stack.Screen name="(auth)" />
-          </Stack.Protected>
-        </Stack>
-        <StatusBar style="auto" />
-      </ThemeProvider>
-    </Providers>
+    <AppErrorBoundary>
+      <Providers>
+        <ThemeProvider value={DarkTheme}>
+          <Stack screenOptions={{ headerShown: false }}>
+            <Stack.Protected guard={isAuthenticated}>
+              <Stack.Screen name="(main)" />
+            </Stack.Protected>
+            <Stack.Protected guard={!isAuthenticated}>
+              <Stack.Screen name="index" />
+              <Stack.Screen name="(auth)" />
+            </Stack.Protected>
+          </Stack>
+          <Toast />
+          <StatusBar style="auto" />
+        </ThemeProvider>
+      </Providers>
+    </AppErrorBoundary>
   );
 }

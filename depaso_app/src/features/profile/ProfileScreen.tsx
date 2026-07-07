@@ -344,7 +344,12 @@ export default function ProfileScreen() {
     return () => { alive = false; };
   }, [isCarrier]);
 
-  const handleLogout = async () => { await logout(); };
+  const handleLogout = () => {
+    Alert.alert("Cerrar sesión", "¿Querés cerrar tu sesión?", [
+      { text: "Cancelar", style: "cancel" },
+      { text: "Cerrar sesión", style: "destructive", onPress: () => { logout(); } },
+    ]);
+  };
 
   const firstName  = user?.first_name ?? "";
   const lastName   = user?.last_name  ?? "";

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Modal, View, TextInput, TouchableOpacity, Alert, ActivityIndicator } from "react-native";
+import { Modal, View, TextInput, TouchableOpacity, Alert, ActivityIndicator, KeyboardAvoidingView, Platform } from "react-native";
 import { Text } from "react-native-paper";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -53,7 +53,7 @@ export function ChangePasswordModal({ visible, onClose }: { visible: boolean; on
 
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
-      <View className="flex-1 bg-bg" style={{ paddingTop: insets.top }}>
+      <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} className="flex-1 bg-bg" style={{ paddingTop: insets.top }}>
         <View className="flex-row items-center justify-between px-5 py-[14px] border-b border-borderSoft">
           <TouchableOpacity onPress={onClose} hitSlop={10}>
             <MaterialCommunityIcons name="arrow-left" size={22} color={T.ink} />
@@ -77,7 +77,7 @@ export function ChangePasswordModal({ visible, onClose }: { visible: boolean; on
             {saving ? <ActivityIndicator color="#F4EFE3" /> : <Text className="text-[#F4EFE3] font-bold text-[16px]">Actualizar</Text>}
           </TouchableOpacity>
         </View>
-      </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }

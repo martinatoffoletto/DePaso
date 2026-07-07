@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { View, ScrollView, TouchableOpacity, ActivityIndicator, Modal, Linking, Alert, Image, Share, TextInput } from "react-native";
+import { View, ScrollView, TouchableOpacity, ActivityIndicator, Modal, Linking, Alert, Image, Share, TextInput, RefreshControl } from "react-native";
 import MapView, { Marker, Polyline } from "react-native-maps";
 import { Text } from "react-native-paper";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
@@ -571,6 +571,7 @@ export default function MisEnviosScreen() {
   const router = useRouter();
   const [shipments, setShipments] = useState<Shipment[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(false);
   const [tab, setTab] = useState<Tab>("active");
   const [query, setQuery] = useState("");
@@ -578,8 +579,8 @@ export default function MisEnviosScreen() {
   const [selectedShipment, setSelectedShipment] = useState<Shipment | null>(null);
   const [ratingShipment, setRatingShipment] = useState<Shipment | null>(null);
 
-  async function load() {
-    setLoading(true);
+  async function load(isRefresh = false) {
+    if (!isRefresh) setLoading(true);
     setError(false);
     try {
       const data = await shipmentsService.getMyShipments(0, 50);
@@ -594,8 +595,11 @@ export default function MisEnviosScreen() {
       setError(true);
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   }
+
+  const onRefresh = () => { setRefreshing(true); load(true); };
 
   useFocusEffect(useCallback(() => { load(); }, []));
 
@@ -696,6 +700,7 @@ export default function MisEnviosScreen() {
           className="flex-1"
           contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 14, gap: 10, paddingBottom: insets.bottom + 32 }}
           showsVerticalScrollIndicator={false}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={T.forest} />}
         >
           {/* Section header for Entregados / Cancelados */}
           {tab !== "active" && tabList.length > 0 && (

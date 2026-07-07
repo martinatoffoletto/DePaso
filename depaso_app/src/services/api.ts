@@ -2,6 +2,7 @@ import axios, { AxiosError, AxiosInstance } from "axios";
 import * as SecureStore from "expo-secure-store";
 import Constants from "expo-constants";
 import { useConnectionStore } from "../stores/connectionStore";
+import { useToastStore } from "../stores/toastStore";
 
 const debuggerHost = Constants.expoConfig?.hostUri;
 const localIp = debuggerHost ? debuggerHost.split(":")[0] : "localhost";
@@ -66,9 +67,17 @@ class ApiClient {
       },
       async (error: AxiosError) => {
         // No HTTP response = network/connectivity failure -> mark offline.
-        if (!error.response) useConnectionStore.getState().setOnline(false);
+        if (!error.response) {
+          useConnectionStore.getState().setOnline(false);
+          return Promise.reject(error);
+        }
         const original = error.config as any;
-        if (error.response?.status === 401 && original && !original._retried) {
+        const status = error.response.status;
+        // Auth endpoints handle their own errors (wrong password, etc.) — don't
+        // treat their 401 as an expired session.
+        const isAuthCall = typeof original?.url === "string" && original.url.includes("/auth/");
+
+        if (status === 401 && original && !original._retried && !isAuthCall) {
           original._retried = true;
           refreshPromise = refreshPromise ?? refreshAccessToken();
           const newToken = await refreshPromise;
@@ -78,9 +87,18 @@ class ApiClient {
             original.headers.Authorization = `Bearer ${newToken}`;
             return this.instance.request(original);
           }
-          // refresh failed -> log out
+          // refresh failed -> session expired: tell the user, then log out.
+          useToastStore.getState().show("Tu sesión expiró. Iniciá sesión de nuevo.", "info");
           const { useAuthStore } = await import("../stores/authStore");
           useAuthStore.getState().logout();
+          return Promise.reject(error);
+        }
+
+        // Global handling for unexpected errors (screens still get the rejection).
+        if (status === 429) {
+          useToastStore.getState().show("Demasiados intentos. Esperá un momento.", "error");
+        } else if (status >= 500) {
+          useToastStore.getState().show("Error del servidor. Probá de nuevo en un momento.", "error");
         }
         return Promise.reject(error);
       },

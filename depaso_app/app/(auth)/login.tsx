@@ -2,6 +2,7 @@ import { useState } from "react";
 import {
   View, ScrollView, TouchableOpacity,
   TextInput, ActivityIndicator, Text,
+  KeyboardAvoidingView, Platform,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
@@ -75,7 +76,7 @@ export default function LoginScreen() {
   }
 
   return (
-    <View style={{ flex: 1, backgroundColor: T.bg }}>
+    <KeyboardAvoidingView style={{ flex: 1, backgroundColor: T.bg }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
       {/* ── Hero ── */}
       <View style={{ backgroundColor: T.forest, paddingTop: insets.top + 12, paddingHorizontal: 24, paddingBottom: 36 }}>
         <TouchableOpacity
@@ -183,6 +184,6 @@ export default function LoginScreen() {
           </TouchableOpacity>
         </View>
       </ScrollView>
-    </View>
+    </KeyboardAvoidingView>
   );
 }
