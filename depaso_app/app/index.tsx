@@ -146,7 +146,7 @@ const styles = StyleSheet.create({
   },
   splashDot: { color: T.lime },
   splashSub: {
-    fontSize: 10, letterSpacing: 3.5, color: "rgba(244,239,227,0.5)",
+    fontSize: 10, letterSpacing: 3.5, color: "rgba(244,239,227,0.75)",
     textTransform: "uppercase", marginTop: 6,
   },
   splashProgress: {
@@ -156,7 +156,7 @@ const styles = StyleSheet.create({
   },
   splashBar: { width: "65%", height: "100%", backgroundColor: T.lime },
   splashBarLabel: {
-    fontSize: 9, letterSpacing: 2.5, color: "rgba(244,239,227,0.45)",
+    fontSize: 9, letterSpacing: 2.5, color: "rgba(244,239,227,0.75)",
     textTransform: "uppercase", marginTop: 8,
   },
 
@@ -167,7 +167,7 @@ const styles = StyleSheet.create({
   markBox: { marginBottom: 22 },
   tagline: {
     fontSize: 10, letterSpacing: 3,
-    color: "rgba(244,239,227,0.55)", textTransform: "uppercase", marginBottom: 10,
+    color: "rgba(244,239,227,0.8)", textTransform: "uppercase", marginBottom: 10,
   },
   headline: {
     fontSize: 40, fontWeight: "700", color: "#F4EFE3",
@@ -189,7 +189,7 @@ const styles = StyleSheet.create({
   featureTitle: { fontSize: 13, fontWeight: "600", color: "#F4EFE3", letterSpacing: -0.2 },
   featureSub: {
     fontSize: 9, letterSpacing: 1,
-    color: "rgba(244,239,227,0.5)", textTransform: "uppercase", marginTop: 2,
+    color: "rgba(244,239,227,0.75)", textTransform: "uppercase", marginTop: 2,
   },
 
   ctas: { paddingHorizontal: 24, gap: 10, marginTop: 16 },

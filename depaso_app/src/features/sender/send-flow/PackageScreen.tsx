@@ -71,6 +71,7 @@ export type PackagePayload = {
   categoryId: string;
   weightKg: number;
   description: string;
+  declaredValue: number | null;
   photoUri: string | null;
 };
 
@@ -94,6 +95,7 @@ export function PackageScreen({ initial, onBack, onNext }: Props) {
   const [dimH, setDimH] = useState("12");
   const [dimKg, setDimKg] = useState(initial?.weightKg ? String(initial.weightKg) : "1.4");
   const [description, setDescription] = useState(initial?.description ?? "");
+  const [declaredValue, setDeclaredValue] = useState(initial?.declaredValue ? String(initial.declaredValue) : "");
 
   const selectedCat = CATEGORIES.find((c) => c.id === selected) ?? CATEGORIES[2];
   const canContinue = description.trim().length > 0;
@@ -177,7 +179,14 @@ export function PackageScreen({ initial, onBack, onNext }: Props) {
         .catch(() => {});
     }
     const kg = parseFloat(dimKg);
-    onNext({ categoryId: selected, weightKg: isNaN(kg) ? 1 : kg, description, photoUri });
+    const value = parseFloat(declaredValue.replace(",", "."));
+    onNext({
+      categoryId: selected,
+      weightKg: isNaN(kg) ? 1 : kg,
+      description,
+      declaredValue: isNaN(value) || value <= 0 ? null : value,
+      photoUri,
+    });
   }
 
   return (
@@ -396,6 +405,28 @@ export function PackageScreen({ initial, onBack, onNext }: Props) {
               textAlignVertical="top"
             />
           </View>
+        </View>
+
+        {/* Valor declarado — opcional, lo ve el cadete al decidir */}
+        <View className="gap-2">
+          <Text className="text-[10px] text-inkSoft tracking-[1px] uppercase font-semibold">VALOR DECLARADO · OPCIONAL</Text>
+          <View className="flex-row items-center gap-[10px] bg-card rounded-xl border border-border px-[14px] py-3">
+            <MaterialCommunityIcons name="cash-multiple" size={18} color={T.inkMute} />
+            <Text className="text-[15px] text-inkMute font-medium">$</Text>
+            <RNTextInput
+              className="flex-1 text-[15px] text-ink"
+              style={{ padding: 0 }}
+              value={declaredValue}
+              onChangeText={setDeclaredValue}
+              placeholder="Ej: 250.000"
+              placeholderTextColor={T.inkFaint}
+              keyboardType="decimal-pad"
+            />
+            <Text className="text-[11px] text-inkMute">ARS</Text>
+          </View>
+          <Text className="text-[11px] text-inkMute leading-[15px]">
+            Cuánto vale lo que enviás. Ayuda al cadete a cuidar el paquete como corresponde.
+          </Text>
         </View>
       </ScrollView>
 

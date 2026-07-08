@@ -8,88 +8,14 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as Location from "expo-location";
 import { T } from "@/constants/tokens";
 import { reverseGeocode } from "@/src/utils/geocoding";
+import { searchAddresses, formatAddress, Suggestion } from "@/src/utils/addressSearch";
 import { useAuthStore } from "@/src/stores/authStore";
 import { useAddressBookStore } from "@/src/stores/addressBookStore";
 import type { Coords } from "./FlowNavigator";
 
 type IconName = React.ComponentProps<typeof MaterialCommunityIcons>["name"];
 
-// ── Geocoding (Photon / Komoot — OSM, sin rate-limit) ────────────────────────
-// Photon soporta lang: default | de | en | fr ÚNICAMENTE — no pasar "es"
-type Suggestion = {
-  place_id: number; display_name: string;
-  lat: string; lon: string;
-  address?: {
-    road?: string; house_number?: string;
-    neighbourhood?: string; suburb?: string; city_district?: string;
-    city?: string; town?: string; postcode?: string;
-  };
-};
-
-async function searchAddresses(query: string): Promise<Suggestion[]> {
-  if (query.length < 3) return [];
-  const params = new URLSearchParams({
-    q: `${query} Buenos Aires`,
-    limit: "7",
-    lat: "-34.6118",
-    lon: "-58.4173",
-  });
-  const controller = new AbortController();
-  const tid = setTimeout(() => controller.abort(), 8000);
-  try {
-    const res = await fetch(`https://photon.komoot.io/api/?${params}`, {
-      signal: controller.signal,
-    });
-    clearTimeout(tid);
-    if (!res.ok) return [];
-    const data = await res.json();
-    const seen = new Set<string>();
-    return (data.features ?? [])
-      .filter((f: any) => (f.properties?.countrycode ?? "AR").toUpperCase() === "AR")
-      .map((f: any): Suggestion => {
-        const p = f.properties ?? {};
-        const street = [p.street, p.housenumber].filter(Boolean).join(" ");
-        return {
-          place_id: p.osm_id ?? Math.floor(Math.random() * 1e9),
-          lat: String(f.geometry.coordinates[1]),
-          lon: String(f.geometry.coordinates[0]),
-          display_name: [street || p.name, p.city ?? p.county].filter(Boolean).join(", "),
-          address: {
-            road: p.street,
-            house_number: p.housenumber,
-            neighbourhood: p.district ?? p.locality,
-            city: p.city ?? p.county,
-            postcode: p.postcode,
-          },
-        };
-      })
-      .filter((r: Suggestion) => {
-        const key = `${parseFloat(r.lat).toFixed(3)},${parseFloat(r.lon).toFixed(3)}`;
-        if (seen.has(key)) return false;
-        seen.add(key);
-        return true;
-      })
-      .slice(0, 5);
-  } catch {
-    clearTimeout(tid);
-    return [];
-  }
-}
-
-function formatAddress(s: Suggestion): { label: string; sublabel: string } {
-  const a = s.address;
-  if (!a) {
-    const parts = s.display_name.split(",").map((p) => p.trim());
-    return { label: parts[0] ?? "", sublabel: parts.slice(1, 3).join(", ") };
-  }
-  const street = [a.road, a.house_number].filter(Boolean).join(" ");
-  const neighborhood = a.neighbourhood ?? a.suburb ?? a.city_district ?? "";
-  const postcode = a.postcode ? `(${a.postcode})` : "";
-  const label = street || a.city || a.town || "Buenos Aires";
-  const sublabel = [neighborhood, postcode].filter(Boolean).join(" ");
-  return { label, sublabel };
-}
-// ─────────────────────────────────────────────────────────────────────────────
+// Geocoding compartido (Photon / Komoot — OSM): src/utils/addressSearch.ts
 
 function StepDots({ current, total }: { current: number; total: number }) {
   return (
@@ -223,22 +149,67 @@ export function AddressScreen({ initial, onBack, onNext }: Props) {
     setNoResults(false);
   }
 
-  function handleSavedAddrPress(addr: string) {
+  async function handleSavedAddrPress(addr: string) {
     Keyboard.dismiss();
     setSuggestions([]);
-    if (activeField === "origin") {
+    setNoResults(false);
+    const field = activeField === "origin" ? "origin" : "destination";
+    if (field === "origin") {
       setOrigin(addr);
       setOriginCoords(null);
     } else {
       setDestination(addr);
       setDestCoords(null);
     }
+    // Resolve coordinates through the same geocoding library as the
+    // autocomplete — a saved address must behave exactly like a picked one.
+    setSearching(true);
+    try {
+      const results = await searchAddresses(addr);
+      const first = results[0];
+      if (first) {
+        const coords: Coords = { latitude: parseFloat(first.lat), longitude: parseFloat(first.lon) };
+        if (field === "origin") {
+          setOriginCoords(coords);
+          setActiveField("destination");
+          setTimeout(() => destInputRef.current?.focus(), 150);
+        } else {
+          setDestCoords(coords);
+          setActiveField(null);
+        }
+      }
+    } catch { /* queda sin coords y el flujo lo resuelve después */ }
+    finally { setSearching(false); }
   }
 
   function handleFillMe() {
     if (!user) return;
     setRecipientName(`${user.first_name} ${user.last_name}`);
     setRecipientPhone(user.phone_number ?? "");
+  }
+
+  const [resolving, setResolving] = useState(false);
+
+  // Continue always leaves with resolved coordinates: anything typed by hand
+  // (or a saved address that failed earlier) goes through the geocoder here.
+  async function handleContinue() {
+    if (!canContinue || resolving) return;
+    setResolving(true);
+    try {
+      let oc = originCoords;
+      let dc = destCoords;
+      if (!oc) {
+        const r = await searchAddresses(origin);
+        if (r[0]) oc = { latitude: parseFloat(r[0].lat), longitude: parseFloat(r[0].lon) };
+      }
+      if (!dc) {
+        const r = await searchAddresses(destination);
+        if (r[0]) dc = { latitude: parseFloat(r[0].lat), longitude: parseFloat(r[0].lon) };
+      }
+      onNext({ origin, destination, originCoords: oc, destinationCoords: dc, recipientName, recipientPhone });
+    } finally {
+      setResolving(false);
+    }
   }
 
   return (
@@ -517,17 +488,20 @@ export function AddressScreen({ initial, onBack, onNext }: Props) {
         <TouchableOpacity
           className={`rounded-2xl h-[54px] flex-row items-center justify-center gap-[10px] ${!canContinue ? "bg-inkMute" : ""}`}
           style={canContinue ? { backgroundColor: T.forest, shadowColor: T.forest, shadowOffset: { width: 0, height: 12 }, shadowOpacity: 0.4, shadowRadius: 20, elevation: 5 } : undefined}
-          onPress={() => {
-            if (!canContinue) return;
-            onNext({ origin, destination, originCoords, destinationCoords: destCoords, recipientName, recipientPhone });
-          }}
+          onPress={handleContinue}
           activeOpacity={0.88}
-          disabled={!canContinue}
+          disabled={!canContinue || resolving}
         >
-          <Text className="text-[#F4EFE3] font-semibold text-[15px]">
-            {canContinue ? "Continuar · Ver ruta" : "Ingresá las direcciones"}
-          </Text>
-          {canContinue && <MaterialCommunityIcons name="arrow-right" size={18} color="#F4EFE3" />}
+          {resolving ? (
+            <ActivityIndicator color="#F4EFE3" />
+          ) : (
+            <>
+              <Text className="text-[#F4EFE3] font-semibold text-[15px]">
+                {canContinue ? "Continuar · Ver ruta" : "Ingresá las direcciones"}
+              </Text>
+              {canContinue && <MaterialCommunityIcons name="arrow-right" size={18} color="#F4EFE3" />}
+            </>
+          )}
         </TouchableOpacity>
       </View>
     </View>

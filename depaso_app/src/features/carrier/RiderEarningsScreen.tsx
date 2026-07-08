@@ -5,7 +5,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useFocusEffect } from "@react-navigation/native";
 import { carriersService } from "@/src/services/carriers";
 import { shipmentsService } from "@/src/services/shipments";
-import { CarrierSummary, PackageCategory, Shipment, ShipmentStatus } from "@/src/types";
+import { CarrierSummary, Shipment, ShipmentStatus } from "@/src/types";
 import { EmptyState } from "@/src/components/EmptyState";
 import { T } from "@/constants/tokens";
 import { PACKAGE_LABEL_SHORT } from "@/src/utils/packageCategory";
@@ -78,7 +78,7 @@ export default function RiderEarningsScreen() {
         {/* Hero — total earnings */}
         <View className="px-4 pt-3">
           <View className="bg-forest rounded-[24px] px-5 pt-5 pb-[22px] overflow-hidden">
-            <Text className="text-[10px] tracking-[2px] text-[#F4EFE3]/55 uppercase font-bold">Ganado en total</Text>
+            <Text className="text-[10px] tracking-[2px] text-[#F4EFE3]/80 uppercase font-bold">Ganado en total</Text>
             <Text className="text-[44px] font-bold text-lime tracking-[-2px] leading-[46px] mt-1">
               {summary ? money(summary.total_earnings) : "—"}
             </Text>

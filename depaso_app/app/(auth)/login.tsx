@@ -90,7 +90,7 @@ export default function LoginScreen() {
           <View style={{ width: 40, height: 40, borderRadius: 13, backgroundColor: "rgba(244,239,227,0.12)", alignItems: "center", justifyContent: "center" }}>
             <MaterialCommunityIcons name="map-marker-path" size={20} color="#F4EFE3" />
           </View>
-          <Text style={{ fontSize: 11, letterSpacing: 3.5, color: "rgba(244,239,227,0.4)", textTransform: "uppercase", fontWeight: "700" }}>
+          <Text style={{ fontSize: 11, letterSpacing: 3.5, color: "rgba(244,239,227,0.7)", textTransform: "uppercase", fontWeight: "700" }}>
             DEPASO
           </Text>
         </View>
@@ -98,7 +98,7 @@ export default function LoginScreen() {
         <Text style={{ fontSize: 38, fontWeight: "800", color: "#F4EFE3", letterSpacing: -1.5, lineHeight: 42 }}>
           {"Hola,\nbienvenido."}
         </Text>
-        <Text style={{ fontSize: 14, color: "rgba(244,239,227,0.55)", marginTop: 10, lineHeight: 20 }}>
+        <Text style={{ fontSize: 14, color: "rgba(244,239,227,0.8)", marginTop: 10, lineHeight: 20 }}>
           Ingresá para seguir moviendo paquetes en AMBA.
         </Text>
       </View>

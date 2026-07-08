@@ -96,15 +96,15 @@ export default function ImpactScreen() {
         <View className="flex-row mt-5">
           <View className="flex-1 border-r border-[#F4EFE3]/[0.12] pr-[10px] mr-[14px]">
             <Text className="text-xl font-bold text-[#F4EFE3] tracking-[-0.5px]">{impact?.shipments_delivered ?? 0}</Text>
-            <Text className="text-[9px] tracking-[1.3px] text-[#F4EFE3]/55 mt-[2px]">ENTREGADOS</Text>
+            <Text className="text-[9px] tracking-[1.3px] text-[#F4EFE3]/80 mt-[2px]">ENTREGADOS</Text>
           </View>
           <View className="flex-1 border-r border-[#F4EFE3]/[0.12] pr-[10px] mr-[14px]">
             <Text className="text-xl font-bold text-[#F4EFE3] tracking-[-0.5px]">{impact?.shipments_collaborative ?? 0}</Text>
-            <Text className="text-[9px] tracking-[1.3px] text-[#F4EFE3]/55 mt-[2px]">COLABORATIVOS</Text>
+            <Text className="text-[9px] tracking-[1.3px] text-[#F4EFE3]/80 mt-[2px]">COLABORATIVOS</Text>
           </View>
           <View className="flex-1">
             <Text className="text-xl font-bold text-lime tracking-[-0.5px]">{(collaborativeShare * 100).toFixed(0)}%</Text>
-            <Text className="text-[9px] tracking-[1.3px] text-[#F4EFE3]/55 mt-[2px]">ECO</Text>
+            <Text className="text-[9px] tracking-[1.3px] text-[#F4EFE3]/80 mt-[2px]">ECO</Text>
           </View>
         </View>
       </View>

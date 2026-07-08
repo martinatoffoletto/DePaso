@@ -399,25 +399,25 @@ export default function ProfileScreen() {
                   <MaterialCommunityIcons name="leaf" size={10} color={T.lime} />
                   <Text className="text-[9px] tracking-[1px] text-lime font-bold uppercase">ECO · NIVEL {ecoLevel}</Text>
                 </View>
-                {memberSince && <Text className="text-[9px] tracking-[1px] text-[#F4EFE3]/45 uppercase">DESDE {memberSince}</Text>}
+                {memberSince && <Text className="text-[9px] tracking-[1px] text-[#F4EFE3]/75 uppercase">DESDE {memberSince}</Text>}
               </View>
             </View>
           </View>
           <View className="flex-row mt-[22px]">
             <View className="flex-1 border-r border-[#F4EFE3]/[0.12] pr-[10px] mr-[14px]">
               <Text className="text-[22px] font-bold text-[#F4EFE3] tracking-[-0.5px]">{stats.shipments}</Text>
-              <Text className="text-[9px] tracking-[1.5px] text-[#F4EFE3]/55 uppercase mt-[2px]">ENVÍOS</Text>
+              <Text className="text-[9px] tracking-[1.5px] text-[#F4EFE3]/80 uppercase mt-[2px]">ENVÍOS</Text>
             </View>
             <View className="flex-1 border-r border-[#F4EFE3]/[0.12] pr-[10px] mr-[14px]">
               <Text className="text-[22px] font-bold text-lime tracking-[-0.5px]">{stats.co2}<Text className="text-xs font-normal text-[#F4EFE3]">kg</Text></Text>
-              <Text className="text-[9px] tracking-[1.5px] text-[#F4EFE3]/55 uppercase mt-[2px]">CO₂ AHORRADO</Text>
+              <Text className="text-[9px] tracking-[1.5px] text-[#F4EFE3]/80 uppercase mt-[2px]">CO₂ AHORRADO</Text>
             </View>
             <View className="flex-1">
               <View className="flex-row items-center gap-1">
                 <Text className="text-[22px] font-bold text-[#F4EFE3] tracking-[-0.5px]">{reputation.toFixed(1)}</Text>
                 <MaterialCommunityIcons name="star" size={14} color={T.lime} />
               </View>
-              <Text className="text-[9px] tracking-[1.5px] text-[#F4EFE3]/55 uppercase mt-[2px]">REPUTACIÓN</Text>
+              <Text className="text-[9px] tracking-[1.5px] text-[#F4EFE3]/80 uppercase mt-[2px]">REPUTACIÓN</Text>
             </View>
           </View>
         </View>

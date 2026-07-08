@@ -8,10 +8,9 @@ import { useFocusEffect } from "@react-navigation/native";
 import { useRouter } from "expo-router";
 import { shipmentsService } from "@/src/services/shipments";
 import { trackingService } from "@/src/services/carriers";
-import { AssignedCarrier, Shipment, ShipmentStatus, PackageCategory, DeliveryMode, TrackedPosition } from "@/src/types";
+import { AssignedCarrier, Shipment, ShipmentStatus, DeliveryMode, TrackedPosition } from "@/src/types";
 import { co2EquivalenceLabel } from "@/src/utils/co2";
 import { T } from "@/constants/tokens";
-import { reverseGeocode } from "@/src/utils/geocoding";
 import { PACKAGE_LABEL_SHORT } from "@/src/utils/packageCategory";
 import { EmptyState } from "@/src/components/EmptyState";
 import { SkeletonCard } from "@/src/components/Skeleton";
@@ -20,7 +19,6 @@ import {
   carrierInitials, formatDate, liveMapRegion, timelineSteps, useAddress,
 } from "./shipmentsUi";
 
-type IconName = React.ComponentProps<typeof MaterialCommunityIcons>["name"];
 type Tab = "active" | "delivered" | "cancelled";
 
 const ACTIVE_STATUSES = [

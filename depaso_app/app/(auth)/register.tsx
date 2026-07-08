@@ -148,18 +148,18 @@ export default function RegisterScreen() {
             <View style={{ width: 20, height: 6, borderRadius: 4, backgroundColor: "#F4EFE3" }} />
             <View style={{ width: 6, height: 6, borderRadius: 4, backgroundColor: "rgba(244,239,227,0.25)" }} />
             <View style={{ width: 6, height: 6, borderRadius: 4, backgroundColor: "rgba(244,239,227,0.25)" }} />
-            <Text style={{ fontSize: 10, letterSpacing: 1.5, color: "rgba(244,239,227,0.4)", marginLeft: 4 }}>01/03</Text>
+            <Text style={{ fontSize: 10, letterSpacing: 1.5, color: "rgba(244,239,227,0.7)", marginLeft: 4 }}>01/03</Text>
           </View>
           <View style={{ width: 38 }} />
         </View>
 
-        <Text style={{ fontSize: 10, letterSpacing: 2.5, color: "rgba(244,239,227,0.45)", textTransform: "uppercase", marginBottom: 6, fontWeight: "700" }}>
+        <Text style={{ fontSize: 10, letterSpacing: 2.5, color: "rgba(244,239,227,0.75)", textTransform: "uppercase", marginBottom: 6, fontWeight: "700" }}>
           TUS DATOS
         </Text>
         <Text style={{ fontSize: 32, fontWeight: "800", color: "#F4EFE3", letterSpacing: -1.2, lineHeight: 36 }}>
           Creá tu cuenta
         </Text>
-        <Text style={{ fontSize: 13.5, color: "rgba(244,239,227,0.55)", marginTop: 8, lineHeight: 19 }}>
+        <Text style={{ fontSize: 13.5, color: "rgba(244,239,227,0.8)", marginTop: 8, lineHeight: 19 }}>
           En 3 pasos. Después empezás a enviar.
         </Text>
       </View>

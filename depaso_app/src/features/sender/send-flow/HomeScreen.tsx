@@ -87,7 +87,7 @@ export function HomeScreen({ onStart }: HomeScreenProps) {
 
         <View className="flex-row justify-between items-start">
           <View>
-            <Text className="text-[10px] tracking-[2.5px] uppercase mb-[6px]" style={{ color: "rgba(244,239,227,0.55)" }}>
+            <Text className="text-[10px] tracking-[2.5px] uppercase mb-[6px]" style={{ color: "rgba(244,239,227,0.8)" }}>
               {getDateLabel()}
             </Text>
             <Text className="text-sm mb-0.5" style={{ color: "rgba(244,239,227,0.75)" }}>Hola, {firstName}</Text>
@@ -106,20 +106,20 @@ export function HomeScreen({ onStart }: HomeScreenProps) {
             <Text className="text-[22px] font-bold text-[#F4EFE3] tracking-[-0.5px]">
               {impact != null ? String(impact.shipments_delivered) : "—"}
             </Text>
-            <Text className="text-[9px] tracking-[1.5px] uppercase mt-0.5" style={{ color: "rgba(244,239,227,0.55)" }}>ENVÍOS</Text>
+            <Text className="text-[9px] tracking-[1.5px] uppercase mt-0.5" style={{ color: "rgba(244,239,227,0.8)" }}>ENVÍOS</Text>
           </View>
           <View className="flex-1 pr-[10px] mr-[14px]" style={{ borderRightWidth: 1, borderRightColor: "rgba(244,239,227,0.12)" }}>
             <Text className="text-[22px] font-bold text-lime tracking-[-0.5px]">
               {impact != null ? impact.total_co2_saved_kg.toFixed(1) : "—"}
               {impact != null ? <Text className="text-xs font-normal text-[#F4EFE3]">kg</Text> : null}
             </Text>
-            <Text className="text-[9px] tracking-[1.5px] uppercase mt-0.5" style={{ color: "rgba(244,239,227,0.55)" }}>CO₂ AHORRADO</Text>
+            <Text className="text-[9px] tracking-[1.5px] uppercase mt-0.5" style={{ color: "rgba(244,239,227,0.8)" }}>CO₂ AHORRADO</Text>
           </View>
           <View className="flex-1">
             <Text className="text-[22px] font-bold text-[#F4EFE3] tracking-[-0.5px]">
               {user ? user.rating.toFixed(1) : "—"}
             </Text>
-            <Text className="text-[9px] tracking-[1.5px] uppercase mt-0.5" style={{ color: "rgba(244,239,227,0.55)" }}>REPUTACIÓN</Text>
+            <Text className="text-[9px] tracking-[1.5px] uppercase mt-0.5" style={{ color: "rgba(244,239,227,0.8)" }}>REPUTACIÓN</Text>
           </View>
         </View>
       </View>

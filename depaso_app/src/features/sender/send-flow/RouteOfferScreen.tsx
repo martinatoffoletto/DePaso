@@ -244,7 +244,7 @@ export function RouteOfferScreen({ origin, destination, originCoords, destinatio
                   <View className="bg-lime rounded px-[5px] py-[2px]"><Text className="text-[8px] tracking-[1px] text-forest font-bold uppercase">ECO −43%</Text></View>
                 </View>
                 <View className="flex-row gap-[10px] items-center">
-                  <Text className={`text-[11.5px] ${isCollab ? "text-[#F4EFE3]/65" : "text-inkMute"}`}>
+                  <Text className={`text-[11.5px] ${isCollab ? "text-[#F4EFE3]/80" : "text-inkMute"}`}>
                     {quote ? `${quote.eta_collaborative_min} min` : "—"}
                   </Text>
                   <Text className={`text-[11.5px] font-semibold ${isCollab ? "text-lime" : "text-emeraldDeep"}`}>
@@ -257,7 +257,7 @@ export function RouteOfferScreen({ origin, destination, originCoords, destinatio
                   ? <ActivityIndicator size="small" color={isCollab ? T.lime : T.forest} />
                   : <>
                       <Text className={`text-lg font-bold tracking-[-0.5px] ${isCollab ? "text-[#F4EFE3]" : "text-ink"}`}>{fmtPrice(quote?.price_collaborative)}</Text>
-                      <Text className={`text-[10px] line-through ${isCollab ? "text-[#F4EFE3]/40" : "text-inkFaint"}`}>{fmtPrice(quote?.price_dedicated)}</Text>
+                      <Text className={`text-[10px] line-through ${isCollab ? "text-[#F4EFE3]/60" : "text-inkFaint"}`}>{fmtPrice(quote?.price_dedicated)}</Text>
                     </>}
               </View>
             </TouchableOpacity>

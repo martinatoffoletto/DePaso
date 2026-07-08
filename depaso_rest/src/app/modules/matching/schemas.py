@@ -75,6 +75,9 @@ class FeedItemResponse(BaseModel):
     destination_lat: float
     destination_lon: float
     estimated_price: float | None
+    photo_url: str | None = None
+    description: str | None = None
+    declared_value: float | None = None
     score: float
     detour_km: float | None = None      # collaborative: extra km on the carrier's route
     detour_ratio: float | None = None

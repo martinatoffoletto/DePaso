@@ -71,6 +71,12 @@ MAX_DETOUR_RATIO_COLLABORATIVE = 0.15
 MAX_SOFT_MOBILITY_TRIP_KM = 5.0
 SOFT_MOBILITY = {VehicleType.PEDESTRIAN, VehicleType.BIKE}
 
+# When a carrier already has active deliveries ("dedicado por espacio"), a new
+# dedicated offer must chain naturally with the current work: its pickup has to
+# be near the carrier's position or near one of the active drop-offs, so the
+# rider is never sent to a completely different zone mid-route.
+MAX_CHAIN_PICKUP_KM = 5.0
+
 # Vehicle -> categories it may carry (spec 3.3). Empty intersection = knockout.
 CARGO_COMPATIBILITY: dict[str, set[str]] = {
     VehicleType.PEDESTRIAN: {PackageSize.S},
@@ -208,12 +214,31 @@ class MatchingService:
                 if r.carrier_id == carrier_id and r.kind == "collaborative_route"
             ]
 
+        # Active deliveries shape what can still be offered: they consume
+        # capacity and anchor the zone where chained pickups make sense.
+        active = self.shipment_repo.list_active_by_carrier(carrier_id)
+        reserved_kg = sum(s.weight_kg for s in active)
+        active_dropoffs = [Point(s.destination_lat, s.destination_lon) for s in active]
+        carrier_pos = (
+            Point(carrier.current_lat, carrier.current_lon)
+            if carrier.current_lat is not None and carrier.current_lon is not None
+            else None
+        )
+
         items: list[FeedItemResponse] = []
         for shipment in self.shipment_repo.list_pending():
             if not self._passes_common_knockouts(carrier, shipment):
                 continue
+            # Remaining (not total) capacity: what the vehicle can still take.
+            if carrier.capacity_kg - reserved_kg < shipment.weight_kg:
+                continue
             pickup = Point(shipment.origin_lat, shipment.origin_lon)
             dropoff = Point(shipment.destination_lat, shipment.destination_lon)
+
+            # With deliveries in progress, only offer pickups that chain with
+            # the current work (near the rider or near an active drop-off).
+            if active and not self._chains_with_active(carrier_pos, active_dropoffs, pickup):
+                continue
 
             if shipment.modality == ShipmentModality.COLLABORATIVE:
                 if shipment.package_size in COLLABORATIVE_FORBIDDEN_SIZES:
@@ -240,6 +265,9 @@ class MatchingService:
                     destination_lat=shipment.destination_lat,
                     destination_lon=shipment.destination_lon,
                     estimated_price=shipment.estimated_price,
+                    photo_url=shipment.photo_url,
+                    description=shipment.description,
+                    declared_value=shipment.declared_value,
                     score=round(score, 4),
                     detour_km=detour.detour_km,
                     detour_ratio=detour.detour_ratio,
@@ -250,11 +278,6 @@ class MatchingService:
                     ],
                 ))
             else:
-                carrier_pos = (
-                    Point(carrier.current_lat, carrier.current_lon)
-                    if carrier.current_lat is not None and carrier.current_lon is not None
-                    else None
-                )
                 geo = geo_score_dedicated(carrier_pos, pickup)
                 distance = road_km(carrier_pos, pickup) if carrier_pos else None
                 score = (self.weights["geo"] * geo
@@ -272,9 +295,16 @@ class MatchingService:
                     destination_lat=shipment.destination_lat,
                     destination_lon=shipment.destination_lon,
                     estimated_price=shipment.estimated_price,
+                    photo_url=shipment.photo_url,
+                    description=shipment.description,
+                    declared_value=shipment.declared_value,
                     score=round(score, 4),
                     distance_to_pickup_km=round(distance, 2) if distance is not None else None,
-                    explanation=["Envío dedicado: te desplazás especialmente para este pedido"],
+                    explanation=(
+                        ["Encadena con tus entregas en curso"]
+                        if active else
+                        ["Envío dedicado: te desplazás especialmente para este pedido"]
+                    ),
                 ))
 
         items.sort(key=lambda i: i.score, reverse=True)
@@ -438,6 +468,19 @@ class MatchingService:
         return results
 
     # -- shared helpers ---------------------------------------------------------
+
+    @staticmethod
+    def _chains_with_active(carrier_pos: Point | None,
+                            active_dropoffs: list[Point], pickup: Point) -> bool:
+        """A new pickup chains with the current work if it is close to the
+        rider's position or to one of the active drop-offs (MAX_CHAIN_PICKUP_KM).
+        Without a known position, only the drop-off anchors apply."""
+        anchors = list(active_dropoffs)
+        if carrier_pos is not None:
+            anchors.append(carrier_pos)
+        if not anchors:
+            return True
+        return any(road_km(a, pickup) <= MAX_CHAIN_PICKUP_KM for a in anchors)
 
     def _passes_common_knockouts(self, carrier: Carrier, shipment: Shipment) -> bool:
         """Hard filters common to both modalities (spec 5.2 'filtros duros')."""

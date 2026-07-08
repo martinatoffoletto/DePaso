@@ -24,6 +24,7 @@ export function FlowNavigator() {
   const [categoryId, setCategoryId]   = useState("m");
   const [weightKg, setWeightKg]       = useState(2);
   const [description, setDescription] = useState("");
+  const [declaredValue, setDeclaredValue] = useState<number | null>(null);
   const [photoUri, setPhotoUri]       = useState<string | null>(null);
 
   // Address state
@@ -44,6 +45,7 @@ export function FlowNavigator() {
     setCategoryId("m");
     setWeightKg(2);
     setDescription("");
+    setDeclaredValue(null);
     setPhotoUri(null);
     setOrigin("");
     setDestination("");
@@ -66,12 +68,13 @@ export function FlowNavigator() {
     if (step === "package") {
       return (
         <PackageScreen
-          initial={{ categoryId, weightKg, description, photoUri }}
+          initial={{ categoryId, weightKg, description, declaredValue, photoUri }}
           onBack={() => setStep("home")}
           onNext={(p) => {
             setCategoryId(p.categoryId);
             setWeightKg(p.weightKg);
             setDescription(p.description);
+            setDeclaredValue(p.declaredValue);
             setPhotoUri(p.photoUri);
             setStep("address");
           }}
@@ -126,6 +129,7 @@ export function FlowNavigator() {
         categoryId={categoryId}
         weightKg={weightKg}
         description={description}
+        declaredValue={declaredValue}
         photoUri={photoUri}
         mode={mode}
         quote={quote}
@@ -135,7 +139,7 @@ export function FlowNavigator() {
         onConfirm={resetAll}
       />
     );
-  }, [step, categoryId, weightKg, description, photoUri, origin, destination, originCoords, destinationCoords, recipientName, recipientPhone, mode, quote]);
+  }, [step, categoryId, weightKg, description, declaredValue, photoUri, origin, destination, originCoords, destinationCoords, recipientName, recipientPhone, mode, quote]);
 
   return <PaperProvider theme={MD3LightTheme}>{screen}</PaperProvider>;
 }

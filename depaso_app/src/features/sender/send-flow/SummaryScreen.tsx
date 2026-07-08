@@ -39,6 +39,7 @@ type SummaryScreenProps = {
   categoryId: string;
   weightKg: number;
   description?: string;
+  declaredValue?: number | null;
   photoUri?: string | null;
   mode: "dedicada" | "colaborativa";
   quote: Quote | null;
@@ -60,7 +61,7 @@ function Row({ icon, label, value }: { icon: IconName; label: string; value: str
 
 export function SummaryScreen({
   origin, destination, originCoords, destinationCoords,
-  categoryId, weightKg, description, photoUri, mode, quote, recipientName, recipientPhone,
+  categoryId, weightKg, description, declaredValue, photoUri, mode, quote, recipientName, recipientPhone,
   onBack, onConfirm,
 }: SummaryScreenProps) {
   const insets = useSafeAreaInsets();
@@ -93,6 +94,7 @@ export function SummaryScreen({
         destination_lon: destinationCoords.longitude,
         weight_kg: weightKg,
         description: description || undefined,
+        declared_value: declaredValue ?? undefined,
         recipient_name: recipientName || undefined,
         recipient_phone: recipientPhone || undefined,
       });
@@ -111,12 +113,12 @@ export function SummaryScreen({
     try {
       const b = await shipmentsService.paySimulated(payShipmentId);
       setPayShipmentId(null);
+      // The client only sees the total — the platform commission is deducted
+      // from the carrier payout, never itemised as a client-facing charge.
       Alert.alert(
         "Pago confirmado",
         `Pagaste $${b.amount.toLocaleString("es-AR")} ARS.\n` +
-          `El cadete recibirá $${b.carrier_payout.toLocaleString("es-AR")} ` +
-          `(comisión DePaso ${Math.round(b.platform_commission_rate * 100)}%: ` +
-          `$${b.platform_fee.toLocaleString("es-AR")}).\n\n` +
+          "El monto queda protegido y se libera al cadete al completar la entrega.\n\n" +
           "Te avisamos cuando se asigne un cadete.",
         [
           { text: "Ver mis envíos", onPress: () => { onConfirm(); router.push("/(main)/envios"); } },
@@ -226,6 +228,13 @@ export function SummaryScreen({
             <>
               <View className="h-px bg-borderSoft" />
               <Row icon="text-box-outline" label="Descripción" value={description} />
+            </>
+          )}
+
+          {declaredValue != null && declaredValue > 0 && (
+            <>
+              <View className="h-px bg-borderSoft" />
+              <Row icon="cash-multiple" label="Valor decl." value={`$${declaredValue.toLocaleString("es-AR")} ARS`} />
             </>
           )}
 
@@ -342,7 +351,7 @@ export function SummaryScreen({
                 </Text>
               </View>
               <Text className="text-[11px] text-inkMute mt-1">
-                Incluye la comisión de la plataforma. El desglose se muestra al confirmar.
+                Precio final, sin cargos ocultos.
               </Text>
             </View>
 

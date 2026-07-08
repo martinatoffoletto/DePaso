@@ -154,6 +154,7 @@ export interface Shipment {
   weight_kg: number;
   photo_url?: string;
   description?: string;
+  declared_value?: number | null;
   estimated_price?: number;
   payment_status: PaymentStatus;
   co2_savings_kg?: number;
@@ -191,6 +192,7 @@ export interface ShipmentCreatePayload {
   weight_kg: number;
   photo_url?: string;
   description?: string;
+  declared_value?: number;
   recipient_name?: string;
   recipient_phone?: string;
 }
@@ -233,6 +235,9 @@ export interface FeedItem {
   destination_lat: number;
   destination_lon: number;
   estimated_price: number | null;
+  photo_url: string | null;
+  description: string | null;
+  declared_value: number | null;
   score: number;
   detour_km: number | null;
   detour_ratio: number | null;

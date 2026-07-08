@@ -60,6 +60,7 @@ class ShipmentService:
                         destination_lat: float, destination_lon: float,
                         weight_kg: float, photo_url: str | None = None,
                         description: str | None = None,
+                        declared_value: float | None = None,
                         recipient_name: str | None = None,
                         recipient_phone: str | None = None) -> Shipment:
         """Create a new shipment with its estimated price (RF-SHP-01)."""
@@ -80,6 +81,7 @@ class ShipmentService:
             weight_kg=weight_kg,
             photo_url=photo_url,
             description=description,
+            declared_value=declared_value,
             recipient_name=recipient_name,
             recipient_phone=recipient_phone,
             estimated_price=estimated_price,

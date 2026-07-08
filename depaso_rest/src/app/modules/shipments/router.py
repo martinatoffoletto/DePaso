@@ -81,6 +81,7 @@ async def create_shipment(
             weight_kg=data.weight_kg,
             photo_url=data.photo_url,
             description=data.description,
+            declared_value=data.declared_value,
             recipient_name=data.recipient_name,
             recipient_phone=data.recipient_phone,
         )

@@ -31,6 +31,8 @@ class Shipment(Base, TimestampMixin):
     weight_kg = Column(Float, nullable=False)
     photo_url = Column(String(500), nullable=True)
     description = Column(String(500), nullable=True)
+    # Declared value of the package contents (ARS), shown to the carrier in the offer.
+    declared_value = Column(Float, nullable=True)
     # Recipient contact at the destination, so the assigned carrier can reach them.
     recipient_name = Column(String(120), nullable=True)
     recipient_phone = Column(String(30), nullable=True)
