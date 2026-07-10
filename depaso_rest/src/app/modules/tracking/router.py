@@ -57,5 +57,5 @@ async def shipment_history(
     service: TrackingService = Depends(get_tracking_service),
 ):
     """Full GPS trace of a shipment for auditing (RF-TRK-03)."""
-    traces = await service.shipment_history(shipment_id)
+    traces = await service.shipment_history(shipment_id, current_user_id)
     return [TraceResponse.model_validate(t) for t in traces]

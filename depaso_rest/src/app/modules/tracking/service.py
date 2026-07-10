@@ -51,18 +51,13 @@ class TrackingService:
             )
         return len(active)
 
-    async def shipment_location(self, shipment_id: int, requester_user_id: int) -> GpsTrace | None:
-        """Latest carrier position for a shipment (RF-TRK-02).
-
-        Privacy (RNF-PRV-02): only the shipment's client (or the assigned
-        carrier) can see positions, and only while the shipment is active.
-        """
+    async def _require_can_track(self, shipment_id: int, requester_user_id: int):
+        """Autoriza acceso al tracking de un envío: solo su cliente o el carrier
+        asignado (RNF-PRV-02). Devuelve el shipment; lanza si no existe / no
+        autorizado. La posición GPS y el recorrido son datos privados."""
         shipment = await self.shipment_repo.get_by_id(shipment_id)
         if not shipment:
             raise NotFoundError("Shipment")
-        if shipment.status not in TRACKABLE_STATUSES:
-            return None
-
         is_client = shipment.client_id == requester_user_id
         carrier = (
             await self.carrier_repo.get_by_id(shipment.carrier_id)
@@ -71,9 +66,25 @@ class TrackingService:
         is_carrier = carrier is not None and carrier.user_id == requester_user_id
         if not (is_client or is_carrier):
             raise ForbiddenError("Not authorized to track this shipment.")
+        return shipment
 
+    async def shipment_location(self, shipment_id: int, requester_user_id: int) -> GpsTrace | None:
+        """Latest carrier position for a shipment (RF-TRK-02).
+
+        Privacy (RNF-PRV-02): only the shipment's client (or the assigned
+        carrier) can see positions, and only while the shipment is active.
+        """
+        shipment = await self._require_can_track(shipment_id, requester_user_id)
+        if shipment.status not in TRACKABLE_STATUSES:
+            return None
         return await self.repository.latest_for_shipment(shipment_id)
 
-    async def shipment_history(self, shipment_id: int) -> list[GpsTrace]:
-        """Full trace history for auditing (RF-TRK-03)."""
+    async def shipment_history(self, shipment_id: int, requester_user_id: int) -> list[GpsTrace]:
+        """Full trace history for auditing (RF-TRK-03).
+
+        El recorrido GPS completo es aún más sensible que la posición actual;
+        misma autorización (cliente o carrier asignado). Sin filtro de estado:
+        la auditoría post-entrega es legítima para el dueño.
+        """
+        await self._require_can_track(shipment_id, requester_user_id)
         return await self.repository.history_for_shipment(shipment_id)

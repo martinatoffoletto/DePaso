@@ -217,8 +217,9 @@ async def test_shipment_location_no_traces_returns_none():
 # --- Unit tests: shipment_history --------------------------------------------
 
 async def test_shipment_history_returns_empty_list_when_no_traces():
-    svc, _ = make_service()
-    history = await svc.shipment_history(shipment_id=42)
+    ship = make_shipment(id=42, client_id=5)
+    svc, _ = make_service(shipments=[ship])
+    history = await svc.shipment_history(shipment_id=42, requester_user_id=5)
     assert history == []
 
 
@@ -226,12 +227,22 @@ async def test_shipment_history_returns_traces_in_order():
     t1 = SimpleNamespace(id=1, shipment_id=7, lat=-34.6, lon=-58.3)
     t2 = SimpleNamespace(id=2, shipment_id=7, lat=-34.61, lon=-58.31)
     t3 = SimpleNamespace(id=3, shipment_id=9, lat=-34.7, lon=-58.2)
-    svc, repo = make_service()
+    ship = make_shipment(id=7, client_id=5)
+    svc, repo = make_service(shipments=[ship])
     repo._traces.extend([t1, t2, t3])
-    history = await svc.shipment_history(shipment_id=7)
+    history = await svc.shipment_history(shipment_id=7, requester_user_id=5)
     assert len(history) == 2
     assert history[0].id == 1
     assert history[1].id == 2
+
+
+async def test_shipment_history_denies_third_party():
+    """El recorrido GPS solo lo ve el cliente o el carrier asignado."""
+    ship = make_shipment(id=7, carrier_id=1, client_id=5)
+    svc, _ = make_service(carriers=[make_carrier(id=1, user_id=10)], shipments=[ship])
+    # user 999 no es ni el cliente (5) ni el carrier (user 10)
+    with pytest.raises(ForbiddenError):
+        await svc.shipment_history(shipment_id=7, requester_user_id=999)
 
 
 # --- Integration tests via TestClient ----------------------------------------
@@ -303,10 +314,9 @@ def test_get_history_unauthenticated(client: TestClient):
     assert res.status_code == 401
 
 
-def test_get_history_returns_empty_list(client: TestClient):
-    """History for a shipment with no traces returns an empty list."""
+def test_get_history_of_missing_shipment_is_404(client: TestClient):
+    """History ahora valida existencia y autorización: un envío inexistente
+    da 404 (antes devolvía 200 [] sin chequear nada)."""
     headers = _register(client, "track_hist@example.com")
     res = client.get("/api/v1/tracking/99999/history", headers=headers)
-    # The history endpoint doesn't check shipment existence; returns empty
-    assert res.status_code == 200
-    assert res.json() == []
+    assert res.status_code == 404
