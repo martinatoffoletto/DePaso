@@ -134,7 +134,7 @@ async def get_shipment(
     current_user_id: CurrentUserId,
     service: ShipmentService = Depends(get_shipment_service),
 ):
-    shipment = await service.get_shipment_by_id(shipment_id)
+    shipment = await service.get_shipment_for_user(shipment_id, current_user_id)
     return ShipmentResponse.model_validate(shipment)
 
 
@@ -145,7 +145,7 @@ async def get_shipment_events(
     service: ShipmentService = Depends(get_shipment_service),
 ):
     """Status timeline (audit trail, RF-TRK-03)."""
-    events = await service.list_events(shipment_id)
+    events = await service.list_events(shipment_id, current_user_id)
     return [ShipmentEventResponse.model_validate(e) for e in events]
 
 

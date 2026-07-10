@@ -562,3 +562,28 @@ def test_carrier_admin_endpoints_require_admin(client: TestClient, db):
     assert client.patch(f"/api/v1/carriers/{c2_id}", json={"capacity_kg": 999},
                         headers=h1).status_code == 403
     assert client.delete(f"/api/v1/carriers/{c2_id}", headers=h1).status_code == 403
+
+
+def test_shipment_detail_is_private(client: TestClient, db):
+    """Un tercero no puede leer el envío de otro (contiene teléfono del
+    destinatario, dirección y valor declarado): IDOR en GET /{id} y /events."""
+    owner, _ = _register(client, "ship_owner@example.com")
+    ship = client.post("/api/v1/shipments", json={**SHIP_BASE, "modality": "collaborative",
+                        "recipient_name": "Ana", "recipient_phone": "+5491100000000",
+                        "declared_value": 50000}, headers=owner).json()
+
+    stranger, _ = _register(client, "stranger@example.com")
+    assert client.get(f"/api/v1/shipments/{ship['id']}", headers=stranger).status_code == 403
+    assert client.get(f"/api/v1/shipments/{ship['id']}/events", headers=stranger).status_code == 403
+
+    # el dueño sí lo ve
+    assert client.get(f"/api/v1/shipments/{ship['id']}", headers=owner).status_code == 200
+
+
+def test_assigned_carrier_can_view_shipment(client: TestClient, db):
+    """El carrier asignado sí puede leer el envío (necesita el contacto)."""
+    owner, _ = _register(client, "so2@example.com")
+    carrier_headers, _ = _verified_carrier(client, db, "sc2@example.com", plate="SV-001")
+    ship = _mk_shipment(client, owner, "collaborative")
+    client.post(f"/api/v1/shipments/{ship['id']}/accept", json={}, headers=carrier_headers)
+    assert client.get(f"/api/v1/shipments/{ship['id']}", headers=carrier_headers).status_code == 200

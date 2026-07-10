@@ -96,6 +96,33 @@ class ShipmentService:
             raise ShipmentNotFoundError()
         return shipment
 
+    async def _can_view(self, shipment: Shipment, user_id: int) -> bool:
+        """Quién puede ver un envío: su cliente, el carrier asignado, o un admin.
+
+        Un envío contiene datos privados del destinatario (nombre/teléfono),
+        la dirección exacta y el valor declarado — no es legible por cualquier
+        usuario autenticado. Los carriers ven los pendientes por el feed de
+        matching, que no expone el contacto del destinatario.
+        """
+        if shipment.client_id == user_id:
+            return True
+        if self.carrier_repo and shipment.carrier_id is not None:
+            carrier = await self.carrier_repo.get_by_id(shipment.carrier_id)
+            if carrier and carrier.user_id == user_id:
+                return True
+        if self.user_repo:
+            user = await self.user_repo.get_by_id(user_id)
+            if user and user.user_type == "admin":
+                return True
+        return False
+
+    async def get_shipment_for_user(self, shipment_id: int, user_id: int) -> Shipment:
+        """get_shipment_by_id + control de acceso (client / carrier asignado / admin)."""
+        shipment = await self.get_shipment_by_id(shipment_id)
+        if not await self._can_view(shipment, user_id):
+            raise ForbiddenError("Not allowed to view this shipment.")
+        return shipment
+
     async def update_shipment(self, shipment_id: int, client_id: int, **updates) -> Shipment:
         """Update a pending shipment. Re-calculates price if needed."""
         shipment = await self.get_shipment_by_id(shipment_id)
@@ -138,9 +165,12 @@ class ShipmentService:
     async def list_pending(self) -> list[Shipment]:
         return await self.repository.list_pending()
 
-    async def list_events(self, shipment_id: int) -> list[ShipmentEvent]:
-        """Status history (audit trail)."""
-        await self.get_shipment_by_id(shipment_id)
+    async def list_events(self, shipment_id: int, requester_user_id: int) -> list[ShipmentEvent]:
+        """Status history (audit trail). El timeline incluye posiciones GPS —
+        solo el cliente, el carrier asignado o un admin lo leen."""
+        shipment = await self.get_shipment_by_id(shipment_id)
+        if not await self._can_view(shipment, requester_user_id):
+            raise ForbiddenError("Not allowed to view this shipment.")
         return await self.repository.list_events(shipment_id)
 
     # -- lifecycle ----------------------------------------------------------------
