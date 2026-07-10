@@ -20,7 +20,8 @@ DePaso/
 ## Backend — `depaso_rest/`
 
 ### Stack
-- **FastAPI** + **Pydantic v2**, **SQLAlchemy 2** + **Alembic**, **PostgreSQL** (prod) / SQLite (tests)
+- **FastAPI** + **Pydantic v2**, **SQLAlchemy 2**, **PostgreSQL** (prod) / SQLite (tests)
+- Sin migraciones (MVP): el esquema se crea con `Base.metadata.create_all()` al arrancar (`main.py`)
 - Auth: JWT access+refresh, argon2 (passlib). Rate limiting: slowapi. Logging: structlog.
 
 ### Arquitectura modular
@@ -75,9 +76,6 @@ cd depaso_rest && .venv/bin/python -m pip install -r requirements.txt
 # Correr servidor
 ./start.sh   # o: uvicorn src.app.main:app --reload
 
-# Migraciones
-.venv/bin/alembic upgrade head
-
 # Tests (siempre con SQLite override)
 DATABASE_URL="sqlite:///./depaso_test.db" RATE_LIMIT_ENABLED=false \
   .venv/bin/python -m pytest tests/ -q -p no:warnings
@@ -111,18 +109,24 @@ app/
     impacto.tsx    # solo clientes: pantalla CO2
     perfil.tsx     # todos los roles
     admin.tsx      # solo admins
-src/
-  features/
-    sender/        # screens del cliente (send-flow, ShipmentsScreen, ImpactScreen)
-    carrier/       # FeedScreen, CarrierShipmentsScreen, PublishRouteScreen
-    profile/       # ProfileScreen
-    admin/         # AdminScreen
-  stores/          # zustand: authStore, shipmentStore
-  services/        # axios: api.ts, vision.ts, co2Service, etc.
-  types/           # index.ts — tipos compartidos y enums TS
+src/                 # regla: lo que usa UN rol va en su carpeta; lo que usan 2+ va en shared/
+  shared/
+    ui/            # Button, Card, FormInput, Toast (+toastStore), Skeleton, AddressField...
+    errors/        # AppErrorBoundary, OfflineBanner, connectionStore
+    session/       # authStore, settingsStore, auth.ts (service)
+    api/           # client.ts (axios), shipments.ts, carriers.ts, notifications.ts, co2.ts
+    profile/       # ProfileScreen + modales, addressBookStore (todos los roles)
+    onboarding/    # OnboardingOverlay
+    hooks/         # useShipmentNotifications
+    utils/         # geocoding, addressSearch, packageCategory
+    types.ts       # tipos compartidos y enums TS
+  sender/          # send-flow/, ShipmentsScreen, ImpactScreen, vision.ts, dimensioning, co2
+  carrier/         # RiderHomeScreen, CarrierShipmentsScreen, PublishTripScreen, riderStore, useGpsPublisher
+  admin/           # AdminScreen, api.ts
 constants/
   tokens.ts        # Design tokens → importar como `T` (ej: T.forest, T.bg)
 ```
+Imports siempre con alias `@/src/...` (único path alias en tsconfig).
 
 ### Roles y tabs
 | Rol | Tab "Pedidos/Enviar" | Tab "Mis Viajes/Envíos" | Tab especial |

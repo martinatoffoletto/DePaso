@@ -15,7 +15,7 @@ import type { Coords } from "./FlowNavigator";
 
 type IconName = React.ComponentProps<typeof MaterialCommunityIcons>["name"];
 
-// Geocoding compartido (Photon / Komoot — OSM): src/utils/addressSearch.ts
+// Geocoding compartido (Photon / Komoot — OSM): src/shared/utils/addressSearch.ts
 
 function StepDots({ current, total }: { current: number; total: number }) {
   return (

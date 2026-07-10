@@ -17,7 +17,7 @@
 | **Backend** | Python 3.12 + FastAPI (async) | Mandatorio por propuesta. Async nativo, OpenAPI gratis (RNF-MNT-04), Pydantic v2 integrado (RNF-SEC-04) |
 | **ORM / DB** | SQLAlchemy 2 async + **PostgreSQL 16 + PostGIS** | PostGIS es **obligatorio** para matching geoespacial (RNF-SCAL-02, ST_DWithin). GeoAlchemy2 para modelos |
 | **DB hosting** | **Supabase** (free tier) | Postgres + PostGIS + Storage con URLs firmadas (RNF-SEC-07) + Auth opcional. Todo en tier gratuito (RNF-COST) |
-| **Migraciones** | Alembic | Ya configurado, mandatorio (RNF-MNT-03) |
+| **Esquema DB** | `Base.metadata.create_all()` en el lifespan | Sin migraciones en el MVP (decisión jul-2026: Alembic eliminado para simplificar; se reintroduce si el esquema necesita evolucionar con datos en prod) |
 | **Auth** | JWT access (30 min) + refresh token (7 días), passlib + **argon2** | RNF-SEC-03. Nota: la spec dice bcrypt, pero argon2 (ya instalado) es superior — documentar la mejora en la tesis |
 | **Rate limiting** | `slowapi` | RNF-SEC-06 (5 intentos/min en login) con una sola dependencia |
 | **Ruteo / distancias** | **OSRM** (demo server público o Docker local) | Necesario para `compat_geo` y `desvio_norm` del matching (5.2) y para CO₂ contrafactual. Gratis |
@@ -86,14 +86,13 @@ depaso_rest/
 │   │   ├── co2/                 # RF-CO2: cálculo determinístico, acumulados
 │   │   ├── organizations/       # Pymes: orgs, miembros, flota (alta/baja), envíos B2B, finanzas
 │   │   └── admin/               # RF-ADM: stats, moderación, configuración de pesos
-│   ├── common/                  # utils compartidos (paginación, geo helpers, enums globales)
-│   └── shared/                  # clientes externos: osrm_client.py, storage_client.py (Supabase)
+│   └── shared/                  # compartido entre módulos: enums, geo, base_model/base_repository,
+│                                #   paginación, excepciones, osrm_client.py
 ├── ml/                          # TODO lo del modelo de IA (ver sección 5)
 │   ├── dataset/                 # scripts de construcción del dataset (NO las imágenes — van en Drive)
 │   ├── notebooks/               # Colab notebooks de entrenamiento y evaluación
 │   ├── models/                  # modelo exportado .keras + metadata.json (versión, métricas)
 │   └── reports/                 # matriz de confusión, análisis de sesgos (para la tesis)
-├── alembic/                     # migraciones
 ├── tests/
 │   ├── unit/                    # services con repos mockeados; matching y co2 son funciones puras → fáciles
 │   └── integration/             # endpoints con DB de test (testcontainers o SQLite donde aplique)
@@ -210,60 +209,41 @@ PATCH  /admin/matching-weights        5.2
 
 ## 3. Arquitectura Frontend (`depaso_app`)
 
-### 3.1 Organización: Expo Router (rutas) + features (lógica)
+### 3.1 Organización: Expo Router (rutas) + carpetas por rol (lógica)
+
+Regla central: **lo que usa un solo rol vive en la carpeta de ese rol (`sender/`, `carrier/`, `admin/`); lo que usan dos o más roles vive en `shared/`.** Los archivos de `app/` son wrappers delgados que solo montan pantallas de `src/`.
 
 ```
 depaso_app/
-├── app/                            # SOLO routing — pantallas delgadas que montan features
-│   ├── _layout.tsx                 # providers: QueryClient, fonts, auth guard
-│   ├── (auth)/
-│   │   ├── login.tsx
-│   │   ├── register-client.tsx
-│   │   ├── register-carrier.tsx    # + vehículo + documentación (RF-USR-02)
-│   │   └── forgot-password.tsx
-│   ├── (client)/                   # tab group del rol cliente
-│   │   ├── _layout.tsx             # tabs: Inicio | Envíos | Impacto | Perfil
-│   │   ├── index.tsx               # home: CTA crear envío + envíos activos
-│   │   ├── create/                 # flujo crear envío — máx 4 pantallas (RNF-UX-01)
-│   │   │   ├── route.tsx           # 1. origen/destino/ventana/modalidad (RF-SHP-01)
-│   │   │   ├── package.tsx         # 2. foto → /classify → confirmar o manual (RF-SHP-02/03/04)
-│   │   │   ├── offers.tsx          # 3. modalidad/precio (dedicada vs colaborativa)
-│   │   │   └── confirm.tsx         # 4. resumen + confirmar
-│   │   ├── shipment/[id].tsx       # tracking en vivo: mapa + estado + cancelar (RF-SHP-06/07)
-│   │   ├── shipment/[id]/rate.tsx  # calificación post-entrega (RF-SHP-08)
-│   │   ├── history.tsx
-│   │   ├── impact.tsx              # CO₂ ahorrado acumulado (RF-CO2-03)
-│   │   └── profile.tsx
-│   ├── (carrier)/                  # tab group del rol transportista
-│   │   ├── _layout.tsx             # tabs: Pedidos | Mi ruta | Activo | Ganancias | Perfil
-│   │   ├── feed.tsx                # pedidos compatibles, aceptar/rechazar (RF-CAR-03)
-│   │   ├── publish-route.tsx       # trayecto colaborativo (RF-CAR-01)
-│   │   ├── publish-window.tsx      # disponibilidad dedicada (RF-CAR-02)
-│   │   ├── active/[id].tsx         # envío activo: botones de estado + GPS en background (RF-CAR-05, RF-TRK-01)
-│   │   ├── earnings.tsx            # historial, ingresos, reputación (RF-CAR-06)
-│   │   └── profile.tsx             # incluye estado de validación (RF-USR-07)
-│   └── (admin)/                    # solo Expo Web — panel operativo (RF-ADM)
-│       ├── dashboard.tsx           # mapa en vivo, envíos activos, stats
-│       └── moderation.tsx          # aprobar/suspender carriers, editar pesos
+├── app/                            # SOLO routing (expo-router, typedRoutes)
+│   ├── _layout.tsx                 # Providers, Toast, AppErrorBoundary, Stack.Protected (auth guard)
+│   ├── (auth)/                     # login, register, forgot-password, reset-password
+│   └── (main)/                     # tabs role-based: enviar, envios, impacto, pagos, perfil, admin
 ├── src/
-│   ├── features/                   # lógica por dominio (espeja los módulos del back)
-│   │   ├── auth/                   #   hooks (useLogin, useSession), api calls, stores
-│   │   ├── shipments/
-│   │   ├── classify/               #   useClassifyImage: captura → resize 224 → upload → resultado
-│   │   ├── carrier/
-│   │   ├── tracking/               #   useShipmentLocation (refetchInterval 15s), useGpsPublisher
-│   │   └── impact/
-│   ├── components/ui/              # design system propio: Button, Card, Badge, Input, Sheet...
-│   ├── lib/
-│   │   ├── api.ts                  # axios instance + interceptor refresh token
-│   │   ├── queryClient.ts
-│   │   └── schemas.ts              # Zod schemas (espejo de Pydantic)
-│   └── constants/tokens.ts         # tokens cream/forest (ya existe)
+│   ├── shared/                     # compartido entre roles
+│   │   ├── ui/                     #   Button, Card, FormInput, Toast (+toastStore), Skeleton,
+│   │   │                           #   EmptyState, AddressField, MotoIcon, Providers
+│   │   ├── errors/                 #   AppErrorBoundary, OfflineBanner, connectionStore
+│   │   ├── session/                #   authStore, settingsStore, auth.ts (service de login/registro)
+│   │   ├── api/                    #   client.ts (axios + interceptor refresh), shipments.ts,
+│   │   │                           #   carriers.ts, notifications.ts, co2.ts
+│   │   ├── profile/                #   ProfileScreen + modales, addressBookStore
+│   │   ├── onboarding/             #   OnboardingOverlay
+│   │   ├── hooks/                  #   useShipmentNotifications
+│   │   ├── utils/                  #   geocoding, addressSearch, packageCategory
+│   │   └── types.ts                #   tipos y enums TS (espejo de los schemas Pydantic)
+│   ├── sender/                     # rol cliente: send-flow/ (4 pantallas), ShipmentsScreen,
+│   │                               #   ImpactScreen, vision.ts, dimensioning.ts, co2.ts
+│   ├── carrier/                    # rol transportista: RiderHomeScreen, CarrierShipmentsScreen,
+│   │                               #   PublishTripScreen, RiderEarningsScreen, riderStore, useGpsPublisher
+│   └── admin/                      # AdminScreen + api.ts
+└── constants/tokens.ts             # tokens cream/forest
 ```
 
 **Reglas:**
-- Las pantallas en `app/` no contienen lógica: importan de `src/features/*` y componen UI.
-- Un rol = un route group. El guard en `_layout.tsx` raíz redirige según rol y sesión
+- Las pantallas en `app/` no contienen lógica: importan de `src/*` y componen UI.
+- Imports siempre con el alias `@/src/...` (único path alias configurado en tsconfig).
+- El guard (`Stack.Protected` en `_layout.tsx` raíz) redirige según rol y sesión
   (un usuario con ambos roles puede cambiar de modo desde el perfil — RF-USR-06).
 - Server state **siempre** en TanStack Query. Zustand solo para: sesión/rol activo y el
   borrador del envío entre las 4 pantallas del flujo `create/`.

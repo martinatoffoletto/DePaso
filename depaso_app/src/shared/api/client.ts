@@ -89,7 +89,7 @@ class ApiClient {
           }
           // refresh failed -> session expired: tell the user, then log out.
           useToastStore.getState().show("Tu sesión expiró. Iniciá sesión de nuevo.", "info");
-          const { useAuthStore } = await import("../stores/authStore");
+          const { useAuthStore } = await import("../session/authStore");
           useAuthStore.getState().logout();
           return Promise.reject(error);
         }
