@@ -7,9 +7,9 @@ import {
 import { useRouter } from "expo-router";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useAuthStore } from "@/src/stores/authStore";
-import { carriersService } from "@/src/services/carriers";
-import { TransportType, UserType } from "@/src/types";
+import { useAuthStore } from "@/src/shared/session/authStore";
+import { carriersService } from "@/src/shared/api/carriers";
+import { TransportType, UserType } from "@/src/shared/types";
 import { T } from "@/constants/tokens";
 
 const VEHICLES: { type: TransportType; label: string; icon: any; capacityKg: number }[] = [

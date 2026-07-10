@@ -9,11 +9,7 @@ services:
     rootDir: depaso_rest
     plan: free
     # El esquema se crea solo al arrancar (create_all en el lifespan).
-    # Para migraciones gestionadas: correr `alembic upgrade head` manualmente
-    # (preDeployCommand requiere plan pago en Render).
-    # alembic upgrade head runs here because preDeployCommand requires a paid plan.
-    # On first deploy this creates all tables; subsequent deploys apply new migrations.
-    buildCommand: pip install -r requirements.txt && alembic upgrade head
+    buildCommand: pip install -r requirements.txt
     startCommand: uvicorn src.app.main:app --host 0.0.0.0 --port $PORT
     healthCheckPath: /api/v1/health
     autoDeploy: true

@@ -5,11 +5,11 @@ import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import "react-native-reanimated";
 
-import { Providers } from "@/src/components/Providers";
-import { AppErrorBoundary } from "@/src/components/AppErrorBoundary";
-import { Toast } from "@/src/components/Toast";
-import { useAuthStore } from "@/src/stores/authStore";
-import { useSettingsStore } from "@/src/stores/settingsStore";
+import { Providers } from "@/src/shared/ui/Providers";
+import { AppErrorBoundary } from "@/src/shared/errors/AppErrorBoundary";
+import { Toast } from "@/src/shared/ui/Toast";
+import { useAuthStore } from "@/src/shared/session/authStore";
+import { useSettingsStore } from "@/src/shared/session/settingsStore";
 
 export default function RootLayout() {
   // Route gating uses Stack.Protected (Expo Router's recommended pattern):

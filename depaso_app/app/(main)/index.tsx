@@ -1,6 +1,6 @@
 import { Redirect } from "expo-router";
-import { useAuthStore } from "@/src/stores/authStore";
-import { UserType } from "@/src/types";
+import { useAuthStore } from "@/src/shared/session/authStore";
+import { UserType } from "@/src/shared/types";
 
 /** Land each role on its home tab: admin → panel, everyone else → enviar. */
 export default function MainIndex() {

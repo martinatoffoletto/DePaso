@@ -3,13 +3,13 @@ import { ColorValue, View } from "react-native";
 import { Tabs, useRouter } from "expo-router";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import * as Notifications from "expo-notifications";
-import { useAuthStore } from "@/src/stores/authStore";
-import { UserType } from "@/src/types";
+import { useAuthStore } from "@/src/shared/session/authStore";
+import { UserType } from "@/src/shared/types";
 import { T } from "@/constants/tokens";
-import { MotoIcon } from "@/src/components/MotoIcon";
-import { useShipmentNotifications } from "@/src/hooks/useShipmentNotifications";
-import { OfflineBanner } from "@/src/components/OfflineBanner";
-import { OnboardingOverlay } from "@/src/features/onboarding/OnboardingOverlay";
+import { MotoIcon } from "@/src/shared/ui/MotoIcon";
+import { useShipmentNotifications } from "@/src/shared/hooks/useShipmentNotifications";
+import { OfflineBanner } from "@/src/shared/errors/OfflineBanner";
+import { OnboardingOverlay } from "@/src/shared/onboarding/OnboardingOverlay";
 
 type IconName = React.ComponentProps<typeof MaterialCommunityIcons>["name"];
 

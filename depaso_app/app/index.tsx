@@ -3,7 +3,7 @@ import { Text } from "react-native-paper";
 import { useRouter } from "expo-router";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useAuthStore } from "@/src/stores/authStore";
+import { useAuthStore } from "@/src/shared/session/authStore";
 import { T } from "@/constants/tokens";
 
 // Waypoint mark approximation for RN (origin ring + arc dots + destination filled circle)

@@ -1,9 +1,9 @@
 import { useEffect, useState } from "react";
 import { useNavigation } from "expo-router";
-import { FlowNavigator } from "@/src/features/sender/send-flow/FlowNavigator";
-import RiderHomeScreen from "@/src/features/carrier/RiderHomeScreen";
-import { useAuthStore } from "@/src/stores/authStore";
-import { UserType } from "@/src/types";
+import { FlowNavigator } from "@/src/sender/send-flow/FlowNavigator";
+import RiderHomeScreen from "@/src/carrier/RiderHomeScreen";
+import { useAuthStore } from "@/src/shared/session/authStore";
+import { UserType } from "@/src/shared/types";
 
 export default function EnviarTab() {
   const [resetKey, setResetKey] = useState(0);

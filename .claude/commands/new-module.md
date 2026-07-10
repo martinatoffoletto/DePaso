@@ -19,7 +19,7 @@ When creating the module:
 1. Create all 6 files with correct imports and minimal boilerplate
 2. Add `from src.app.modules.<name>.router import router as <name>_router` to `src/app/main.py`
 3. Include the router: `app.include_router(<name>_router)`
-4. Remind the user to create an Alembic migration with `/migrate new <name>-table`
+4. Las tablas se crean solas al arrancar (`create_all` en el lifespan) — no hay migraciones
 
 Follow these conventions:
 - SQLAlchemy 2 style: `mapped_column`, `Mapped[T]`, `relationship()` with `back_populates`

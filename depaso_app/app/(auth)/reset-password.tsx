@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { View, Text, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, ScrollView, ActivityIndicator, Alert } from "react-native";
 import { useRouter } from "expo-router";
-import { authService } from "@/src/services/auth";
+import { authService } from "@/src/shared/session/auth";
 
 export default function ResetPasswordScreen() {
   const router = useRouter();

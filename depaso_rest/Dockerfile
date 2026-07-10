@@ -17,8 +17,6 @@ WORKDIR /app
 
 COPY --from=builder /install /usr/local
 
-COPY alembic.ini .
-COPY alembic ./alembic
 COPY src ./src
 COPY scripts ./scripts
 # ml/ is intentionally excluded — the model is injected at runtime via VISION_MODEL_PATH env var
@@ -34,6 +32,5 @@ EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=15s \
     CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/v1/health')"
 
-# Run migrations then start the server in a single shell command so the
-# container fails fast (non-zero exit) if alembic upgrade fails.
-CMD ["sh", "-c", "alembic upgrade head && uvicorn src.app.main:app --host 0.0.0.0 --port 8000"]
+# El esquema se crea al arrancar (create_all en el lifespan de main.py).
+CMD ["uvicorn", "src.app.main:app", "--host", "0.0.0.0", "--port", "8000"]
