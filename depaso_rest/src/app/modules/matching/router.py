@@ -67,20 +67,27 @@ async def update_weights(
     return WeightsResponse(**await repo.load(DEFAULT_WEIGHTS))
 
 
+# Inspección del matching (ranking completo con scores, patentes y ubicaciones
+# de TODOS los candidatos) -> admin-only. El flujo de usuario no lo usa: el
+# carrier ve ofertas por GET /carriers/me/feed. Antes estaban SIN autenticación,
+# exponiendo datos de todos los carriers a cualquiera.
+
 @router.get("/{shipment_id}/ranked", response_model=list[CarrierScoreResponse])
 async def rank_carriers(
     shipment_id: int,
+    _admin: AdminUserId,
     top_k: int = 5,
     service: MatchingService = Depends(get_matching_service),
 ):
-    """Get ranked carriers for a shipment by matching score."""
+    """Ranked carriers for a shipment by matching score (admin/inspección)."""
     return await service.rank_carriers(shipment_id, top_k=top_k)
 
 
 @router.post("/{shipment_id}/match", response_model=MatchingResponse)
 async def match_best_carrier(
     shipment_id: int,
+    _admin: AdminUserId,
     service: MatchingService = Depends(get_matching_service),
 ):
-    """Find and return the best carrier match for a shipment."""
+    """Best carrier match for a shipment (admin/inspección)."""
     return await service.match_best(shipment_id)

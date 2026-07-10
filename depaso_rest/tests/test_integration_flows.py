@@ -587,3 +587,21 @@ def test_assigned_carrier_can_view_shipment(client: TestClient, db):
     ship = _mk_shipment(client, owner, "collaborative")
     client.post(f"/api/v1/shipments/{ship['id']}/accept", json={}, headers=carrier_headers)
     assert client.get(f"/api/v1/shipments/{ship['id']}", headers=carrier_headers).status_code == 200
+
+
+def test_matching_inspection_endpoints_require_admin(client: TestClient, db):
+    """/ranked y /match exponen datos de todos los carriers -> admin-only.
+    Antes estaban sin autenticación."""
+    owner, _ = _register(client, "match_owner@example.com")
+    ship = _mk_shipment(client, owner, "collaborative")
+    sid = ship["id"]
+
+    # sin token
+    assert client.get(f"/api/v1/matching/{sid}/ranked").status_code == 401
+    assert client.post(f"/api/v1/matching/{sid}/match").status_code == 401
+    # user normal (incluso el dueño del envío) -> 403
+    assert client.get(f"/api/v1/matching/{sid}/ranked", headers=owner).status_code == 403
+    assert client.post(f"/api/v1/matching/{sid}/match", headers=owner).status_code == 403
+    # admin -> 200
+    admin = _make_admin(db)
+    assert client.get(f"/api/v1/matching/{sid}/ranked", headers=admin).status_code == 200
