@@ -57,7 +57,14 @@ class RouteService:
         updates = {k: v for k, v in updates.items() if v is not None}
         if not updates:
             return RouteResponse.model_validate(route)
-            
+
+        # Validar la ventana con los valores EFECTIVOS (nuevo o el actual):
+        # el create la valida, pero un update parcial podía invertirla.
+        new_start = updates.get("window_start", route.window_start)
+        new_end = updates.get("window_end", route.window_end)
+        if new_end <= new_start:
+            raise ValidationError("window_end must be after window_start.")
+
         updated = await self.route_repo.update(route_id, **updates)
         return RouteResponse.model_validate(updated)
 

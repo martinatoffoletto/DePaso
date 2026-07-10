@@ -1,22 +1,39 @@
 """
 Routes module schemas.
 """
-from datetime import datetime
+from datetime import datetime, timezone
 
-from pydantic import BaseModel, model_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
+
+ROUTE_KIND_PATTERN = r"^(collaborative_route|dedicated_window)$"
+
+
+def _to_naive_utc(dt: datetime | None) -> datetime | None:
+    """Normaliza a naive UTC: las fechas guardadas y las que compara el matching
+    son naive UTC, así que un payload con tz (ej. '...Z') debe convertirse para
+    no chocar aware-vs-naive."""
+    if dt is None:
+        return None
+    if dt.tzinfo is not None:
+        dt = dt.astimezone(timezone.utc).replace(tzinfo=None)
+    return dt
 
 
 class RouteCreateRequest(BaseModel):
     """Publish a carrier route (RF-CAR-01) or dedicated window (RF-CAR-02)."""
 
-    kind: str = "collaborative_route"  # collaborative_route | dedicated_window
-    origin_lat: float
-    origin_lon: float
-    destination_lat: float | None = None
-    destination_lon: float | None = None
+    # pattern: un kind fuera de estos dos se guardaría y nunca matchearía
+    # (ruta huérfana que ensucia el matching).
+    kind: str = Field(default="collaborative_route", pattern=ROUTE_KIND_PATTERN)
+    origin_lat: float = Field(..., ge=-90, le=90)
+    origin_lon: float = Field(..., ge=-180, le=180)
+    destination_lat: float | None = Field(default=None, ge=-90, le=90)
+    destination_lon: float | None = Field(default=None, ge=-180, le=180)
     window_start: datetime
     window_end: datetime
     recurrence_days: str | None = None  # e.g. "mon,tue,wed,thu,fri"
+
+    _norm_windows = field_validator("window_start", "window_end")(_to_naive_utc)
 
     @model_validator(mode="after")
     def validate_route(self) -> "RouteCreateRequest":
@@ -38,6 +55,8 @@ class RouteUpdate(BaseModel):
     window_start: datetime | None = None
     window_end: datetime | None = None
     recurrence_days: str | None = None
+
+    _norm_windows = field_validator("window_start", "window_end")(_to_naive_utc)
 
 
 class RouteResponse(BaseModel):
