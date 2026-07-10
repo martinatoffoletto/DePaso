@@ -109,16 +109,6 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name="admin"
-        options={{
-          href: isAdmin ? undefined : null,
-          title: "Admin",
-          tabBarIcon: ({ color, size }) => (
-            <TabIcon name="shield-account-outline" color={color} size={size} />
-          ),
-        }}
-      />
-      <Tabs.Screen
         name="perfil"
         options={{
           title: "Perfil",

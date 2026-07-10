@@ -63,7 +63,7 @@ class OrgCarrierResponse(BaseModel):
     carrier_id: int
     company_name: str
     vehicle_type: str
-    license_plate: str
+    license_plate: str | None = None
     capacity_kg: float
     reputation: float
     is_active: bool

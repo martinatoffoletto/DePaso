@@ -5,23 +5,47 @@ from datetime import datetime
 from pydantic import BaseModel, Field, model_validator
 
 
+MOTORIZED_VEHICLES = {"motorcycle", "car", "van", "truck"}
+
+
 class CarrierBase(BaseModel):
-    """Base carrier schema."""
+    """Base carrier schema.
+
+    license_plate es condicional: obligatoria para vehículos motorizados,
+    None para movilidad blanda (un peatón/ciclista no tiene patente).
+    """
 
     company_name: str = Field(..., min_length=1, max_length=255)
     vehicle_type: str = Field(..., pattern="^(pedestrian|bike|motorcycle|car|van|truck)$")
-    license_plate: str = Field(..., min_length=1, max_length=20)
+    license_plate: str | None = Field(default=None, max_length=20)
     capacity_kg: float = Field(..., gt=0)
     capacity_volume_m3: float | None = None
 
 
-class CarrierCreate(CarrierBase):
+class _PlateRuleMixin(BaseModel):
+    """Regla de creación (no aplica a los responses, que solo serializan)."""
+
+    @model_validator(mode="after")
+    def _plate_required_for_motorized(self):
+        if self.vehicle_type in MOTORIZED_VEHICLES:
+            if not self.license_plate or not self.license_plate.strip():
+                raise ValueError(
+                    f"license_plate is required for vehicle_type '{self.vehicle_type}'"
+                )
+            self.license_plate = self.license_plate.strip().upper()
+        else:
+            # movilidad blanda: se descarta cualquier valor enviado
+            self.license_plate = None
+        return self
+
+
+class CarrierCreate(_PlateRuleMixin, CarrierBase):
     """Schema for carrier creation by an admin (explicit user_id)."""
 
     user_id: int
 
 
-class CarrierProfileCreate(CarrierBase):
+class CarrierProfileCreate(_PlateRuleMixin, CarrierBase):
     """Self-service carrier profile creation — user_id comes from the JWT."""
 
 

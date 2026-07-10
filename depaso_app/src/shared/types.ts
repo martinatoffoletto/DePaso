@@ -111,7 +111,7 @@ export interface Carrier {
   user_id: number;
   company_name: string;
   vehicle_type: TransportType;
-  license_plate: string;
+  license_plate: string | null;
   capacity_kg: number;
   capacity_volume_m3: number | null;
   reputation: number;
@@ -125,7 +125,7 @@ export interface CarrierCreatePayload {
   user_id: number;
   company_name: string;
   vehicle_type: TransportType;
-  license_plate: string;
+  license_plate: string | null;
   capacity_kg: number;
   capacity_volume_m3?: number;
 }
@@ -377,7 +377,7 @@ export interface CarrierScoreResponse {
   carrier_id: number;
   company_name: string;
   vehicle_type: TransportType;
-  license_plate: string;
+  license_plate: string | null;
   total_score: number;
   breakdown: ScoreBreakdown;
   detour_km: number | null;

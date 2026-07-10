@@ -500,3 +500,19 @@ def test_shipment_cannot_be_accepted_twice(client: TestClient, db):
     # el envío sigue asignado al PRIMER carrier
     res = client.get(f"/api/v1/shipments/{shipment['id']}", headers=client_headers)
     assert res.json()["carrier_id"] == c1_id
+
+
+def test_soft_mobility_carrier_needs_no_plate(client: TestClient, db):
+    """Un ciclista se registra sin patente; un auto sin patente se rechaza."""
+    h1, _ = _register(client, "bici@example.com")
+    res = client.post("/api/v1/carriers/me", json={
+        "company_name": "Bici Mensajería", "vehicle_type": "bike", "capacity_kg": 8.0,
+    }, headers=h1)
+    assert res.status_code == 201, res.text
+    assert res.json()["license_plate"] is None
+
+    h2, _ = _register(client, "auto_sin_patente@example.com")
+    res = client.post("/api/v1/carriers/me", json={
+        "company_name": "Auto SA", "vehicle_type": "car", "capacity_kg": 100.0,
+    }, headers=h2)
+    assert res.status_code == 422  # validación de Pydantic

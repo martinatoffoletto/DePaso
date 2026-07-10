@@ -17,7 +17,9 @@ class Carrier(Base, TimestampMixin):
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False, unique=True, index=True)
     company_name = Column(String(255), nullable=False)
     vehicle_type = Column(String(20), nullable=False)
-    license_plate = Column(String(20), unique=True, nullable=False)
+    # nullable: movilidad blanda (pedestrian/bike) no tiene patente. El schema
+    # exige patente para vehículos motorizados. unique admite múltiples NULL.
+    license_plate = Column(String(20), unique=True, nullable=True)
     capacity_kg = Column(Float, nullable=False)
     capacity_volume_m3 = Column(Float, nullable=True)
     reputation = Column(Float, default=5.0)

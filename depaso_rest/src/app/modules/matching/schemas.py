@@ -43,7 +43,7 @@ class CarrierScoreResponse(BaseModel):
     carrier_id: int
     company_name: str
     vehicle_type: str
-    license_plate: str
+    license_plate: str | None = None
     total_score: float
     breakdown: ScoreBreakdown
     detour_km: float | None = None      # real additional km (collaborative only)

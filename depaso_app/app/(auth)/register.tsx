@@ -120,9 +120,7 @@ export default function RegisterScreen() {
             user_id: me.id,
             company_name: `${form.first_name.trim()} ${form.last_name.trim()}`,
             vehicle_type: vehicleType,
-            license_plate: needsPlate
-              ? licensePlate.trim().toUpperCase()
-              : `NP-${me.id}-${Date.now() % 10000}`,
+            license_plate: needsPlate ? licensePlate.trim().toUpperCase() : null,
             capacity_kg: vehicle.capacityKg,
           });
         }
