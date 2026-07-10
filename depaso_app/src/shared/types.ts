@@ -122,7 +122,7 @@ export interface Carrier {
 }
 
 export interface CarrierCreatePayload {
-  user_id: number;
+  // user_id NO se manda: /carriers/me lo toma del JWT.
   company_name: string;
   vehicle_type: TransportType;
   license_plate: string | null;

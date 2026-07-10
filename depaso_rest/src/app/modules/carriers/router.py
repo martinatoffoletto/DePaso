@@ -6,11 +6,10 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.app.core.database import get_db
-from src.app.core.dependencies import CurrentUserId
+from src.app.core.dependencies import AdminUserId, CurrentUserId
 from src.app.modules.carriers.exceptions import CarrierNotFoundError
 from src.app.modules.carriers.schemas import (
     AvailabilityWindowRequest,
-    CarrierCreate,
     CarrierProfileCreate,
     CarrierRatingResponse,
     CarrierResponse,
@@ -34,30 +33,19 @@ def get_carrier_service(db: AsyncSession = Depends(get_db)) -> CarrierService:
     return CarrierService(CarrierRepository(db))
 
 
-@router.post("", response_model=CarrierResponse, status_code=status.HTTP_201_CREATED)
-async def create_carrier(
-    data: CarrierCreate,
-    service: CarrierService = Depends(get_carrier_service),
-) -> CarrierResponse:
-    """Create a new carrier profile."""
-    carrier = await service.create_carrier(
-        user_id=data.user_id,
-        company_name=data.company_name,
-        vehicle_type=data.vehicle_type,
-        license_plate=data.license_plate,
-        capacity_kg=data.capacity_kg,
-        capacity_volume_m3=data.capacity_volume_m3,
-    )
-    return CarrierResponse.model_validate(carrier)
+# El alta de carrier es self-service: POST /carriers/me (user_id del JWT).
+# No hay POST /carriers con user_id arbitrario — permitía crear un perfil
+# a nombre de cualquier usuario.
 
 
 @router.get("", response_model=list[CarrierResponse])
 async def list_carriers(
+    _user: CurrentUserId,
     skip: int = 0,
     limit: int = 20,
     service: CarrierService = Depends(get_carrier_service),
 ) -> list[CarrierResponse]:
-    """List all active and verified carriers."""
+    """List all active and verified carriers (requiere sesión)."""
     carriers, _ = await service.list_carriers(skip, limit)
     return [CarrierResponse.model_validate(c) for c in carriers]
 
@@ -195,9 +183,10 @@ async def register_availability_window(
 @router.get("/{carrier_id}", response_model=CarrierResponse)
 async def get_carrier(
     carrier_id: int,
+    _user: CurrentUserId,
     service: CarrierService = Depends(get_carrier_service),
 ) -> CarrierResponse:
-    """Get a carrier by ID."""
+    """Get a carrier by ID (requiere sesión)."""
     carrier = await service.get_carrier_by_id(carrier_id)
     return CarrierResponse.model_validate(carrier)
 
@@ -205,20 +194,27 @@ async def get_carrier(
 @router.get("/user/{user_id}", response_model=CarrierResponse)
 async def get_carrier_by_user(
     user_id: int,
+    _user: CurrentUserId,
     service: CarrierService = Depends(get_carrier_service),
 ) -> CarrierResponse:
-    """Get carrier profile by user ID."""
+    """Get carrier profile by user ID (requiere sesión)."""
     carrier = await service.get_carrier_by_user_id(user_id)
     return CarrierResponse.model_validate(carrier)
 
+
+# -- admin-only ---------------------------------------------------------------
+# La reputación NO se setea por API: se recalcula sola desde los ratings
+# (ver ShipmentService.rate_shipment). Un endpoint para escribirla a mano
+# dejaba que cualquiera se pusiera 5.0.
 
 @router.patch("/{carrier_id}", response_model=CarrierResponse)
 async def update_carrier(
     carrier_id: int,
     data: CarrierUpdate,
+    _admin: AdminUserId,
     service: CarrierService = Depends(get_carrier_service),
 ) -> CarrierResponse:
-    """Update carrier information."""
+    """Update carrier by id (admin). El carrier se edita a sí mismo por PATCH /me."""
     updates = data.model_dump(exclude_unset=True)
     carrier = await service.update_carrier(carrier_id, **updates)
     return CarrierResponse.model_validate(carrier)
@@ -227,18 +223,8 @@ async def update_carrier(
 @router.delete("/{carrier_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_carrier(
     carrier_id: int,
+    _admin: AdminUserId,
     service: CarrierService = Depends(get_carrier_service),
 ) -> None:
-    """Deactivate a carrier (soft delete)."""
+    """Deactivate a carrier (admin, soft delete)."""
     await service.update_carrier(carrier_id, is_active=False)
-
-
-@router.post("/{carrier_id}/reputation", response_model=CarrierResponse)
-async def update_reputation(
-    carrier_id: int,
-    rating: float,
-    service: CarrierService = Depends(get_carrier_service),
-) -> CarrierResponse:
-    """Update carrier reputation score."""
-    carrier = await service.update_reputation(carrier_id, rating)
-    return CarrierResponse.model_validate(carrier)

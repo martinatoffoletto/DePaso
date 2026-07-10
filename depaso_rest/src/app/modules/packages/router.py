@@ -5,11 +5,10 @@ from fastapi import APIRouter, Depends, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.app.core.database import get_db
-from src.app.modules.admin.router import require_admin
+from src.app.core.dependencies import AdminUserId
 from src.app.modules.packages.repository import PackageRepository
 from src.app.modules.packages.schemas import PackageCreate, PackageResponse
 from src.app.modules.packages.service import PackageService
-from src.app.modules.users.models import User
 
 router = APIRouter(prefix="/packages", tags=["packages"])
 
@@ -39,7 +38,7 @@ async def get_package(
 @router.post("", response_model=PackageResponse, status_code=status.HTTP_201_CREATED)
 async def create_package(
     data: PackageCreate,
-    admin: User = Depends(require_admin),
+    _admin: AdminUserId,
     service: PackageService = Depends(get_package_service),
 ):
     """Create a package category (admin only)."""

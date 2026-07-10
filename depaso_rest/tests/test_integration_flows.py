@@ -516,3 +516,49 @@ def test_soft_mobility_carrier_needs_no_plate(client: TestClient, db):
         "company_name": "Auto SA", "vehicle_type": "car", "capacity_kg": 100.0,
     }, headers=h2)
     assert res.status_code == 422  # validación de Pydantic
+
+
+def test_user_endpoints_require_admin(client: TestClient, db):
+    """Un usuario normal NO puede listar/leer/editar/borrar otros usuarios."""
+    headers, uid = _register(client, "normal@example.com")
+    other, other_id = _register(client, "other@example.com")
+
+    assert client.get("/api/v1/users", headers=headers).status_code == 403
+    assert client.get(f"/api/v1/users/{other_id}", headers=headers).status_code == 403
+    assert client.patch(f"/api/v1/users/{other_id}", json={"first_name": "Hacked"},
+                        headers=headers).status_code == 403
+    assert client.delete(f"/api/v1/users/{other_id}", headers=headers).status_code == 403
+    # sin token: 401
+    assert client.get("/api/v1/users").status_code == 401
+
+
+def test_admin_can_use_user_endpoints(client: TestClient, db):
+    admin_headers = _make_admin(db)
+    _, target_id = _register(client, "target@example.com")
+    assert client.get("/api/v1/users", headers=admin_headers).status_code == 200
+    assert client.get(f"/api/v1/users/{target_id}", headers=admin_headers).status_code == 200
+
+
+def test_no_public_user_creation(client: TestClient):
+    """POST /users ya no existe: el alta pasa por /auth/register (rate-limited)."""
+    r = client.post("/api/v1/users", json={
+        "email": "sneaky@example.com", "password": "Password123!",
+        "first_name": "S", "last_name": "T",
+    })
+    assert r.status_code in (404, 405)  # ruta eliminada
+
+
+def test_carrier_reputation_not_settable_by_api(client: TestClient, db):
+    """No hay endpoint para escribir reputación a mano (se recalcula de ratings)."""
+    headers, _ = _verified_carrier(client, db, "repcheat@example.com", plate="REP-001")
+    r = client.post("/api/v1/carriers/1/reputation?rating=5.0", headers=headers)
+    assert r.status_code in (404, 405)
+
+
+def test_carrier_admin_endpoints_require_admin(client: TestClient, db):
+    """Un carrier no puede editar/borrar el perfil de otro por id."""
+    h1, _ = _verified_carrier(client, db, "c_a@example.com", plate="CA-001")
+    h2, c2_id = _verified_carrier(client, db, "c_b@example.com", plate="CA-002")
+    assert client.patch(f"/api/v1/carriers/{c2_id}", json={"capacity_kg": 999},
+                        headers=h1).status_code == 403
+    assert client.delete(f"/api/v1/carriers/{c2_id}", headers=h1).status_code == 403

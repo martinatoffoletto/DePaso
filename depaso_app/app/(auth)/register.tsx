@@ -117,7 +117,6 @@ export default function RegisterScreen() {
         const vehicle = VEHICLES.find(v => v.type === vehicleType)!;
         if (me) {
           await carriersService.createProfile({
-            user_id: me.id,
             company_name: `${form.first_name.trim()} ${form.last_name.trim()}`,
             vehicle_type: vehicleType,
             license_plate: needsPlate ? licensePlate.trim().toUpperCase() : null,

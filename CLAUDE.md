@@ -29,6 +29,7 @@ DePaso/
 - **Regla de negocio**: viaje `dedicated` es exclusivo — un carrier con un dedicado activo no acepta nada más, y no puede aceptar un dedicado teniendo trabajo en curso (códigos `CARRIER_BUSY` / `CARRIER_ON_DEDICATED_TRIP`)
 - **Constraints únicas como última defensa**: `users.email`, `carriers.user_id`, `ratings.shipment_id` — si una race las viola, el handler de `IntegrityError` responde 409 (nunca 500)
 - **Deploy**: uvicorn SIEMPRE con `--proxy-headers --forwarded-allow-ips '*'` detrás de Render — sin eso el rate limit por IP agrupa a todos los usuarios en la IP del proxy
+- **Autorización**: `CurrentUserId` (sesión) y `AdminUserId` (`require_admin`) en `core/dependencies.py`. Regla: CRUD por id / listados globales de users y carriers son admin-only; cada usuario se edita a sí mismo por `/me`. El alta de usuario pasa solo por `/auth/register`; la de carrier por `POST /carriers/me` (user_id del JWT, nunca del body). La reputación no se escribe por API: se recalcula desde los ratings
 - Errores al cliente: `{success, error, detail, code}` — `detail` se mantiene por compatibilidad con los fronts
 - Auth: JWT access+refresh, argon2 (passlib). Rate limiting: slowapi. Logging: structlog.
 

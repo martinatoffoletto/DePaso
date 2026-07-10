@@ -12,7 +12,8 @@ import {
 
 export const carriersService = {
   async createProfile(payload: CarrierCreatePayload): Promise<Carrier> {
-    const response = await apiClient.post<Carrier>("/carriers", payload);
+    // /carriers/me: el user_id sale del JWT, no del body (self-service).
+    const response = await apiClient.post<Carrier>("/carriers/me", payload);
     return response.data;
   },
 

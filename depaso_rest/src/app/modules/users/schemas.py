@@ -16,12 +16,6 @@ class UserBase(BaseModel):
     user_type: str = Field(default="client", pattern="^(client|carrier)$")
 
 
-class UserCreate(UserBase):
-    """Schema for user creation."""
-
-    password: str = Field(..., min_length=8)
-
-
 class UserUpdate(BaseModel):
     """Schema for user updates."""
 
@@ -33,6 +27,10 @@ class UserUpdate(BaseModel):
 
 class UserResponse(UserBase):
     """Schema for user responses."""
+
+    # Override: en respuestas el patrón de UserBase no aplica — un admin es un
+    # user_type válido almacenado y debe poder serializarse.
+    user_type: str
 
     id: int
     is_active: bool

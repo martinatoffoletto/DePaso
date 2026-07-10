@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.app.core.database import get_db
-from src.app.modules.admin.router import require_admin
+from src.app.core.dependencies import AdminUserId
 from src.app.modules.carriers.repository import CarrierRepository
 from src.app.modules.matching.repository import MatchingWeightsRepository
 from src.app.modules.matching.schemas import (
@@ -17,7 +17,6 @@ from src.app.modules.matching.schemas import (
 from src.app.modules.matching.service import DEFAULT_WEIGHTS, MatchingService
 from src.app.modules.routes.repository import RouteRepository
 from src.app.modules.shipments.repository import ShipmentRepository
-from src.app.modules.users.models import User
 
 router = APIRouter(prefix="/matching", tags=["matching"])
 
@@ -36,7 +35,7 @@ async def get_matching_service(db: AsyncSession = Depends(get_db)) -> MatchingSe
 
 @router.get("/weights", response_model=WeightsResponse)
 async def get_weights(
-    admin: User = Depends(require_admin),
+    _admin: AdminUserId,
     db: AsyncSession = Depends(get_db),
 ):
     """Current scoring weights — DB values over code defaults (RF-ADM)."""
@@ -46,7 +45,7 @@ async def get_weights(
 @router.patch("/weights", response_model=WeightsResponse)
 async def update_weights(
     data: WeightsUpdateRequest,
-    admin: User = Depends(require_admin),
+    _admin: AdminUserId,
     db: AsyncSession = Depends(get_db),
 ):
     """Tune scoring weights without redeploy (admin). The set must sum to 1."""
