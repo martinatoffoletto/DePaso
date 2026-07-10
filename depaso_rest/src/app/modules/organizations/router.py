@@ -110,18 +110,21 @@ async def get_my_organization(
     return MyOrganizationResponse(**payload, my_role=membership.role)
 
 
-@router.patch("/{org_id}", response_model=OrganizationResponse)
-async def update_organization(
-    org_id: int,
+@router.patch("/me", response_model=OrganizationResponse)
+async def update_my_organization(
     data: OrganizationUpdate,
-    current_user_id: CurrentUserId,
+    org: Organization = Depends(get_current_org),
     service: OrganizationService = Depends(get_org_service),
 ) -> OrganizationResponse:
-    """Update an organization (must be a member)."""
-    if service.org_repo.get_membership(org_id, current_user_id) is None:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN,
-                            detail="You are not a member of this organization")
-    org = await service.update_organization(org_id, **data.model_dump(exclude_unset=True))
+    """Update the caller's organization.
+
+    Antes esto tomaba org_id del path y verificaba membresía con
+    `get_membership(...) is None` SIN await: la coroutine nunca es None, así
+    que el chequeo pasaba siempre y cualquier usuario podía editar cualquier
+    organización (IDOR). Ahora la org se resuelve de la membresía real vía
+    get_current_org, igual que el resto del módulo.
+    """
+    org = await service.update_organization(org.id, **data.model_dump(exclude_unset=True))
     return OrganizationResponse.model_validate(org)
 
 

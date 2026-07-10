@@ -149,7 +149,7 @@ class OrganizationService:
         Reuses shipments.service for pricing/state, then stamps organization_id.
         """
         await self._require_kind(org, _MERCHANT_KINDS, "create shipments")
-        shipment = self.shipment_service.create_shipment(client_id=owner_user_id, **data)
+        shipment = await self.shipment_service.create_shipment(client_id=owner_user_id, **data)
         updated = await self.shipment_repo.update(shipment.id, organization_id=org.id)
         return updated or shipment
 
