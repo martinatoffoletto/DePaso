@@ -12,7 +12,9 @@ class Carrier(Base, TimestampMixin):
     __tablename__ = "carriers"
 
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    # unique: un usuario tiene a lo sumo UN perfil de carrier (evita duplicados
+    # por doble-tap / requests concurrentes en el POST de creación)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, unique=True, index=True)
     company_name = Column(String(255), nullable=False)
     vehicle_type = Column(String(20), nullable=False)
     license_plate = Column(String(20), unique=True, nullable=False)

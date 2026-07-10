@@ -10,7 +10,10 @@ services:
     plan: free
     # El esquema se crea solo al arrancar (create_all en el lifespan).
     buildCommand: pip install -r requirements.txt
-    startCommand: uvicorn src.app.main:app --host 0.0.0.0 --port $PORT
+    # --proxy-headers: detrás del proxy de Render, sin esto TODAS las requests
+    # comparten la IP del proxy y el rate limit de login (por IP) bloquearía
+    # a todos los usuarios juntos.
+    startCommand: uvicorn src.app.main:app --host 0.0.0.0 --port $PORT --proxy-headers --forwarded-allow-ips '*'
     healthCheckPath: /api/v1/health
     autoDeploy: true
     envVars:

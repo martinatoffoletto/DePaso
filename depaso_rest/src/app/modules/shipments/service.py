@@ -242,8 +242,29 @@ class ShipmentService:
         if shipment.status != ShipmentStatus.PENDING:
             raise InvalidShipmentStatusError(shipment.status, ShipmentStatus.ASSIGNED)
 
-        carrier = await self._get_carrier(carrier_id)
-        available = await self._available_capacity(carrier)
+        # Lock de fila sobre el carrier (SELECT FOR UPDATE): dos accepts
+        # concurrentes del MISMO carrier se serializan acá, así los chequeos
+        # de capacidad/exclusividad de abajo no pueden correr en paralelo
+        # sobre datos viejos. Se libera al commitear la request.
+        carrier = await self._get_carrier(carrier_id, for_update=True)
+
+        active = await self.repository.list_active_by_carrier(carrier_id)
+
+        # Exclusividad del dedicado (spec 3.3: "te desplazás especialmente"):
+        # - un viaje dedicado no se comparte con NADA en curso
+        # - un carrier con un dedicado activo no toma más envíos hasta entregar
+        if shipment.modality == ShipmentModality.DEDICATED and active:
+            raise ValidationError(
+                "Carrier already has active shipments; dedicated trips are exclusive.",
+                code="CARRIER_BUSY",
+            )
+        if any(s.modality == ShipmentModality.DEDICATED for s in active):
+            raise ValidationError(
+                "Carrier is on a dedicated trip and cannot take more shipments.",
+                code="CARRIER_ON_DEDICATED_TRIP",
+            )
+
+        available = carrier.capacity_kg - sum(s.weight_kg for s in active)
         if available < shipment.weight_kg:
             raise ValidationError("Carrier does not have enough available capacity.", code="INSUFFICIENT_CAPACITY")
 
@@ -317,10 +338,13 @@ class ShipmentService:
 
     # -- capacity (RF-CAP) ------------------------------------------------------------
 
-    async def _get_carrier(self, carrier_id: int):
+    async def _get_carrier(self, carrier_id: int, for_update: bool = False):
         if not self.carrier_repo:
             raise ValueError("Carrier repository not configured.")
-        carrier = await self.carrier_repo.get_by_id(carrier_id)
+        if for_update:
+            carrier = await self.carrier_repo.get_by_id_for_update(carrier_id)
+        else:
+            carrier = await self.carrier_repo.get_by_id(carrier_id)
         if not carrier:
             raise NotFoundError("Carrier")
         return carrier

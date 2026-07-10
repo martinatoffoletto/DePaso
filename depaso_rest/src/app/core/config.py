@@ -15,6 +15,10 @@ class Settings(BaseSettings):
 
     # Database — defaults to SQLite for local dev, set DATABASE_URL env var for PostgreSQL
     database_url: str = "sqlite:///./depaso_dev.db"  # Override con DATABASE_URL en .env
+    # Pool (solo Postgres): hasta pool_size + max_overflow queries simultáneas.
+    # Subir via env si el piloto satura (ojo con el límite de conexiones de Supabase).
+    db_pool_size: int = 10
+    db_max_overflow: int = 20
 
     # JWT
     jwt_secret_key: str = INSECURE_JWT_DEFAULT

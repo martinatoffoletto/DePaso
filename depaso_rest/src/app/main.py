@@ -9,6 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
+from sqlalchemy.exc import IntegrityError
 
 from src.app.core.config import settings
 from src.app.core.limiter import limiter
@@ -151,6 +152,21 @@ def create_app() -> FastAPI:
         return JSONResponse(
             status_code=_status_for(exc),
             content=ErrorResponse(error=exc.message, detail=exc.message, code=exc.code).model_dump(),
+        )
+
+    @app.exception_handler(IntegrityError)
+    async def integrity_error_handler(request: Request, exc: IntegrityError):
+        # Red de seguridad para races que los checks de aplicación no vieron:
+        # el UNIQUE de la DB es la última línea de defensa (email duplicado,
+        # doble perfil de carrier, doble rating). 409, no 500.
+        logger.warning("integrity_conflict", exc_info=exc)
+        return JSONResponse(
+            status_code=409,
+            content=ErrorResponse(
+                error="Resource already exists or conflicts with existing data",
+                detail="Resource already exists or conflicts with existing data",
+                code="CONFLICT",
+            ).model_dump(),
         )
 
     @app.exception_handler(Exception)

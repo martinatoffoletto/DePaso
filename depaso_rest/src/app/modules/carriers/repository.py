@@ -14,6 +14,16 @@ class CarrierRepository(BaseRepository[Carrier]):
     def __init__(self, db: AsyncSession) -> None:
         super().__init__(Carrier, db)
 
+    async def get_by_id_for_update(self, carrier_id: int) -> Carrier | None:
+        """Get a carrier locking its row until the request commits (SELECT FOR
+        UPDATE). Serializes concurrent accepts on the SAME carrier so the
+        capacity/exclusivity checks can't race. No-op on SQLite (single writer).
+        """
+        result = await self.db.execute(
+            select(Carrier).where(Carrier.id == carrier_id).with_for_update()
+        )
+        return result.scalar_one_or_none()
+
     async def get_by_user_id(self, user_id: int) -> Carrier | None:
         """Get carrier profile by user ID."""
         result = await self.db.execute(select(Carrier).where(Carrier.user_id == user_id))

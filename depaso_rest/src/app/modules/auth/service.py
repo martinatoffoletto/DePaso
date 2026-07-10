@@ -125,18 +125,26 @@ class AuthService:
         """Reset password using a single-use, time-limited reset token."""
         db = self.user_repository.db
         token_hash = hashlib.sha256(token.encode()).hexdigest()
-        from sqlalchemy import select
+        from sqlalchemy import select, update as sql_update
+        now = datetime.now(timezone.utc).replace(tzinfo=None)
         record = (
             await db.execute(
                 select(PasswordResetToken).where(PasswordResetToken.token_hash == token_hash)
             )
         ).scalars().first()
-        if (record is None or record.used
-                or record.expires_at < datetime.now(timezone.utc).replace(tzinfo=None)):
+        if record is None or record.used or record.expires_at < now:
             raise ValidationError("Invalid or expired reset token", code="INVALID_RESET_TOKEN")
 
+        # Compare-and-set sobre used=False: el token es single-use incluso si
+        # llegan dos requests con el mismo token en paralelo.
+        result = await db.execute(
+            sql_update(PasswordResetToken)
+            .where(PasswordResetToken.id == record.id, PasswordResetToken.used == False)  # noqa: E712
+            .values(used=True)
+        )
+        if result.rowcount == 0:
+            raise ValidationError("Invalid or expired reset token", code="INVALID_RESET_TOKEN")
         await self.user_repository.update(record.user_id, password_hash=get_password_hash(new_password))
-        record.used = True
         await db.flush()
         logger.info(f"Password reset completed for user {record.user_id}")
         return True

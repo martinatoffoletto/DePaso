@@ -25,7 +25,10 @@ DePaso/
 - **Todo async**: repos/services/routers usan `await`; queries estilo `select()`, nunca `db.query()`
 - **Transacción por request**: los repos hacen `flush()`, el commit único vive en `get_db()` — nunca commitees en un repo/service
 - **Excepciones**: los services lanzan excepciones de dominio (`shared/exceptions.py`); el handler global de `main.py` las traduce a HTTP (NotFound→404, AlreadyExists→409, Unauthorized→401, Forbidden→403, Validation→400). Los routers NO usan try/except
-- **Races**: transiciones de estado con compare-and-set (`transition_status`, `assign_carrier_if_pending`) — nunca check-then-act
+- **Races**: transiciones de estado con compare-and-set (`transition_status`, `assign_carrier_if_pending`) — nunca check-then-act. El accept lockea la fila del carrier (`get_by_id_for_update`) antes de chequear capacidad/exclusividad; ese lock requiere Postgres (en SQLite dev es no-op)
+- **Regla de negocio**: viaje `dedicated` es exclusivo — un carrier con un dedicado activo no acepta nada más, y no puede aceptar un dedicado teniendo trabajo en curso (códigos `CARRIER_BUSY` / `CARRIER_ON_DEDICATED_TRIP`)
+- **Constraints únicas como última defensa**: `users.email`, `carriers.user_id`, `ratings.shipment_id` — si una race las viola, el handler de `IntegrityError` responde 409 (nunca 500)
+- **Deploy**: uvicorn SIEMPRE con `--proxy-headers --forwarded-allow-ips '*'` detrás de Render — sin eso el rate limit por IP agrupa a todos los usuarios en la IP del proxy
 - Errores al cliente: `{success, error, detail, code}` — `detail` se mantiene por compatibilidad con los fronts
 - Auth: JWT access+refresh, argon2 (passlib). Rate limiting: slowapi. Logging: structlog.
 

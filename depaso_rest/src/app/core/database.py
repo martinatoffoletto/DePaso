@@ -50,7 +50,12 @@ _pool_kwargs = (
     if _is_sqlite(settings.database_url)
     # pool_pre_ping detecta conexiones muertas (Supabase/Render cierran idles);
     # pool_recycle las renueva antes de que el servidor las corte.
-    else {"pool_pre_ping": True, "pool_recycle": 300}
+    else {
+        "pool_pre_ping": True,
+        "pool_recycle": 300,
+        "pool_size": settings.db_pool_size,
+        "max_overflow": settings.db_max_overflow,
+    }
 )
 
 engine = create_async_engine(

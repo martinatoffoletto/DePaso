@@ -44,13 +44,13 @@ def _make_admin(db) -> dict:
 
 
 def _verified_carrier(client: TestClient, db, email: str, vehicle="car",
-                      capacity_kg=25.0) -> tuple[dict, int]:
+                      capacity_kg=25.0, plate="ABC-123") -> tuple[dict, int]:
     """Register a user, create a carrier profile and have an admin verify it."""
     headers, _ = _register(client, email, user_type="client")
     res = client.post("/api/v1/carriers/me", json={
         "company_name": "ACME Logistics",
         "vehicle_type": vehicle,
-        "license_plate": "ABC-123",
+        "license_plate": plate,
         "capacity_kg": capacity_kg,
         "capacity_volume_m3": 2.0,
     }, headers=headers)
@@ -114,7 +114,7 @@ def test_integration_flow_carrier_capacity_and_matching(client: TestClient, db):
         "user_id": carrier_user_id,
         "company_name": "Jane Logistics",
         "vehicle_type": "car",
-        "license_plate": "ABC-123",
+        "license_plate": "JLG-100",
         "capacity_kg": 25.0,
         "capacity_volume_m3": 2.0
     }, headers=carrier_headers)
@@ -404,3 +404,99 @@ def test_carrier_late_cancellation_penalty(client: TestClient, db):
     rep_after = client.get("/api/v1/carriers/me/summary",
                            headers=carrier_headers).json()["reputation"]
     assert rep_after < rep_before  # reputation penalty applied
+
+
+# --- concurrencia / exclusividad (auditoría piloto 1000 usuarios) -------------
+
+SHIP_BASE = {
+    "package_size": "m",
+    "assignment_mode": "manual",
+    "origin_lat": -34.6000, "origin_lon": -58.3850,
+    "destination_lat": -34.5900, "destination_lon": -58.3950,
+    "weight_kg": 5.0,
+}
+
+
+def _mk_shipment(client, headers, modality):
+    res = client.post("/api/v1/shipments", json={**SHIP_BASE, "modality": modality},
+                      headers=headers)
+    assert res.status_code == 201, res.text
+    return res.json()
+
+
+def test_dedicated_trip_is_exclusive(client: TestClient, db):
+    """Un carrier con un viaje dedicado activo no puede aceptar otro envío,
+    y un carrier con envíos activos no puede aceptar un dedicado."""
+    client_headers, _ = _register(client, "excl_client@example.com")
+    carrier_headers, _ = _verified_carrier(client, db, "excl_carrier@example.com",
+                                           plate="EXC-001")
+
+    dedicated = _mk_shipment(client, client_headers, "dedicated")
+    other = _mk_shipment(client, client_headers, "collaborative")
+
+    # acepta el dedicado
+    res = client.post(f"/api/v1/shipments/{dedicated['id']}/accept", json={},
+                      headers=carrier_headers)
+    assert res.status_code == 200, res.text
+
+    # con un dedicado activo, NO puede aceptar nada más
+    res = client.post(f"/api/v1/shipments/{other['id']}/accept", json={},
+                      headers=carrier_headers)
+    assert res.status_code == 400
+    assert res.json()["code"] == "CARRIER_ON_DEDICATED_TRIP"
+
+
+def test_dedicated_rejected_if_carrier_has_active_work(client: TestClient, db):
+    client_headers, _ = _register(client, "excl2_client@example.com")
+    carrier_headers, _ = _verified_carrier(client, db, "excl2_carrier@example.com",
+                                           plate="EXC-002")
+
+    collab = _mk_shipment(client, client_headers, "collaborative")
+    dedicated = _mk_shipment(client, client_headers, "dedicated")
+
+    res = client.post(f"/api/v1/shipments/{collab['id']}/accept", json={},
+                      headers=carrier_headers)
+    assert res.status_code == 200, res.text
+
+    # con trabajo activo, un dedicado (exclusivo) se rechaza
+    res = client.post(f"/api/v1/shipments/{dedicated['id']}/accept", json={},
+                      headers=carrier_headers)
+    assert res.status_code == 400
+    assert res.json()["code"] == "CARRIER_BUSY"
+
+
+def test_second_carrier_profile_conflicts(client: TestClient, db):
+    """El UNIQUE de carriers.user_id convierte el doble POST en 409, no en duplicado."""
+    headers, _ = _register(client, "dupcarrier@example.com")
+    payload = {
+        "company_name": "Dup SA", "vehicle_type": "car",
+        "license_plate": "DUP-001", "capacity_kg": 10.0,
+    }
+    res1 = client.post("/api/v1/carriers/me", json=payload, headers=headers)
+    assert res1.status_code == 201, res1.text
+    res2 = client.post("/api/v1/carriers/me",
+                       json={**payload, "license_plate": "DUP-002"}, headers=headers)
+    assert res2.status_code == 409
+
+
+def test_shipment_cannot_be_accepted_twice(client: TestClient, db):
+    """Compare-and-set: el segundo accept del mismo envío recibe error, nunca
+    se reasigna (simula dos carriers compitiendo por el mismo paquete)."""
+    client_headers, _ = _register(client, "race_client@example.com")
+    c1_headers, c1_id = _verified_carrier(client, db, "race_c1@example.com", plate="RAC-001")
+    c2_headers, _ = _verified_carrier(client, db, "race_c2@example.com", plate="RAC-002")
+
+    shipment = _mk_shipment(client, client_headers, "collaborative")
+
+    res1 = client.post(f"/api/v1/shipments/{shipment['id']}/accept", json={},
+                       headers=c1_headers)
+    assert res1.status_code == 200
+    assert res1.json()["carrier_id"] == c1_id
+
+    res2 = client.post(f"/api/v1/shipments/{shipment['id']}/accept", json={},
+                       headers=c2_headers)
+    assert res2.status_code == 400  # ya no está PENDING
+
+    # el envío sigue asignado al PRIMER carrier
+    res = client.get(f"/api/v1/shipments/{shipment['id']}", headers=client_headers)
+    assert res.json()["carrier_id"] == c1_id

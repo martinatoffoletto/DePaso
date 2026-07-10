@@ -33,4 +33,6 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=15s \
     CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/v1/health')"
 
 # El esquema se crea al arrancar (create_all en el lifespan de main.py).
-CMD ["uvicorn", "src.app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# --proxy-headers: la IP real del cliente llega en X-Forwarded-For; el rate
+# limit por IP la necesita para no agrupar a todos detrás del proxy.
+CMD ["uvicorn", "src.app.main:app", "--host", "0.0.0.0", "--port", "8000", "--proxy-headers", "--forwarded-allow-ips", "*"]
