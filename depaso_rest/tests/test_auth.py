@@ -39,7 +39,7 @@ def test_register_duplicate_email(client, test_user):
         },
     )
     
-    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    assert response.status_code == status.HTTP_409_CONFLICT
 
 
 def test_login_success(client, test_user):

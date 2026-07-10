@@ -56,71 +56,71 @@ class OrganizationService:
 
     # -- organization lifecycle ------------------------------------------------
 
-    def create_organization(self, owner_user_id: int, name: str, cuit: str,
+    async def create_organization(self, owner_user_id: int, name: str, cuit: str,
                             kind: str) -> Organization:
         """Create an org; the caller becomes owner + first member."""
-        if self.org_repo.get_by_cuit(cuit):
+        if await self.org_repo.get_by_cuit(cuit):
             raise OrganizationAlreadyExistsError()
-        org = self.org_repo.create(
+        org = await self.org_repo.create(
             name=name, cuit=cuit, kind=kind, owner_user_id=owner_user_id,
         )
-        self.org_repo.add_member(org.id, owner_user_id, OrganizationMemberRole.OWNER)
+        await self.org_repo.add_member(org.id, owner_user_id, OrganizationMemberRole.OWNER)
         return org
 
-    def get_organization(self, org_id: int) -> Organization:
-        org = self.org_repo.get_by_id(org_id)
+    async def get_organization(self, org_id: int) -> Organization:
+        org = await self.org_repo.get_by_id(org_id)
         if not org:
             raise OrganizationNotFoundError()
         return org
 
-    def update_organization(self, org_id: int, **updates) -> Organization:
-        self.get_organization(org_id)
+    async def update_organization(self, org_id: int, **updates) -> Organization:
+        await self.get_organization(org_id)
         clean = {k: v for k, v in updates.items() if v is not None}
-        return self.org_repo.update(org_id, **clean)
+        return await self.org_repo.update(org_id, **clean)
 
-    def list_my_organizations(self, user_id: int) -> list[tuple[Organization, str]]:
+    async def list_my_organizations(self, user_id: int) -> list[tuple[Organization, str]]:
         """Organizations the user administers, with their role in each."""
         result: list[tuple[Organization, str]] = []
-        for m in self.org_repo.list_memberships_for_user(user_id):
-            org = self.org_repo.get_by_id(m.org_id)
+        for m in await self.org_repo.list_memberships_for_user(user_id):
+            org = await self.org_repo.get_by_id(m.org_id)
             if org is not None:
                 result.append((org, m.role))
         return result
 
-    def resolve_membership(self, user_id: int) -> tuple[Organization, OrganizationMember] | None:
+    async def resolve_membership(self, user_id: int) -> tuple[Organization, OrganizationMember] | None:
         """Resolve the caller's active organization (most recent membership).
 
         MVP assumption: an administrator manages one org; if they belong to
         several, the most recently joined one is used.
         """
-        memberships = self.org_repo.list_memberships_for_user(user_id)
+        memberships = await self.org_repo.list_memberships_for_user(user_id)
         for m in memberships:
-            org = self.org_repo.get_by_id(m.org_id)
+            org = await self.org_repo.get_by_id(m.org_id)
             if org is not None:
                 return org, m
         return None
 
     # -- fleet: carrier management ---------------------------------------------
 
-    def link_carrier(self, org: Organization, carrier_id: int):
-        self._require_kind(org, _FLEET_KINDS, "manage fleet carriers")
-        carrier = self.carrier_repo.get_by_id(carrier_id)
+    async def link_carrier(self, org: Organization, carrier_id: int):
+        await self._require_kind(org, _FLEET_KINDS, "manage fleet carriers")
+        carrier = await self.carrier_repo.get_by_id(carrier_id)
         if carrier is None:
             raise CarrierNotLinkableError("Carrier not found.")
-        return self.org_repo.link_carrier(org.id, carrier_id)
+        return await self.org_repo.link_carrier(org.id, carrier_id)
 
-    def unlink_carrier(self, org: Organization, carrier_id: int):
-        self._require_kind(org, _FLEET_KINDS, "manage fleet carriers")
-        link = self.org_repo.unlink_carrier(org.id, carrier_id)
+    async def unlink_carrier(self, org: Organization, carrier_id: int):
+        await self._require_kind(org, _FLEET_KINDS, "manage fleet carriers")
+        link = await self.org_repo.unlink_carrier(org.id, carrier_id)
         if link is None:
             raise CarrierNotLinkableError("Carrier is not linked to this organization.")
         return link
 
-    def list_fleet(self, org: Organization) -> list[dict]:
+    async def list_fleet(self, org: Organization) -> list[dict]:
         """Carrier profiles + link metadata for the org's fleet."""
-        links = self.org_repo.list_carrier_links(org.id)
+        links = await self.org_repo.list_carrier_links(org.id)
         # Batch-fetch all carriers in one query instead of one per link (no N+1).
-        carriers = self.carrier_repo.get_by_ids([link.carrier_id for link in links])
+        carriers = await self.carrier_repo.get_by_ids([link.carrier_id for link in links])
         rows: list[dict] = []
         for link in links:
             carrier = carriers.get(link.carrier_id)
@@ -143,26 +143,26 @@ class OrganizationService:
 
     # -- merchant: shipments ---------------------------------------------------
 
-    def create_shipment(self, org: Organization, owner_user_id: int, **data) -> Shipment:
+    async def create_shipment(self, org: Organization, owner_user_id: int, **data) -> Shipment:
         """Create a shipment on behalf of the merchant org.
 
         Reuses shipments.service for pricing/state, then stamps organization_id.
         """
-        self._require_kind(org, _MERCHANT_KINDS, "create shipments")
+        await self._require_kind(org, _MERCHANT_KINDS, "create shipments")
         shipment = self.shipment_service.create_shipment(client_id=owner_user_id, **data)
-        updated = self.shipment_repo.update(shipment.id, organization_id=org.id)
+        updated = await self.shipment_repo.update(shipment.id, organization_id=org.id)
         return updated or shipment
 
-    def list_shipments(self, org: Organization, status: str | None = None,
+    async def list_shipments(self, org: Organization, status: str | None = None,
                        skip: int = 0, limit: int = 50) -> tuple[list[Shipment], int]:
-        return self.shipment_repo.list_by_organization(org.id, status, skip, limit)
+        return await self.shipment_repo.list_by_organization(org.id, status, skip, limit)
 
     # -- monitoring & finance --------------------------------------------------
 
-    def dashboard(self, org: Organization) -> dict:
-        shipments = self.shipment_repo.list_all_by_organization(org.id)
-        active_carrier_ids = self.org_repo.active_carrier_ids(org.id)
-        earned_shipments = self.shipment_repo.list_delivered_by_carriers(active_carrier_ids)
+    async def dashboard(self, org: Organization) -> dict:
+        shipments = await self.shipment_repo.list_all_by_organization(org.id)
+        active_carrier_ids = await self.org_repo.active_carrier_ids(org.id)
+        earned_shipments = await self.shipment_repo.list_delivered_by_carriers(active_carrier_ids)
 
         return {
             "organization_id": org.id,
@@ -181,7 +181,7 @@ class OrganizationService:
             ),
         }
 
-    def finance(self, org: Organization) -> dict:
+    async def finance(self, org: Organization) -> dict:
         """Money put in (spent on org shipments) vs earned (by the fleet),
         aggregated per calendar month plus an accumulated total.
 
@@ -189,14 +189,14 @@ class OrganizationService:
         Spent is keyed by shipment creation month; earned by delivery month
         (updated_at of the delivered shipment).
         """
-        spent_shipments = self.shipment_repo.list_all_by_organization(org.id)
-        active_carrier_ids = self.org_repo.active_carrier_ids(org.id)
-        earned_shipments = self.shipment_repo.list_delivered_by_carriers(active_carrier_ids)
+        spent_shipments = await self.shipment_repo.list_all_by_organization(org.id)
+        active_carrier_ids = await self.org_repo.active_carrier_ids(org.id)
+        earned_shipments = await self.shipment_repo.list_delivered_by_carriers(active_carrier_ids)
 
-        spent = self._series(
+        spent = await self._series(
             [(s.created_at, s.estimated_price or 0.0) for s in spent_shipments]
         )
-        earned = self._series(
+        earned = await self._series(
             [(s.updated_at, pricing.carrier_payout(s.estimated_price or 0.0)) for s in earned_shipments]
         )
         return {
@@ -209,7 +209,7 @@ class OrganizationService:
     # -- helpers ---------------------------------------------------------------
 
     @staticmethod
-    def _series(rows: list[tuple]) -> dict:
+    async def _series(rows: list[tuple]) -> dict:
         buckets: dict[str, float] = defaultdict(float)
         total = 0.0
         for when, amount in rows:
@@ -222,6 +222,6 @@ class OrganizationService:
         return {"total": round(total, 2), "by_month": by_month}
 
     @staticmethod
-    def _require_kind(org: Organization, allowed: set[str], action: str) -> None:
+    async def _require_kind(org: Organization, allowed: set[str], action: str) -> None:
         if org.kind not in allowed:
             raise OrgKindNotAllowedError(action)

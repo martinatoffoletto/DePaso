@@ -16,10 +16,16 @@ class SuccessResponse(BaseModel, Generic[T]):
 
 
 class ErrorResponse(BaseModel):
-    """Standard error response."""
+    """Standard error response.
+
+    `detail` duplica `error` a propósito: los frontends (app y web) parsean
+    `data.detail` — el formato de HTTPException de FastAPI — y este envelope
+    debe ser un superset compatible.
+    """
 
     success: bool = False
     error: str
+    detail: str
     code: str
 
 

@@ -20,8 +20,13 @@ DePaso/
 ## Backend — `depaso_rest/`
 
 ### Stack
-- **FastAPI** + **Pydantic v2**, **SQLAlchemy 2**, **PostgreSQL** (prod) / SQLite (tests)
-- Sin migraciones (MVP): el esquema se crea con `Base.metadata.create_all()` al arrancar (`main.py`)
+- **FastAPI** + **Pydantic v2**, **SQLAlchemy 2 async** (asyncpg en prod, aiosqlite en dev/tests), **PostgreSQL** (prod) / SQLite (tests)
+- Sin migraciones (MVP): el esquema se crea con `create_all()` al arrancar (`main.py`)
+- **Todo async**: repos/services/routers usan `await`; queries estilo `select()`, nunca `db.query()`
+- **Transacción por request**: los repos hacen `flush()`, el commit único vive en `get_db()` — nunca commitees en un repo/service
+- **Excepciones**: los services lanzan excepciones de dominio (`shared/exceptions.py`); el handler global de `main.py` las traduce a HTTP (NotFound→404, AlreadyExists→409, Unauthorized→401, Forbidden→403, Validation→400). Los routers NO usan try/except
+- **Races**: transiciones de estado con compare-and-set (`transition_status`, `assign_carrier_if_pending`) — nunca check-then-act
+- Errores al cliente: `{success, error, detail, code}` — `detail` se mantiene por compatibilidad con los fronts
 - Auth: JWT access+refresh, argon2 (passlib). Rate limiting: slowapi. Logging: structlog.
 
 ### Arquitectura modular

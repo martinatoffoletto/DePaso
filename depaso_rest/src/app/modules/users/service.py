@@ -14,15 +14,15 @@ class UserService:
         """Initialize with repository."""
         self.repository = repository
 
-    def create_user(self, email: str, password: str, first_name: str, last_name: str,
+    async def create_user(self, email: str, password: str, first_name: str, last_name: str,
                     phone_number: str | None = None, user_type: str = "client") -> User:
         """Create a new user with password hashing."""
-        existing_user = self.repository.get_by_email(email)
+        existing_user = await self.repository.get_by_email(email)
         if existing_user:
             raise UserAlreadyExistsError()
 
         password_hash = get_password_hash(password)
-        return self.repository.create(
+        return await self.repository.create(
             email=email,
             password_hash=password_hash,
             first_name=first_name,
@@ -31,29 +31,29 @@ class UserService:
             user_type=user_type,
         )
 
-    def get_user_by_id(self, user_id: int) -> User:
+    async def get_user_by_id(self, user_id: int) -> User:
         """Get a user by id."""
-        user = self.repository.get_by_id(user_id)
+        user = await self.repository.get_by_id(user_id)
         if not user:
             raise UserNotFoundError()
         return user
 
-    def get_user_by_email(self, email: str) -> User:
+    async def get_user_by_email(self, email: str) -> User:
         """Get a user by email."""
-        user = self.repository.get_by_email(email)
+        user = await self.repository.get_by_email(email)
         if not user:
             raise UserNotFoundError()
         return user
 
-    def list_users(self, skip: int = 0, limit: int = 20) -> tuple[list[User], int]:
+    async def list_users(self, skip: int = 0, limit: int = 20) -> tuple[list[User], int]:
         """List users with pagination."""
-        return self.repository.list_active(skip, limit)
+        return await self.repository.list_active(skip, limit)
 
-    def update_user(self, user_id: int, first_name: str | None = None,
+    async def update_user(self, user_id: int, first_name: str | None = None,
                     last_name: str | None = None, phone_number: str | None = None,
                     user_type: str | None = None) -> User:
         """Update user information."""
-        self.get_user_by_id(user_id)  # validates existence (raises if missing)
+        await self.get_user_by_id(user_id)  # validates existence (raises if missing)
         updates = {}
         if first_name:
             updates["first_name"] = first_name
@@ -64,16 +64,16 @@ class UserService:
         if user_type:
             updates["user_type"] = user_type
 
-        updated_user = self.repository.update(user_id, **updates)
+        updated_user = await self.repository.update(user_id, **updates)
         if not updated_user:
             raise UserNotFoundError()
         return updated_user
 
-    def delete_user(self, user_id: int) -> bool:
+    async def delete_user(self, user_id: int) -> bool:
         """Soft delete a user."""
-        self.get_user_by_id(user_id)  # Check existence
-        return self.repository.soft_delete(user_id)
+        await self.get_user_by_id(user_id)  # Check existence
+        return await self.repository.soft_delete(user_id)
 
-    def verify_password(self, user: User, password: str) -> bool:
+    async def verify_password(self, user: User, password: str) -> bool:
         """Verify password for a user."""
         return verify_password(password, user.password_hash)

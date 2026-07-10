@@ -1,67 +1,80 @@
 """
-Base repository with generic CRUD operations.
+Base repository with generic async CRUD operations.
 Module-specific repositories inherit from this and add domain queries.
-"""
-from typing import TypeVar, Generic, Type
 
-from sqlalchemy.orm import Session
+Repositories flush (make changes visible inside the current transaction and
+populate IDs) but NEVER commit — the commit happens once per request in
+get_db(). This keeps multi-step operations atomic.
+"""
+from typing import Generic, Type, TypeVar
+
+from sqlalchemy import func, select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 T = TypeVar("T")
 
 
 class BaseRepository(Generic[T]):
     """Generic repository providing standard CRUD operations.
-    
+
     Usage:
         class UserRepository(BaseRepository[User]):
-            def __init__(self, db: Session):
+            def __init__(self, db: AsyncSession):
                 super().__init__(User, db)
-            
-            def get_by_email(self, email: str) -> User | None:
-                return self.db.query(self.model).filter(self.model.email == email).first()
+
+            async def get_by_email(self, email: str) -> User | None:
+                result = await self.db.execute(select(User).where(User.email == email))
+                return result.scalar_one_or_none()
     """
 
-    def __init__(self, model: Type[T], db: Session) -> None:
-        """Initialize with model class and database session."""
+    def __init__(self, model: Type[T], db: AsyncSession) -> None:
         self.model = model
         self.db = db
 
-    def create(self, **kwargs: object) -> T:
-        """Create a new entity."""
+    async def create(self, **kwargs: object) -> T:
+        """Create a new entity (flushed, not committed)."""
         instance = self.model(**kwargs)
         self.db.add(instance)
-        self.db.commit()
-        self.db.refresh(instance)
+        await self.db.flush()
+        await self.db.refresh(instance)
         return instance
 
-    def get_by_id(self, entity_id: int) -> T | None:
+    async def get_by_id(self, entity_id: int) -> T | None:
         """Get an entity by its primary key."""
-        return self.db.query(self.model).filter(self.model.id == entity_id).first()
+        result = await self.db.execute(
+            select(self.model).where(self.model.id == entity_id)
+        )
+        return result.scalar_one_or_none()
 
-    def list_all(self, skip: int = 0, limit: int = 20) -> tuple[list[T], int]:
+    async def list_all(self, skip: int = 0, limit: int = 20) -> tuple[list[T], int]:
         """List entities with pagination. Returns (items, total_count)."""
-        query = self.db.query(self.model)
-        total = query.count()
-        items = query.offset(skip).limit(limit).all()
-        return items, total
+        total = (
+            await self.db.execute(select(func.count()).select_from(self.model))
+        ).scalar_one()
+        result = await self.db.execute(select(self.model).offset(skip).limit(limit))
+        return list(result.scalars().all()), total
 
-    def update(self, entity_id: int, **kwargs: object) -> T | None:
-        """Update an entity by ID. Returns None if not found."""
-        instance = self.get_by_id(entity_id)
+    async def update(self, entity_id: int, **kwargs: object) -> T | None:
+        """Update an entity by ID. Returns None if not found.
+
+        Note: None values are skipped (partial-update semantics). To set a
+        column to NULL, write an explicit repository method for it.
+        """
+        instance = await self.get_by_id(entity_id)
         if not instance:
             return None
         for key, value in kwargs.items():
             if value is not None:
                 setattr(instance, key, value)
-        self.db.commit()
-        self.db.refresh(instance)
+        await self.db.flush()
+        await self.db.refresh(instance)
         return instance
 
-    def delete(self, entity_id: int) -> bool:
+    async def delete(self, entity_id: int) -> bool:
         """Hard delete an entity by ID. Returns True if deleted."""
-        instance = self.get_by_id(entity_id)
+        instance = await self.get_by_id(entity_id)
         if not instance:
             return False
-        self.db.delete(instance)
-        self.db.commit()
+        await self.db.delete(instance)
+        await self.db.flush()
         return True

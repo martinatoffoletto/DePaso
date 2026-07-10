@@ -212,7 +212,7 @@ def test_integration_flow_carrier_capacity_and_matching(client: TestClient, db):
 
     # 10. Carrier attempts to accept Shipment 3 (5kg) -> Reject due to capacity
     res_accept3 = client.post(f"/api/v1/shipments/{s3['id']}/accept", json={"route_id": route_id}, headers=carrier_headers)
-    assert res_accept3.status_code == 422
+    assert res_accept3.status_code == 400  # ValidationError de dominio -> 400
     assert "capacity" in res_accept3.json()["detail"].lower()
 
     # 11. Carrier delivers Shipment 1 -> Capacity is freed

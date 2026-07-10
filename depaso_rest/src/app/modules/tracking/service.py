@@ -10,6 +10,7 @@ from src.app.modules.tracking.repository import TrackingRepository
 from src.app.modules.carriers.repository import CarrierRepository
 from src.app.modules.shipments.repository import ShipmentRepository
 from src.app.shared.enums import ShipmentStatus
+from src.app.shared.exceptions import ForbiddenError, NotFoundError
 
 # Statuses during which the client may see the carrier position (RNF-PRV-02).
 TRACKABLE_STATUSES = {
@@ -32,47 +33,47 @@ class TrackingService:
         self.carrier_repo = carrier_repo
         self.shipment_repo = shipment_repo
 
-    def publish_position(self, carrier_id: int, lat: float, lon: float) -> int:
+    async def publish_position(self, carrier_id: int, lat: float, lon: float) -> int:
         """Carrier publishes its position (RF-TRK-01).
 
         Also refreshes the carrier's current location (used by dedicated
         matching) and attaches the sample to every active shipment.
         Returns the number of active shipments traced.
         """
-        self.carrier_repo.update(carrier_id, current_lat=lat, current_lon=lon)
-        active = self.shipment_repo.list_active_by_carrier(carrier_id)
+        await self.carrier_repo.update(carrier_id, current_lat=lat, current_lon=lon)
+        active = await self.shipment_repo.list_active_by_carrier(carrier_id)
         if not active:
-            self.repository.create(carrier_id=carrier_id, shipment_id=None, lat=lat, lon=lon)
+            await self.repository.create(carrier_id=carrier_id, shipment_id=None, lat=lat, lon=lon)
             return 0
         for shipment in active:
-            self.repository.create(
+            await self.repository.create(
                 carrier_id=carrier_id, shipment_id=shipment.id, lat=lat, lon=lon
             )
         return len(active)
 
-    def shipment_location(self, shipment_id: int, requester_user_id: int) -> GpsTrace | None:
+    async def shipment_location(self, shipment_id: int, requester_user_id: int) -> GpsTrace | None:
         """Latest carrier position for a shipment (RF-TRK-02).
 
         Privacy (RNF-PRV-02): only the shipment's client (or the assigned
         carrier) can see positions, and only while the shipment is active.
         """
-        shipment = self.shipment_repo.get_by_id(shipment_id)
+        shipment = await self.shipment_repo.get_by_id(shipment_id)
         if not shipment:
-            raise ValueError("Shipment not found.")
+            raise NotFoundError("Shipment")
         if shipment.status not in TRACKABLE_STATUSES:
             return None
 
         is_client = shipment.client_id == requester_user_id
         carrier = (
-            self.carrier_repo.get_by_id(shipment.carrier_id)
+            await self.carrier_repo.get_by_id(shipment.carrier_id)
             if shipment.carrier_id else None
         )
         is_carrier = carrier is not None and carrier.user_id == requester_user_id
         if not (is_client or is_carrier):
-            raise PermissionError("Not authorized to track this shipment.")
+            raise ForbiddenError("Not authorized to track this shipment.")
 
-        return self.repository.latest_for_shipment(shipment_id)
+        return await self.repository.latest_for_shipment(shipment_id)
 
-    def shipment_history(self, shipment_id: int) -> list[GpsTrace]:
+    async def shipment_history(self, shipment_id: int) -> list[GpsTrace]:
         """Full trace history for auditing (RF-TRK-03)."""
-        return self.repository.history_for_shipment(shipment_id)
+        return await self.repository.history_for_shipment(shipment_id)

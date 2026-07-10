@@ -2,7 +2,7 @@
 CO2 module API router. Aggregation and equivalences live in CO2Service.
 """
 from fastapi import APIRouter, Depends
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.app.core.database import get_db
 from src.app.core.dependencies import CurrentUserId
@@ -40,7 +40,7 @@ async def estimate_savings(data: CO2EstimateRequest):
 @router.get("/me/summary", response_model=ClientImpactResponse)
 async def my_impact(
     current_user_id: CurrentUserId,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
 ):
     """Accumulated CO2 savings of the authenticated client + equivalences (RF-CO2-02)."""
     impact = CO2Service().client_impact(db, current_user_id)

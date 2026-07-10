@@ -2,7 +2,8 @@
 User module repository for data access.
 Extends BaseRepository with user-specific queries.
 """
-from sqlalchemy.orm import Session
+from sqlalchemy import func, select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.app.shared.base_repository import BaseRepository
 from src.app.modules.users.models import User
@@ -11,26 +12,29 @@ from src.app.modules.users.models import User
 class UserRepository(BaseRepository[User]):
     """Repository for user data access."""
 
-    def __init__(self, db: Session) -> None:
+    def __init__(self, db: AsyncSession) -> None:
         """Initialize with database session."""
         super().__init__(User, db)
 
-    def get_by_email(self, email: str) -> User | None:
+    async def get_by_email(self, email: str) -> User | None:
         """Get user by email."""
-        return self.db.query(User).filter(User.email == email).first()
+        result = await self.db.execute(select(User).where(User.email == email))
+        return result.scalar_one_or_none()
 
-    def list_active(self, skip: int = 0, limit: int = 20) -> tuple[list[User], int]:
+    async def list_active(self, skip: int = 0, limit: int = 20) -> tuple[list[User], int]:
         """List all active users with pagination."""
-        query = self.db.query(User).filter(User.is_active == True)
-        total = query.count()
-        users = query.offset(skip).limit(limit).all()
-        return users, total
+        base = select(User).where(User.is_active == True)  # noqa: E712
+        total = (
+            await self.db.execute(select(func.count()).select_from(base.subquery()))
+        ).scalar_one()
+        users = (await self.db.execute(base.offset(skip).limit(limit))).scalars().all()
+        return list(users), total
 
-    def soft_delete(self, user_id: int) -> bool:
+    async def soft_delete(self, user_id: int) -> bool:
         """Soft delete a user by setting is_active to False."""
-        user = self.get_by_id(user_id)
+        user = await self.get_by_id(user_id)
         if not user:
             return False
         user.is_active = False
-        self.db.commit()
+        await self.db.flush()
         return True

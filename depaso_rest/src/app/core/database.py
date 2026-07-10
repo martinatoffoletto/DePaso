@@ -1,11 +1,18 @@
 """
-Database configuration and session management.
-Supports PostgreSQL+PostGIS for production and SQLite for local development.
-"""
-from typing import Generator
+Database configuration and session management (async SQLAlchemy).
 
-from sqlalchemy import create_engine, event
-from sqlalchemy.orm import sessionmaker, Session
+- Async engine: asyncpg (PostgreSQL) / aiosqlite (SQLite for dev & tests).
+- Transaction per request: get_db() commits once when the request handler
+  finishes without raising, and rolls back otherwise. Repositories flush,
+  they never commit — this keeps multi-write operations atomic.
+- A sync engine is exported ONLY for CLI scripts (seed) that don't run
+  inside an event loop.
+"""
+from typing import AsyncGenerator
+
+from sqlalchemy import create_engine
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from sqlalchemy.orm import sessionmaker
 
 from src.app.core.config import settings
 
@@ -14,48 +21,63 @@ def _is_sqlite(url: str) -> bool:
     return url.startswith("sqlite")
 
 
-# Create engine — SQLite for dev, PostgreSQL for prod
-engine = create_engine(
-    settings.database_url,
-    echo=settings.debug,
-    future=True,
-    # SQLite needs this for FK support
-    **({} if not _is_sqlite(settings.database_url) else {"connect_args": {"check_same_thread": False}}),
+def _async_url(url: str) -> str:
+    """Map a friendly DATABASE_URL to its async driver equivalent."""
+    if url.startswith("sqlite+aiosqlite"):
+        return url
+    if url.startswith("sqlite"):
+        return url.replace("sqlite://", "sqlite+aiosqlite://", 1)
+    if url.startswith("postgresql+asyncpg"):
+        return url
+    if url.startswith("postgresql+psycopg"):
+        return url.replace("postgresql+psycopg", "postgresql+asyncpg", 1)
+    if url.startswith("postgresql://"):
+        return url.replace("postgresql://", "postgresql+asyncpg://", 1)
+    return url
+
+
+def _sync_url(url: str) -> str:
+    """Map a friendly DATABASE_URL to its sync driver equivalent (scripts only)."""
+    if url.startswith("sqlite+aiosqlite"):
+        return url.replace("sqlite+aiosqlite://", "sqlite://", 1)
+    if url.startswith("postgresql+asyncpg"):
+        return url.replace("postgresql+asyncpg", "postgresql+psycopg", 1)
+    return url
+
+
+_pool_kwargs = (
+    {"connect_args": {"check_same_thread": False}}
+    if _is_sqlite(settings.database_url)
+    # pool_pre_ping detecta conexiones muertas (Supabase/Render cierran idles);
+    # pool_recycle las renueva antes de que el servidor las corte.
+    else {"pool_pre_ping": True, "pool_recycle": 300}
 )
 
-# PostGIS extension only for PostgreSQL
-if not _is_sqlite(settings.database_url):
-    try:
-        from geoalchemy2 import Geography  # noqa: F401
+engine = create_async_engine(
+    _async_url(settings.database_url),
+    echo=settings.debug,
+    **_pool_kwargs,
+)
 
-        @event.listens_for(engine, "connect")
-        def receive_connect(dbapi_conn: object, connection_record: object) -> None:
-            """Enable PostGIS extension on connection."""
-            cursor = dbapi_conn.cursor()
-            try:
-                cursor.execute("CREATE EXTENSION IF NOT EXISTS postgis")
-            except Exception:
-                pass
-            finally:
-                cursor.close()
-    except ImportError:
-        pass  # geoalchemy2 not installed, skip PostGIS
-
-
-# Session factory
-SessionLocal = sessionmaker(
+SessionLocal = async_sessionmaker(
     bind=engine,
-    class_=Session,
+    class_=AsyncSession,
     expire_on_commit=False,
     autoflush=False,
-    autocommit=False,
 )
 
+# Sync engine for CLI scripts (seed_demo, smoke_test) — not used by the API.
+sync_engine = create_engine(_sync_url(settings.database_url), future=True)
+SyncSessionLocal = sessionmaker(bind=sync_engine, autoflush=False, autocommit=False)
 
-def get_db() -> Generator[Session, None, None]:
-    """Dependency injection for database session."""
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
+
+async def get_db() -> AsyncGenerator[AsyncSession, None]:
+    """Session per request with a single transaction: commit on success,
+    rollback on any exception (atomicity — no partial writes)."""
+    async with SessionLocal() as session:
+        try:
+            yield session
+            await session.commit()
+        except Exception:
+            await session.rollback()
+            raise

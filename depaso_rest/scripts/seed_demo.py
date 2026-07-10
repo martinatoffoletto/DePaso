@@ -14,7 +14,7 @@ Creates (idempotent — skips if the admin already exists):
 """
 from datetime import datetime, timedelta, timezone
 
-from src.app.core.database import SessionLocal, engine
+from src.app.core.database import SyncSessionLocal as SessionLocal, sync_engine as engine
 from src.app.core.security import get_password_hash
 from src.app.shared.base_model import Base
 from src.app.modules.users.models import User

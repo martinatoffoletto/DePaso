@@ -18,6 +18,7 @@ Formula (spec 5.2):
   score = w1*compat_geo + w2*(1 - detour_norm) + w3*compat_cargo
         + w4*reputation_norm + w5*compat_time
 """
+import asyncio
 from datetime import datetime, timezone
 
 from src.app.modules.carriers.models import Carrier
@@ -33,10 +34,10 @@ from src.app.modules.shipments.exceptions import ShipmentNotFoundError
 from src.app.modules.shipments.models import Shipment
 from src.app.modules.shipments.repository import ShipmentRepository
 from src.app.shared.enums import PackageSize, ShipmentModality, VehicleType
+from src.app.shared.exceptions import NotFoundError
 from src.app.shared.geo import (
     Point,
     eta_minutes,
-    insertion_detour,
     point_to_route_km,
     road_km,
 )
@@ -165,28 +166,28 @@ class MatchingService:
 
     # -- public API -----------------------------------------------------------
 
-    def rank_carriers(self, shipment_id: int, top_k: int = 5) -> list[CarrierScoreResponse]:
+    async def rank_carriers(self, shipment_id: int, top_k: int = 5) -> list[CarrierScoreResponse]:
         """Ranked candidates for a shipment, best first (RF-MAT-01/02)."""
-        shipment = self.shipment_repo.get_by_id(shipment_id)
+        shipment = await self.shipment_repo.get_by_id(shipment_id)
         if not shipment:
             raise ShipmentNotFoundError()
 
         if shipment.modality == ShipmentModality.COLLABORATIVE:
-            scored = self._rank_collaborative(shipment)
+            scored = await self._rank_collaborative(shipment)
         else:
-            scored = self._rank_dedicated(shipment)
+            scored = await self._rank_dedicated(shipment)
 
         scored.sort(key=lambda s: s.total_score, reverse=True)
         return scored[:top_k]
 
-    def match_best(self, shipment_id: int) -> MatchingResponse:
+    async def match_best(self, shipment_id: int) -> MatchingResponse:
         """Best candidate plus the full ranking (for timeout fallback, RF-MAT-05)."""
-        shipment = self.shipment_repo.get_by_id(shipment_id)
+        shipment = await self.shipment_repo.get_by_id(shipment_id)
         if not shipment:
             raise ShipmentNotFoundError()
-        ranked = self.rank_carriers(shipment_id, top_k=5)
+        ranked = await self.rank_carriers(shipment_id, top_k=5)
         if not ranked:
-            raise ValueError("No available carriers match this shipment.")
+            raise NotFoundError("Matching carrier", code="NO_MATCH")
         best = ranked[0]
         return MatchingResponse(
             shipment_id=shipment_id,
@@ -196,27 +197,27 @@ class MatchingService:
             ranked_carriers=ranked,
         )
 
-    def feed_for_carrier(self, carrier_id: int, limit: int = 20) -> list[FeedItemResponse]:
+    async def feed_for_carrier(self, carrier_id: int, limit: int = 20) -> list[FeedItemResponse]:
         """Pending shipments compatible with a carrier (RF-MAT-03, RF-CAR-03).
 
         Collaborative shipments are matched against the carrier's published
         routes (detour hard-capped at 15%); dedicated ones by vehicle
         compatibility and proximity to the pickup.
         """
-        carrier = self.carrier_repo.get_by_id(carrier_id)
+        carrier = await self.carrier_repo.get_by_id(carrier_id)
         if carrier is None or not (carrier.is_active and carrier.is_verified):
             return []
 
         my_routes = []
         if self.route_repo is not None:
             my_routes = [
-                r for r in self.route_repo.list_active_in_window(_naive_utcnow())
+                r for r in await self.route_repo.list_active_in_window(_naive_utcnow())
                 if r.carrier_id == carrier_id and r.kind == "collaborative_route"
             ]
 
         # Active deliveries shape what can still be offered: they consume
         # capacity and anchor the zone where chained pickups make sense.
-        active = self.shipment_repo.list_active_by_carrier(carrier_id)
+        active = await self.shipment_repo.list_active_by_carrier(carrier_id)
         reserved_kg = sum(s.weight_kg for s in active)
         active_dropoffs = [Point(s.destination_lat, s.destination_lon) for s in active]
         carrier_pos = (
@@ -226,8 +227,8 @@ class MatchingService:
         )
 
         items: list[FeedItemResponse] = []
-        for shipment in self.shipment_repo.list_pending():
-            if not self._passes_common_knockouts(carrier, shipment):
+        for shipment in await self.shipment_repo.list_pending():
+            if not await self._passes_common_knockouts(carrier, shipment):
                 continue
             # Remaining (not total) capacity: what the vehicle can still take.
             if carrier.capacity_kg - reserved_kg < shipment.weight_kg:
@@ -237,7 +238,7 @@ class MatchingService:
 
             # With deliveries in progress, only offer pickups that chain with
             # the current work (near the rider or near an active drop-off).
-            if active and not self._chains_with_active(carrier_pos, active_dropoffs, pickup):
+            if active and not await self._chains_with_active(carrier_pos, active_dropoffs, pickup):
                 continue
 
             if shipment.modality == ShipmentModality.COLLABORATIVE:
@@ -245,7 +246,7 @@ class MatchingService:
                     continue
                 # Soft-mobility trip-length knockout is enforced in
                 # _passes_common_knockouts (applies to every modality).
-                best = self._best_route_match(my_routes, pickup, dropoff)
+                best = await self._best_route_match(my_routes, pickup, dropoff)
                 if best is None:
                     continue
                 route, detour, geo = best
@@ -310,15 +311,28 @@ class MatchingService:
         items.sort(key=lambda i: i.score, reverse=True)
         return items[:limit]
 
-    def _best_route_match(self, routes, pickup: Point, dropoff: Point):
-        """Lowest-detour route accepting this shipment, or None if all exceed the cap."""
+    async def _best_route_match(self, routes, pickup: Point, dropoff: Point):
+        """Lowest-detour route accepting this shipment, or None if all exceed the cap.
+
+        Los detours de todas las rutas se piden a OSRM EN PARALELO (gather):
+        N candidatos cuestan ~1 round-trip, no N.
+        """
+        if not routes:
+            return None
+        detours = await asyncio.gather(*[
+            self.osrm.detour(
+                Point(r.origin_lat, r.origin_lon),
+                Point(r.destination_lat, r.destination_lon),
+                pickup, dropoff,
+            )
+            for r in routes
+        ])
         best = None
-        for route in routes:
-            route_origin = Point(route.origin_lat, route.origin_lon)
-            route_dest = Point(route.destination_lat, route.destination_lon)
-            detour = insertion_detour(route_origin, route_dest, pickup, dropoff, osrm_client=self.osrm)
+        for route, detour in zip(routes, detours):
             if detour.detour_ratio > MAX_DETOUR_RATIO_COLLABORATIVE:
                 continue
+            route_origin = Point(route.origin_lat, route.origin_lon)
+            route_dest = Point(route.destination_lat, route.destination_lon)
             geo = geo_score_collaborative(pickup, dropoff, route_origin, route_dest)
             if best is None or detour.detour_km < best[1].detour_km:
                 best = (route, detour, geo)
@@ -326,7 +340,7 @@ class MatchingService:
 
     # -- collaborative: match against published routes -------------------------
 
-    def _rank_collaborative(self, shipment: Shipment) -> list[CarrierScoreResponse]:
+    async def _rank_collaborative(self, shipment: Shipment) -> list[CarrierScoreResponse]:
         if self.route_repo is None:
             return []
         if shipment.package_size in COLLABORATIVE_FORBIDDEN_SIZES:
@@ -337,18 +351,30 @@ class MatchingService:
         now = _naive_utcnow()
 
         results: list[CarrierScoreResponse] = []
-        routes = [r for r in self.route_repo.list_active_in_window(now)
+        routes = [r for r in await self.route_repo.list_active_in_window(now)
                   if r.kind == "collaborative_route"]
         # Batch-fetch the carriers of all candidate routes in one query (no N+1).
-        carriers = self.carrier_repo.get_by_ids([r.carrier_id for r in routes])
+        carriers = await self.carrier_repo.get_by_ids([r.carrier_id for r in routes])
+
+        # Knockouts primero (baratos), después TODOS los detours en paralelo.
+        candidates = []
         for route in routes:
             carrier = carriers.get(route.carrier_id)
-            if carrier is None or not self._passes_common_knockouts(carrier, shipment):
+            if carrier is None or not await self._passes_common_knockouts(carrier, shipment):
                 continue
+            candidates.append((route, carrier))
+        detours = await asyncio.gather(*[
+            self.osrm.detour(
+                Point(r.origin_lat, r.origin_lon),
+                Point(r.destination_lat, r.destination_lon),
+                pickup, dropoff,
+            )
+            for r, _ in candidates
+        ])
 
+        for (route, carrier), detour in zip(candidates, detours):
             route_origin = Point(route.origin_lat, route.origin_lon)
             route_dest = Point(route.destination_lat, route.destination_lon)
-            detour = insertion_detour(route_origin, route_dest, pickup, dropoff, osrm_client=self.osrm)
 
             # HARD constraint (Yang et al.): excessive detour cancels the
             # environmental advantage — exclude, don't just penalize.
@@ -358,7 +384,7 @@ class MatchingService:
             geo = geo_score_collaborative(pickup, dropoff, route_origin, route_dest)
             detour_component = 1.0 - min(1.0, detour.detour_ratio / MAX_DETOUR_RATIO_COLLABORATIVE)
             time_c = time_window_score(route.window_start, route.window_end, now)
-            results.append(self._build_response(
+            results.append(await self._build_response(
                 carrier=carrier,
                 shipment=shipment,
                 geo=geo,
@@ -377,7 +403,7 @@ class MatchingService:
 
     # -- dedicated: match against available carriers ---------------------------
 
-    def _rank_dedicated(self, shipment: Shipment) -> list[CarrierScoreResponse]:
+    async def _rank_dedicated(self, shipment: Shipment) -> list[CarrierScoreResponse]:
         """Score dedicated-mode candidates.
 
         Two sub-modalities (spec 3):
@@ -393,11 +419,11 @@ class MatchingService:
         seen_carrier_ids: set[int] = set()
 
         # --- 1. ON_DEMAND ---------------------------------------------------
-        candidates = self.carrier_repo.list_available_with_location(
+        candidates = await self.carrier_repo.list_available_with_location(
             min_capacity_kg=shipment.weight_kg
         )
         for carrier in candidates:
-            if not self._passes_common_knockouts(carrier, shipment):
+            if not await self._passes_common_knockouts(carrier, shipment):
                 continue
             seen_carrier_ids.add(carrier.id)
             carrier_pos = (
@@ -410,7 +436,7 @@ class MatchingService:
                 eta_minutes(road_km(carrier_pos, pickup), carrier.vehicle_type)
                 if carrier_pos else None
             )
-            results.append(self._build_response(
+            results.append(await self._build_response(
                 carrier=carrier,
                 shipment=shipment,
                 geo=geo,
@@ -430,13 +456,13 @@ class MatchingService:
         # if they don't have is_available=True in their carrier profile — their
         # commitment is the window itself (spec 3.3, RF-CAR-02).
         if self.route_repo is not None:
-            windows = [r for r in self.route_repo.list_active_in_window(now)
+            windows = [r for r in await self.route_repo.list_active_in_window(now)
                        if r.kind == "dedicated_window"]
             # Batch-fetch the carriers of all windows in one query (no N+1).
-            window_carriers = self.carrier_repo.get_by_ids([r.carrier_id for r in windows])
+            window_carriers = await self.carrier_repo.get_by_ids([r.carrier_id for r in windows])
             for route in windows:
                 carrier = window_carriers.get(route.carrier_id)
-                if carrier is None or not self._passes_common_knockouts(carrier, shipment):
+                if carrier is None or not await self._passes_common_knockouts(carrier, shipment):
                     continue
                 if carrier.id in seen_carrier_ids:
                     # Already ranked as ON_DEMAND — avoid double-counting.
@@ -449,7 +475,7 @@ class MatchingService:
                 # Use the zone centre (route origin) as the carrier's effective position.
                 zone_center = Point(route.origin_lat, route.origin_lon)
                 geo = geo_score_dedicated(zone_center, pickup)
-                results.append(self._build_response(
+                results.append(await self._build_response(
                     carrier=carrier,
                     shipment=shipment,
                     geo=geo,
@@ -470,7 +496,7 @@ class MatchingService:
     # -- shared helpers ---------------------------------------------------------
 
     @staticmethod
-    def _chains_with_active(carrier_pos: Point | None,
+    async def _chains_with_active(carrier_pos: Point | None,
                             active_dropoffs: list[Point], pickup: Point) -> bool:
         """A new pickup chains with the current work if it is close to the
         rider's position or to one of the active drop-offs (MAX_CHAIN_PICKUP_KM).
@@ -482,7 +508,7 @@ class MatchingService:
             return True
         return any(road_km(a, pickup) <= MAX_CHAIN_PICKUP_KM for a in anchors)
 
-    def _passes_common_knockouts(self, carrier: Carrier, shipment: Shipment) -> bool:
+    async def _passes_common_knockouts(self, carrier: Carrier, shipment: Shipment) -> bool:
         """Hard filters common to both modalities (spec 5.2 'filtros duros')."""
         if not (carrier.is_active and carrier.is_verified):
             return False
@@ -502,7 +528,7 @@ class MatchingService:
                 return False
         return True
 
-    def _build_response(
+    async def _build_response(
         self,
         carrier: Carrier,
         shipment: Shipment,

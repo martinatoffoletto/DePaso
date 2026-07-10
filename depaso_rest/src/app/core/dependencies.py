@@ -6,7 +6,7 @@ from typing import Annotated
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.app.core.database import get_db
 from src.app.core.security import decode_access_token
@@ -37,4 +37,4 @@ async def get_current_user_id(token: str = Depends(oauth2_scheme)) -> int:
 
 # Type alias for dependency injection
 CurrentUserId = Annotated[int, Depends(get_current_user_id)]
-DatabaseSession = Annotated[Session, Depends(get_db)]
+DatabaseSession = Annotated[AsyncSession, Depends(get_db)]

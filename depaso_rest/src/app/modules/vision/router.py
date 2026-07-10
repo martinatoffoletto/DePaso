@@ -2,7 +2,9 @@
 Vision module API router.
 """
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile, status
-from sqlalchemy.orm import Session
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+from starlette.concurrency import run_in_threadpool
 
 from src.app.core.database import get_db
 from src.app.core.dependencies import CurrentUserId
@@ -24,7 +26,7 @@ async def classify_image(
     current_user_id: CurrentUserId,
     image: UploadFile = File(...),
     has_reference_object: bool = Form(False),
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
 ):
     """Classify a package photo into a size category (RF-VIS-01).
 
@@ -38,7 +40,10 @@ async def classify_image(
                             detail="Image too large (max 10 MB)")
 
     classifier = request.app.state.classifier
-    result = classifier.classify(image_bytes, has_reference_object=has_reference_object)
+    # model.predict es CPU-bound: al threadpool, así no congela el event loop.
+    result = await run_in_threadpool(
+        classifier.classify, image_bytes, has_reference_object=has_reference_object
+    )
 
     record = Classification(
         user_id=current_user_id,
@@ -48,8 +53,8 @@ async def classify_image(
         model_loaded=result["model_loaded"],
     )
     db.add(record)
-    db.commit()
-    db.refresh(record)
+    await db.flush()
+    await db.refresh(record)
 
     return ClassificationResponse(classification_id=record.id, **result)
 
@@ -59,31 +64,34 @@ async def classification_feedback(
     classification_id: int,
     data: ClassificationFeedback,
     current_user_id: CurrentUserId,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
 ):
     """Record whether the user accepted the suggestion or corrected it (RF-VIS-04)."""
-    record = db.query(Classification).filter(Classification.id == classification_id).first()
+    record = (
+        await db.execute(select(Classification).where(Classification.id == classification_id))
+    ).scalar_one_or_none()
     if not record or record.user_id != current_user_id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
                             detail="Classification not found")
     record.accepted = data.accepted
     record.manual_category = data.manual_category
-    db.commit()
-    db.refresh(record)
+    await db.flush()
+    await db.refresh(record)
     return ClassificationLogEntry.model_validate(record)
 
 
 @router.get("/classifications", response_model=list[ClassificationLogEntry])
 async def list_my_classifications(
     current_user_id: CurrentUserId,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
 ):
     """The current user's classification history (RF-VIS-04)."""
     records = (
-        db.query(Classification)
-        .filter(Classification.user_id == current_user_id)
-        .order_by(Classification.created_at.desc())
-        .limit(50)
-        .all()
-    )
+        await db.execute(
+            select(Classification)
+            .where(Classification.user_id == current_user_id)
+            .order_by(Classification.created_at.desc())
+            .limit(50)
+        )
+    ).scalars().all()
     return [ClassificationLogEntry.model_validate(r) for r in records]

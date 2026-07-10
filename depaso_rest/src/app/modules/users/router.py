@@ -2,12 +2,11 @@
 User module API router.
 HTTP endpoints for user management.
 """
-from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.orm import Session
+from fastapi import APIRouter, Depends, status
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.app.core.database import get_db
 from src.app.core.dependencies import CurrentUserId
-from src.app.shared.exceptions import DomainException
 from src.app.modules.users.schemas import UserCreate, UserResponse, UserUpdate
 from src.app.modules.users.service import UserService
 from src.app.modules.users.repository import UserRepository
@@ -15,7 +14,7 @@ from src.app.modules.users.repository import UserRepository
 router = APIRouter(prefix="/users", tags=["users"])
 
 
-def get_user_service(db: Session = Depends(get_db)) -> UserService:
+def get_user_service(db: AsyncSession = Depends(get_db)) -> UserService:
     """Dependency: get user service."""
     return UserService(UserRepository(db))
 
@@ -26,18 +25,15 @@ async def create_user(
     service: UserService = Depends(get_user_service),
 ) -> UserResponse:
     """Create a new user."""
-    try:
-        user = service.create_user(
-            email=user_data.email,
-            password=user_data.password,
-            first_name=user_data.first_name,
-            last_name=user_data.last_name,
-            phone_number=user_data.phone_number,
-            user_type=user_data.user_type,
-        )
-        return UserResponse.model_validate(user)
-    except DomainException as e:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=e.message)
+    user = await service.create_user(
+        email=user_data.email,
+        password=user_data.password,
+        first_name=user_data.first_name,
+        last_name=user_data.last_name,
+        phone_number=user_data.phone_number,
+        user_type=user_data.user_type,
+    )
+    return UserResponse.model_validate(user)
 
 @router.get("/me", response_model=UserResponse)
 async def get_me(
@@ -45,11 +41,8 @@ async def get_me(
     service: UserService = Depends(get_user_service),
 ) -> UserResponse:
     """Get the current user."""
-    try:
-        user = service.get_user_by_id(current_user_id)
-        return UserResponse.model_validate(user)
-    except DomainException as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=e.message)
+    user = await service.get_user_by_id(current_user_id)
+    return UserResponse.model_validate(user)
 
 
 @router.patch("/me", response_model=UserResponse)
@@ -59,17 +52,14 @@ async def update_me(
     service: UserService = Depends(get_user_service),
 ) -> UserResponse:
     """Update the current user."""
-    try:
-        user = service.update_user(
-            current_user_id,
-            first_name=user_data.first_name,
-            last_name=user_data.last_name,
-            phone_number=user_data.phone_number,
-            user_type=user_data.user_type,
-        )
-        return UserResponse.model_validate(user)
-    except DomainException as e:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=e.message)
+    user = await service.update_user(
+        current_user_id,
+        first_name=user_data.first_name,
+        last_name=user_data.last_name,
+        phone_number=user_data.phone_number,
+        user_type=user_data.user_type,
+    )
+    return UserResponse.model_validate(user)
 
 
 @router.get("/{user_id}", response_model=UserResponse)
@@ -78,11 +68,8 @@ async def get_user(
     service: UserService = Depends(get_user_service),
 ) -> UserResponse:
     """Get a user by id."""
-    try:
-        user = service.get_user_by_id(user_id)
-        return UserResponse.model_validate(user)
-    except DomainException as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=e.message)
+    user = await service.get_user_by_id(user_id)
+    return UserResponse.model_validate(user)
 
 
 @router.get("", response_model=list[UserResponse])
@@ -92,7 +79,7 @@ async def list_users(
     service: UserService = Depends(get_user_service),
 ) -> list[UserResponse]:
     """List all users."""
-    users, _ = service.list_users(skip, limit)
+    users, _ = await service.list_users(skip, limit)
     return [UserResponse.model_validate(u) for u in users]
 
 
@@ -103,16 +90,13 @@ async def update_user(
     service: UserService = Depends(get_user_service),
 ) -> UserResponse:
     """Update a user."""
-    try:
-        user = service.update_user(
-            user_id,
-            first_name=user_data.first_name,
-            last_name=user_data.last_name,
-            phone_number=user_data.phone_number,
-        )
-        return UserResponse.model_validate(user)
-    except DomainException as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=e.message)
+    user = await service.update_user(
+        user_id,
+        first_name=user_data.first_name,
+        last_name=user_data.last_name,
+        phone_number=user_data.phone_number,
+    )
+    return UserResponse.model_validate(user)
 
 
 @router.delete("/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -121,7 +105,4 @@ async def delete_user(
     service: UserService = Depends(get_user_service),
 ) -> None:
     """Delete a user (soft delete)."""
-    try:
-        service.delete_user(user_id)
-    except DomainException as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=e.message)
+    await service.delete_user(user_id)

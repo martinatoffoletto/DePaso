@@ -6,7 +6,8 @@ admin is created by the seed script. All logic lives in AdminService — the
 router only handles auth and HTTP mapping.
 """
 from fastapi import APIRouter, Depends, HTTPException, Request, status
-from sqlalchemy.orm import Session
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.app.core.database import get_db
 from src.app.core.dependencies import CurrentUserId
@@ -25,15 +26,17 @@ from src.app.modules.users.models import User
 router = APIRouter(prefix="/admin", tags=["admin"])
 
 
-def require_admin(current_user_id: CurrentUserId, db: Session = Depends(get_db)) -> User:
-    user = db.query(User).filter(User.id == current_user_id).first()
+async def require_admin(current_user_id: CurrentUserId, db: AsyncSession = Depends(get_db)) -> User:
+    user = (
+        await db.execute(select(User).where(User.id == current_user_id))
+    ).scalar_one_or_none()
     if not user or user.user_type != "admin":
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN,
                             detail="Admin access required")
     return user
 
 
-def get_admin_service(db: Session = Depends(get_db)) -> AdminService:
+def get_admin_service(db: AsyncSession = Depends(get_db)) -> AdminService:
     return AdminService(db)
 
 
@@ -43,7 +46,7 @@ async def dashboard(
     service: AdminService = Depends(get_admin_service),
 ):
     """Operational aggregates for the monitoring panel (RF-ADM-01/02)."""
-    return DashboardResponse(**service.dashboard())
+    return DashboardResponse(**await service.dashboard())
 
 
 @router.get("/carriers/pending", response_model=list[CarrierResponse])
@@ -52,7 +55,7 @@ async def pending_carriers(
     service: AdminService = Depends(get_admin_service),
 ):
     """Carriers awaiting verification (RF-USR-07)."""
-    return [CarrierResponse.model_validate(c) for c in service.pending_carriers()]
+    return [CarrierResponse.model_validate(c) for c in await service.pending_carriers()]
 
 
 @router.patch("/carriers/{carrier_id}", response_model=CarrierResponse)
@@ -63,10 +66,7 @@ async def moderate_carrier(
     service: AdminService = Depends(get_admin_service),
 ):
     """Verify, suspend or reactivate a carrier (RF-USR-07, RF-ADM-03)."""
-    try:
-        carrier = service.moderate_carrier(carrier_id, data.action)
-    except ValueError as e:
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(e))
+    carrier = await service.moderate_carrier(carrier_id, data.action)
     if carrier is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Carrier not found")
     return CarrierResponse.model_validate(carrier)
@@ -81,7 +81,7 @@ async def system_status(
     """Operational health for the monitoring panel (RF-ADM): API/DB health and
     whether the vision classifier runs the trained model or the stub fallback."""
     classifier = getattr(request.app.state, "classifier", None)
-    return SystemStatusResponse(**service.system_status(classifier))
+    return SystemStatusResponse(**await service.system_status(classifier))
 
 
 @router.get("/activity", response_model=ActivityResponse)
@@ -91,7 +91,7 @@ async def recent_activity(
     service: AdminService = Depends(get_admin_service),
 ):
     """Latest classifications and shipment status changes (RF-ADM monitoring)."""
-    data = service.recent_activity(limit)
+    data = await service.recent_activity(limit)
     return ActivityResponse(
         recent_classifications=[
             ClassificationActivityItem.model_validate(c, from_attributes=True)

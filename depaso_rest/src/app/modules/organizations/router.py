@@ -6,7 +6,7 @@ become its owner. The "org" role is derived from organization_members via the
 `get_current_org` dependency — it is never carried in the JWT.
 """
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.app.core.database import get_db
 from src.app.core.dependencies import CurrentUserId
@@ -32,12 +32,11 @@ from src.app.modules.organizations.service import OrganizationService
 from src.app.modules.routes.repository import RouteRepository
 from src.app.modules.shipments.repository import ShipmentRepository
 from src.app.modules.shipments.service import ShipmentService
-from src.app.shared.exceptions import DomainException, ForbiddenError, NotFoundError
 
 router = APIRouter(prefix="/organizations", tags=["organizations"])
 
 
-def get_org_service(db: Session = Depends(get_db)) -> OrganizationService:
+def get_org_service(db: AsyncSession = Depends(get_db)) -> OrganizationService:
     shipment_repo = ShipmentRepository(db)
     shipment_service = ShipmentService(
         shipment_repo,
@@ -52,12 +51,12 @@ def get_org_service(db: Session = Depends(get_db)) -> OrganizationService:
     )
 
 
-def get_current_org(
+async def get_current_org(
     current_user_id: CurrentUserId,
     service: OrganizationService = Depends(get_org_service),
 ) -> Organization:
     """Resolve the caller's active organization from their membership (403 if none)."""
-    resolved = service.resolve_membership(current_user_id)
+    resolved = await service.resolve_membership(current_user_id)
     if resolved is None:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -65,14 +64,6 @@ def get_current_org(
         )
     org, _ = resolved
     return org
-
-
-def _raise_domain(exc: DomainException) -> None:
-    if isinstance(exc, NotFoundError):
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=exc.message)
-    if isinstance(exc, ForbiddenError):
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=exc.message)
-    raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=exc.message)
 
 
 # -- organization CRUD ------------------------------------------------------
@@ -84,14 +75,11 @@ async def create_organization(
     service: OrganizationService = Depends(get_org_service),
 ) -> OrganizationResponse:
     """Create an organization; the caller becomes its owner."""
-    try:
-        org = service.create_organization(
-            owner_user_id=current_user_id,
-            name=data.name, cuit=data.cuit, kind=data.kind,
-        )
-        return OrganizationResponse.model_validate(org)
-    except DomainException as e:
-        _raise_domain(e)
+    org = await service.create_organization(
+        owner_user_id=current_user_id,
+        name=data.name, cuit=data.cuit, kind=data.kind,
+    )
+    return OrganizationResponse.model_validate(org)
 
 
 @router.get("", response_model=list[MyOrganizationResponse])
@@ -101,7 +89,7 @@ async def list_my_organizations(
 ) -> list[MyOrganizationResponse]:
     """Organizations the current user administers (with their role in each)."""
     out: list[MyOrganizationResponse] = []
-    for org, role in service.list_my_organizations(current_user_id):
+    for org, role in await service.list_my_organizations(current_user_id):
         payload = OrganizationResponse.model_validate(org).model_dump()
         out.append(MyOrganizationResponse(**payload, my_role=role))
     return out
@@ -113,7 +101,7 @@ async def get_my_organization(
     service: OrganizationService = Depends(get_org_service),
 ) -> MyOrganizationResponse:
     """The caller's active organization (resolved from membership)."""
-    resolved = service.resolve_membership(current_user_id)
+    resolved = await service.resolve_membership(current_user_id)
     if resolved is None:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN,
                             detail=NotAnOrgMemberError().message)
@@ -133,11 +121,8 @@ async def update_organization(
     if service.org_repo.get_membership(org_id, current_user_id) is None:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN,
                             detail="You are not a member of this organization")
-    try:
-        org = service.update_organization(org_id, **data.model_dump(exclude_unset=True))
-        return OrganizationResponse.model_validate(org)
-    except DomainException as e:
-        _raise_domain(e)
+    org = await service.update_organization(org_id, **data.model_dump(exclude_unset=True))
+    return OrganizationResponse.model_validate(org)
 
 
 # -- monitoring & finance ---------------------------------------------------
@@ -148,7 +133,7 @@ async def my_dashboard(
     service: OrganizationService = Depends(get_org_service),
 ) -> OrgDashboardResponse:
     """Monitoring KPIs for the pyme panel."""
-    return OrgDashboardResponse(**service.dashboard(org))
+    return OrgDashboardResponse(**await service.dashboard(org))
 
 
 @router.get("/me/finance", response_model=OrgFinanceResponse)
@@ -157,7 +142,7 @@ async def my_finance(
     service: OrganizationService = Depends(get_org_service),
 ) -> OrgFinanceResponse:
     """Money spent (on shipments) vs earned (by the fleet), per month + total."""
-    return OrgFinanceResponse(**service.finance(org))
+    return OrgFinanceResponse(**await service.finance(org))
 
 
 # -- fleet: carriers --------------------------------------------------------
@@ -168,7 +153,7 @@ async def list_my_carriers(
     service: OrganizationService = Depends(get_org_service),
 ) -> list[OrgCarrierResponse]:
     """List the organization's fleet (active and inactive links)."""
-    return [OrgCarrierResponse(**row) for row in service.list_fleet(org)]
+    return [OrgCarrierResponse(**row) for row in await service.list_fleet(org)]
 
 
 @router.post("/me/carriers", response_model=OrgCarrierResponse,
@@ -179,11 +164,8 @@ async def link_carrier(
     service: OrganizationService = Depends(get_org_service),
 ) -> OrgCarrierResponse:
     """Link an existing carrier to the fleet (fleet/both orgs only)."""
-    try:
-        service.link_carrier(org, data.carrier_id)
-    except DomainException as e:
-        _raise_domain(e)
-    return _carrier_row(service, org, data.carrier_id)
+    await service.link_carrier(org, data.carrier_id)
+    return await _carrier_row(service, org, data.carrier_id)
 
 
 @router.delete("/me/carriers/{carrier_id}", response_model=OrgCarrierResponse)
@@ -193,15 +175,12 @@ async def unlink_carrier(
     service: OrganizationService = Depends(get_org_service),
 ) -> OrgCarrierResponse:
     """Unlink a carrier (status=inactive, keeps the user). Fleet/both orgs only."""
-    try:
-        service.unlink_carrier(org, carrier_id)
-    except DomainException as e:
-        _raise_domain(e)
-    return _carrier_row(service, org, carrier_id)
+    await service.unlink_carrier(org, carrier_id)
+    return await _carrier_row(service, org, carrier_id)
 
 
-def _carrier_row(service: OrganizationService, org: Organization, carrier_id: int) -> OrgCarrierResponse:
-    for row in service.list_fleet(org):
+async def _carrier_row(service: OrganizationService, org: Organization, carrier_id: int) -> OrgCarrierResponse:
+    for row in await service.list_fleet(org):
         if row["carrier_id"] == carrier_id:
             return OrgCarrierResponse(**row)
     raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Carrier link not found")
@@ -218,7 +197,7 @@ async def list_my_shipments(
     service: OrganizationService = Depends(get_org_service),
 ) -> list[OrgShipmentResponse]:
     """Shipments created by the organization (optional ?status= filter)."""
-    shipments, _ = service.list_shipments(org, status_filter, skip, limit)
+    shipments, _ = await service.list_shipments(org, status_filter, skip, limit)
     return [OrgShipmentResponse.model_validate(s) for s in shipments]
 
 
@@ -231,10 +210,7 @@ async def create_my_shipment(
     service: OrganizationService = Depends(get_org_service),
 ) -> OrgShipmentResponse:
     """Create a shipment as a merchant org (merchant/both orgs only)."""
-    try:
-        shipment = service.create_shipment(
-            org, owner_user_id=current_user_id, **data.model_dump()
-        )
-        return OrgShipmentResponse.model_validate(shipment)
-    except DomainException as e:
-        _raise_domain(e)
+    shipment = await service.create_shipment(
+        org, owner_user_id=current_user_id, **data.model_dump()
+    )
+    return OrgShipmentResponse.model_validate(shipment)

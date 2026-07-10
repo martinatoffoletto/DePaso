@@ -1,7 +1,8 @@
 """
 Matching module repository — persistence of admin-tunable scoring weights.
 """
-from sqlalchemy.orm import Session
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.app.modules.matching.models import MatchingWeight
 
@@ -9,27 +10,28 @@ from src.app.modules.matching.models import MatchingWeight
 class MatchingWeightsRepository:
     """Reads/writes the scoring weights stored in DB (RF-ADM)."""
 
-    def __init__(self, db: Session) -> None:
+    def __init__(self, db: AsyncSession) -> None:
         self.db = db
 
-    def load(self, defaults: dict[str, float]) -> dict[str, float]:
+    async def load(self, defaults: dict[str, float]) -> dict[str, float]:
         """Weights from DB merged over the code defaults."""
         weights = defaults.copy()
-        for row in self.db.query(MatchingWeight).all():
+        rows = (await self.db.execute(select(MatchingWeight))).scalars().all()
+        for row in rows:
             if row.name in weights:
                 weights[row.name] = row.value
         return weights
 
-    def save(self, updates: dict[str, float]) -> None:
+    async def save(self, updates: dict[str, float]) -> None:
         """Upsert the given components."""
         for name, value in updates.items():
             row = (
-                self.db.query(MatchingWeight)
-                .filter(MatchingWeight.name == name)
-                .first()
-            )
+                await self.db.execute(
+                    select(MatchingWeight).where(MatchingWeight.name == name)
+                )
+            ).scalar_one_or_none()
             if row:
                 row.value = value
             else:
                 self.db.add(MatchingWeight(name=name, value=value))
-        self.db.commit()
+        await self.db.flush()

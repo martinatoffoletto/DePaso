@@ -64,7 +64,6 @@ def insertion_detour(
     route_destination: Point,
     pickup: Point,
     dropoff: Point,
-    osrm_client=None,
 ) -> DetourResult:
     """
     Detour caused by inserting a shipment into an existing carrier route.
@@ -79,12 +78,8 @@ def insertion_detour(
     (2022): collaborative assignment is only valid below a detour threshold,
     otherwise the emission advantage over a dedicated trip disappears.
     """
-    if osrm_client:
-        base = osrm_client.route_km([route_origin, route_destination])
-        total = osrm_client.route_km([route_origin, pickup, dropoff, route_destination])
-    else:
-        base = road_km(route_origin, route_destination)
-        total = path_km([route_origin, pickup, dropoff, route_destination])
+    base = road_km(route_origin, route_destination)
+    total = path_km([route_origin, pickup, dropoff, route_destination])
 
     detour = max(0.0, total - base)
     ratio = detour / base if base > 0 else float("inf")

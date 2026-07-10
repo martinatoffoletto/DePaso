@@ -9,6 +9,7 @@ from datetime import datetime, timedelta, timezone
 from src.app.core.config import settings
 from src.app.core.security import create_access_token, get_password_hash, verify_password
 from src.app.modules.auth.exceptions import InvalidCredentialsError
+from src.app.shared.exceptions import AlreadyExistsError, NotFoundError, ValidationError
 from src.app.modules.auth.models import PasswordResetToken
 from src.app.modules.users import User, UserRepository
 
@@ -24,15 +25,15 @@ class AuthService:
         """Initialize with user repository."""
         self.user_repository = user_repository
 
-    def register(self, email: str, password: str, first_name: str, last_name: str,
+    async def register(self, email: str, password: str, first_name: str, last_name: str,
                  phone_number: str | None = None, user_type: str = "client") -> User:
         """Register a new user."""
-        existing_user = self.user_repository.get_by_email(email)
+        existing_user = await self.user_repository.get_by_email(email)
         if existing_user:
-            raise ValueError("Email already registered")
+            raise AlreadyExistsError("User", code="EMAIL_ALREADY_REGISTERED")
 
         password_hash = get_password_hash(password)
-        return self.user_repository.create(
+        return await self.user_repository.create(
             email=email,
             password_hash=password_hash,
             first_name=first_name,
@@ -41,18 +42,18 @@ class AuthService:
             user_type=user_type,
         )
 
-    def authenticate(self, email: str, password: str) -> User:
+    async def authenticate(self, email: str, password: str) -> User:
         """Authenticate a user and return the user object."""
-        user = self.user_repository.get_by_email(email)
+        user = await self.user_repository.get_by_email(email)
         if not user or not verify_password(password, user.password_hash):
             raise InvalidCredentialsError()
 
         if not user.is_active:
-            raise ValueError("User account is inactive")
+            raise InvalidCredentialsError()  # generic on purpose: do not leak account state
 
         return user
 
-    def create_tokens(self, user_id: int) -> tuple[str, str, int]:
+    async def create_tokens(self, user_id: int) -> tuple[str, str, int]:
         """Create access + refresh token pair (RNF-SEC-03)."""
         access_token = create_access_token(
             data={"sub": str(user_id)},
@@ -64,7 +65,7 @@ class AuthService:
         )
         return access_token, refresh_token, settings.jwt_expire_minutes * 60
 
-    def refresh_tokens(self, refresh_token: str) -> tuple[str, str, int]:
+    async def refresh_tokens(self, refresh_token: str) -> tuple[str, str, int]:
         """Issue a new token pair from a valid refresh token."""
         from jose import JWTError
 
@@ -77,32 +78,32 @@ class AuthService:
         if payload.get("type") != "refresh" or "sub" not in payload:
             raise InvalidCredentialsError()
 
-        user = self.user_repository.get_by_id(int(payload["sub"]))
+        user = await self.user_repository.get_by_id(int(payload["sub"]))
         if not user or not user.is_active:
             raise InvalidCredentialsError()
-        return self.create_tokens(user.id)
+        return await self.create_tokens(user.id)
 
-    def change_password(self, user_id: int, current_password: str, new_password: str) -> bool:
+    async def change_password(self, user_id: int, current_password: str, new_password: str) -> bool:
         """Change password for an authenticated user."""
-        user = self.user_repository.get_by_id(user_id)
+        user = await self.user_repository.get_by_id(user_id)
         if not user:
-            raise ValueError("User not found")
+            raise NotFoundError("User")
 
         if not verify_password(current_password, user.password_hash):
             raise InvalidCredentialsError()
 
         new_hash = get_password_hash(new_password)
-        self.user_repository.update(user_id, password_hash=new_hash)
+        await self.user_repository.update(user_id, password_hash=new_hash)
         return True
 
-    def request_password_reset(self, email: str) -> str | None:
+    async def request_password_reset(self, email: str) -> str | None:
         """Generate and persist a password reset token. Returns None if user not found.
 
         Email delivery is out of scope for the prototype: the token is logged
         (and surfaced in the API response only in debug mode) so the demo can
         complete the flow without an SMTP service.
         """
-        user = self.user_repository.get_by_email(email)
+        user = await self.user_repository.get_by_email(email)
         if not user:
             # Don't reveal if the email exists
             logger.info(f"Password reset requested for non-existent email: {email}")
@@ -116,25 +117,26 @@ class AuthService:
             expires_at=datetime.now(timezone.utc).replace(tzinfo=None)
             + timedelta(hours=RESET_TOKEN_TTL_HOURS),
         ))
-        db.commit()
+        await db.flush()
         logger.info(f"Password reset token for user {user.id}: {reset_token}")
         return reset_token
 
-    def reset_password(self, token: str, new_password: str) -> bool:
+    async def reset_password(self, token: str, new_password: str) -> bool:
         """Reset password using a single-use, time-limited reset token."""
         db = self.user_repository.db
         token_hash = hashlib.sha256(token.encode()).hexdigest()
+        from sqlalchemy import select
         record = (
-            db.query(PasswordResetToken)
-            .filter(PasswordResetToken.token_hash == token_hash)
-            .first()
-        )
+            await db.execute(
+                select(PasswordResetToken).where(PasswordResetToken.token_hash == token_hash)
+            )
+        ).scalars().first()
         if (record is None or record.used
                 or record.expires_at < datetime.now(timezone.utc).replace(tzinfo=None)):
-            raise ValueError("Invalid or expired reset token")
+            raise ValidationError("Invalid or expired reset token", code="INVALID_RESET_TOKEN")
 
-        self.user_repository.update(record.user_id, password_hash=get_password_hash(new_password))
+        await self.user_repository.update(record.user_id, password_hash=get_password_hash(new_password))
         record.used = True
-        db.commit()
+        await db.flush()
         logger.info(f"Password reset completed for user {record.user_id}")
         return True

@@ -1,7 +1,8 @@
 """
 Carriers module repository for data access.
 """
-from sqlalchemy.orm import Session
+from sqlalchemy import func, select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.app.shared.base_repository import BaseRepository
 from src.app.modules.carriers.models import Carrier
@@ -10,53 +11,65 @@ from src.app.modules.carriers.models import Carrier
 class CarrierRepository(BaseRepository[Carrier]):
     """Repository for carrier data access."""
 
-    def __init__(self, db: Session) -> None:
+    def __init__(self, db: AsyncSession) -> None:
         super().__init__(Carrier, db)
 
-    def get_by_user_id(self, user_id: int) -> Carrier | None:
+    async def get_by_user_id(self, user_id: int) -> Carrier | None:
         """Get carrier profile by user ID."""
-        return self.db.query(Carrier).filter(Carrier.user_id == user_id).first()
+        result = await self.db.execute(select(Carrier).where(Carrier.user_id == user_id))
+        return result.scalar_one_or_none()
 
-    def get_by_ids(self, carrier_ids: list[int]) -> dict[int, Carrier]:
+    async def get_by_ids(self, carrier_ids: list[int]) -> dict[int, Carrier]:
         """Batch-fetch carriers by id, keyed by id (avoids N+1 in loops)."""
         if not carrier_ids:
             return {}
-        carriers = self.db.query(Carrier).filter(Carrier.id.in_(carrier_ids)).all()
-        return {c.id: c for c in carriers}
+        result = await self.db.execute(select(Carrier).where(Carrier.id.in_(carrier_ids)))
+        return {c.id: c for c in result.scalars().all()}
 
-    def list_active(self, skip: int = 0, limit: int = 20) -> tuple[list[Carrier], int]:
+    async def list_active(self, skip: int = 0, limit: int = 20) -> tuple[list[Carrier], int]:
         """List all active and verified carriers."""
-        query = self.db.query(Carrier).filter(
-            Carrier.is_active == True,
-            Carrier.is_verified == True,
+        base = select(Carrier).where(
+            Carrier.is_active == True,  # noqa: E712
+            Carrier.is_verified == True,  # noqa: E712
         )
-        total = query.count()
-        carriers = query.offset(skip).limit(limit).all()
-        return carriers, total
+        total = (
+            await self.db.execute(select(func.count()).select_from(base.subquery()))
+        ).scalar_one()
+        carriers = (await self.db.execute(base.offset(skip).limit(limit))).scalars().all()
+        return list(carriers), total
 
-    def list_available_by_vehicle_type(self, vehicle_type: str) -> list[Carrier]:
+    async def list_available_by_vehicle_type(self, vehicle_type: str) -> list[Carrier]:
         """List active carriers filtered by vehicle type."""
-        return self.db.query(Carrier).filter(
-            Carrier.is_active == True,
-            Carrier.is_verified == True,
-            Carrier.vehicle_type == vehicle_type,
-        ).all()
+        result = await self.db.execute(
+            select(Carrier).where(
+                Carrier.is_active == True,  # noqa: E712
+                Carrier.is_verified == True,  # noqa: E712
+                Carrier.vehicle_type == vehicle_type,
+            )
+        )
+        return list(result.scalars().all())
 
-    def list_with_capacity(self, min_capacity_kg: float) -> list[Carrier]:
+    async def list_with_capacity(self, min_capacity_kg: float) -> list[Carrier]:
         """List carriers with at least the given capacity."""
-        return self.db.query(Carrier).filter(
-            Carrier.is_active == True,
-            Carrier.is_verified == True,
-            Carrier.capacity_kg >= min_capacity_kg,
-        ).all()
+        result = await self.db.execute(
+            select(Carrier).where(
+                Carrier.is_active == True,  # noqa: E712
+                Carrier.is_verified == True,  # noqa: E712
+                Carrier.capacity_kg >= min_capacity_kg,
+            )
+        )
+        return list(result.scalars().all())
 
-    def list_available_with_location(self, min_capacity_kg: float) -> list[Carrier]:
+    async def list_available_with_location(self, min_capacity_kg: float) -> list[Carrier]:
         """List available carriers that have a known location (for matching)."""
-        return self.db.query(Carrier).filter(
-            Carrier.is_active == True,
-            Carrier.is_verified == True,
-            Carrier.is_available == True,
-            Carrier.capacity_kg >= min_capacity_kg,
-            Carrier.current_lat.isnot(None),
-            Carrier.current_lon.isnot(None),
-        ).all()
+        result = await self.db.execute(
+            select(Carrier).where(
+                Carrier.is_active == True,  # noqa: E712
+                Carrier.is_verified == True,  # noqa: E712
+                Carrier.is_available == True,  # noqa: E712
+                Carrier.capacity_kg >= min_capacity_kg,
+                Carrier.current_lat.isnot(None),
+                Carrier.current_lon.isnot(None),
+            )
+        )
+        return list(result.scalars().all())

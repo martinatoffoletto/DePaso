@@ -26,10 +26,33 @@ from src.app.modules.shipments.router import router as shipments_router
 from src.app.modules.tracking.router import router as tracking_router
 from src.app.modules.users.router import router as users_router
 from src.app.modules.vision.router import router as vision_router
-from src.app.shared.exceptions import DomainException
+from src.app.shared.exceptions import (
+    AlreadyExistsError,
+    DomainException,
+    ForbiddenError,
+    NotFoundError,
+    UnauthorizedError,
+    ValidationError,
+)
 from src.app.shared.responses import ErrorResponse
 
 logger = logging.getLogger(__name__)
+
+# Domain exception class → HTTP status. Order matters: subclasses first.
+_STATUS_BY_EXCEPTION: list[tuple[type[DomainException], int]] = [
+    (NotFoundError, 404),
+    (AlreadyExistsError, 409),
+    (UnauthorizedError, 401),
+    (ForbiddenError, 403),
+    (ValidationError, 400),
+]
+
+
+def _status_for(exc: DomainException) -> int:
+    for exc_type, status_code in _STATUS_BY_EXCEPTION:
+        if isinstance(exc, exc_type):
+            return status_code
+    return 400
 
 
 @asynccontextmanager
@@ -70,7 +93,16 @@ async def lifespan(app: FastAPI):
     from src.app.modules.users.models import User  # noqa: F401
     from src.app.modules.vision.models import Classification  # noqa: F401
     from src.app.shared.base_model import Base
-    Base.metadata.create_all(bind=engine)
+
+    async with engine.begin() as conn:
+        if engine.dialect.name == "postgresql":
+            # Once at boot (antes corría en CADA conexión del pool).
+            from sqlalchemy import text
+            try:
+                await conn.execute(text("CREATE EXTENSION IF NOT EXISTS postgis"))
+            except Exception:
+                logger.info("PostGIS extension not available (ok: matching usa haversine)")
+        await conn.run_sync(Base.metadata.create_all)
     logger.info("✅ Database tables initialized")
 
     # Load the cargo classifier (falls back to a stub when TF/model missing)
@@ -84,7 +116,7 @@ async def lifespan(app: FastAPI):
     # Shutdown: release the loaded model and dispose the DB connection pool.
     logger.info("🛑 Shutting down DePaso REST API")
     app.state.classifier = None
-    engine.dispose()
+    await engine.dispose()
 
 
 def create_app() -> FastAPI:
@@ -112,17 +144,25 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
 
-    # Global exception handler for DomainException
+    # Global exception handlers — services raise domain exceptions and the
+    # translation to HTTP happens here, once. Routers must not catch these.
     @app.exception_handler(DomainException)
     async def domain_exception_handler(request: Request, exc: DomainException):
-        """Handle domain exceptions with consistent response format."""
         return JSONResponse(
-            status_code=400,
+            status_code=_status_for(exc),
+            content=ErrorResponse(error=exc.message, detail=exc.message, code=exc.code).model_dump(),
+        )
+
+    @app.exception_handler(Exception)
+    async def unhandled_exception_handler(request: Request, exc: Exception):
+        # Log the full traceback server-side; never leak internals to the client.
+        logger.exception("unhandled_error", exc_info=exc)
+        return JSONResponse(
+            status_code=500,
             content=ErrorResponse(
-                success=False,
-                error=exc.message,
-                code=exc.code,
-                data=None,
+                error="Internal server error",
+                detail="Internal server error",
+                code="INTERNAL_ERROR",
             ).model_dump(),
         )
 

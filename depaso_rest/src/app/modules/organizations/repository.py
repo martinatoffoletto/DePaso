@@ -1,7 +1,8 @@
 """
 Organizations module repository for data access.
 """
-from sqlalchemy.orm import Session
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.app.modules.organizations.models import (
     Organization,
@@ -15,15 +16,16 @@ from src.app.shared.enums import OrganizationCarrierStatus
 class OrganizationRepository(BaseRepository[Organization]):
     """Data access for organizations and their memberships/carriers."""
 
-    def __init__(self, db: Session) -> None:
+    def __init__(self, db: AsyncSession) -> None:
         super().__init__(Organization, db)
 
-    def get_by_cuit(self, cuit: str) -> Organization | None:
-        return self.db.query(Organization).filter(Organization.cuit == cuit).first()
+    async def get_by_cuit(self, cuit: str) -> Organization | None:
+        result = await self.db.execute(select(Organization).where(Organization.cuit == cuit))
+        return result.scalar_one_or_none()
 
     # -- members --------------------------------------------------------------
 
-    def add_member(self, org_id: int, user_id: int, role: str) -> OrganizationMember:
+    async def add_member(self, org_id: int, user_id: int, role: str) -> OrganizationMember:
         from datetime import datetime, timezone
 
         member = OrganizationMember(
@@ -31,45 +33,43 @@ class OrganizationRepository(BaseRepository[Organization]):
             joined_at=datetime.now(timezone.utc).replace(tzinfo=None),
         )
         self.db.add(member)
-        self.db.commit()
-        self.db.refresh(member)
+        await self.db.flush()
+        await self.db.refresh(member)
         return member
 
-    def get_membership(self, org_id: int, user_id: int) -> OrganizationMember | None:
-        return (
-            self.db.query(OrganizationMember)
-            .filter(
+    async def get_membership(self, org_id: int, user_id: int) -> OrganizationMember | None:
+        result = await self.db.execute(
+            select(OrganizationMember).where(
                 OrganizationMember.org_id == org_id,
                 OrganizationMember.user_id == user_id,
             )
-            .first()
         )
+        return result.scalars().first()
 
-    def list_memberships_for_user(self, user_id: int) -> list[OrganizationMember]:
-        return (
-            self.db.query(OrganizationMember)
-            .filter(OrganizationMember.user_id == user_id)
+    async def list_memberships_for_user(self, user_id: int) -> list[OrganizationMember]:
+        result = await self.db.execute(
+            select(OrganizationMember)
+            .where(OrganizationMember.user_id == user_id)
             .order_by(OrganizationMember.created_at.desc())
-            .all()
         )
+        return list(result.scalars().all())
 
     # -- fleet carriers -------------------------------------------------------
 
-    def get_carrier_link(self, org_id: int, carrier_id: int) -> OrganizationCarrier | None:
-        return (
-            self.db.query(OrganizationCarrier)
-            .filter(
+    async def get_carrier_link(self, org_id: int, carrier_id: int) -> OrganizationCarrier | None:
+        result = await self.db.execute(
+            select(OrganizationCarrier).where(
                 OrganizationCarrier.org_id == org_id,
                 OrganizationCarrier.carrier_id == carrier_id,
             )
-            .first()
         )
+        return result.scalars().first()
 
-    def link_carrier(self, org_id: int, carrier_id: int) -> OrganizationCarrier:
+    async def link_carrier(self, org_id: int, carrier_id: int) -> OrganizationCarrier:
         from datetime import datetime, timezone
 
         now = datetime.now(timezone.utc).replace(tzinfo=None)
-        link = self.get_carrier_link(org_id, carrier_id)
+        link = await self.get_carrier_link(org_id, carrier_id)
         if link is not None:
             # Re-linking a previously removed carrier reactivates the row.
             link.status = OrganizationCarrierStatus.ACTIVE
@@ -81,32 +81,31 @@ class OrganizationRepository(BaseRepository[Organization]):
                 status=OrganizationCarrierStatus.ACTIVE, linked_at=now,
             )
             self.db.add(link)
-        self.db.commit()
-        self.db.refresh(link)
+        await self.db.flush()
+        await self.db.refresh(link)
         return link
 
-    def unlink_carrier(self, org_id: int, carrier_id: int) -> OrganizationCarrier | None:
+    async def unlink_carrier(self, org_id: int, carrier_id: int) -> OrganizationCarrier | None:
         from datetime import datetime, timezone
 
-        link = self.get_carrier_link(org_id, carrier_id)
+        link = await self.get_carrier_link(org_id, carrier_id)
         if link is None:
             return None
         link.status = OrganizationCarrierStatus.INACTIVE
         link.unlinked_at = datetime.now(timezone.utc).replace(tzinfo=None)
-        self.db.commit()
-        self.db.refresh(link)
+        await self.db.flush()
+        await self.db.refresh(link)
         return link
 
-    def list_carrier_links(self, org_id: int, active_only: bool = False) -> list[OrganizationCarrier]:
-        query = self.db.query(OrganizationCarrier).filter(
-            OrganizationCarrier.org_id == org_id
-        )
+    async def list_carrier_links(self, org_id: int, active_only: bool = False) -> list[OrganizationCarrier]:
+        query = select(OrganizationCarrier).where(OrganizationCarrier.org_id == org_id)
         if active_only:
-            query = query.filter(
+            query = query.where(
                 OrganizationCarrier.status == OrganizationCarrierStatus.ACTIVE
             )
-        return query.order_by(OrganizationCarrier.linked_at.desc()).all()
+        result = await self.db.execute(query.order_by(OrganizationCarrier.linked_at.desc()))
+        return list(result.scalars().all())
 
-    def active_carrier_ids(self, org_id: int) -> list[int]:
-        rows = self.list_carrier_links(org_id, active_only=True)
+    async def active_carrier_ids(self, org_id: int) -> list[int]:
+        rows = await self.list_carrier_links(org_id, active_only=True)
         return [r.carrier_id for r in rows]

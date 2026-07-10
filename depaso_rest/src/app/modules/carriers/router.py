@@ -3,11 +3,10 @@ Carriers module API router.
 Full CRUD endpoints for carrier management.
 """
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.app.core.database import get_db
 from src.app.core.dependencies import CurrentUserId
-from src.app.shared.exceptions import DomainException
 from src.app.modules.carriers.exceptions import CarrierNotFoundError
 from src.app.modules.carriers.schemas import (
     AvailabilityWindowRequest,
@@ -30,7 +29,7 @@ from src.app.modules.routes.service import RouteService
 router = APIRouter(prefix="/carriers", tags=["carriers"])
 
 
-def get_carrier_service(db: Session = Depends(get_db)) -> CarrierService:
+def get_carrier_service(db: AsyncSession = Depends(get_db)) -> CarrierService:
     """Dependency: get carrier service."""
     return CarrierService(CarrierRepository(db))
 
@@ -41,18 +40,15 @@ async def create_carrier(
     service: CarrierService = Depends(get_carrier_service),
 ) -> CarrierResponse:
     """Create a new carrier profile."""
-    try:
-        carrier = service.create_carrier(
-            user_id=data.user_id,
-            company_name=data.company_name,
-            vehicle_type=data.vehicle_type,
-            license_plate=data.license_plate,
-            capacity_kg=data.capacity_kg,
-            capacity_volume_m3=data.capacity_volume_m3,
-        )
-        return CarrierResponse.model_validate(carrier)
-    except DomainException as e:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=e.message)
+    carrier = await service.create_carrier(
+        user_id=data.user_id,
+        company_name=data.company_name,
+        vehicle_type=data.vehicle_type,
+        license_plate=data.license_plate,
+        capacity_kg=data.capacity_kg,
+        capacity_volume_m3=data.capacity_volume_m3,
+    )
+    return CarrierResponse.model_validate(carrier)
 
 
 @router.get("", response_model=list[CarrierResponse])
@@ -62,12 +58,12 @@ async def list_carriers(
     service: CarrierService = Depends(get_carrier_service),
 ) -> list[CarrierResponse]:
     """List all active and verified carriers."""
-    carriers, _ = service.list_carriers(skip, limit)
+    carriers, _ = await service.list_carriers(skip, limit)
     return [CarrierResponse.model_validate(c) for c in carriers]
 
 
-def _my_carrier(user_id: int, db: Session):
-    carrier = CarrierRepository(db).get_by_user_id(user_id)
+async def _my_carrier(user_id: int, db: AsyncSession):
+    carrier = await CarrierRepository(db).get_by_user_id(user_id)
     if not carrier:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
                             detail="User has no carrier profile")
@@ -77,10 +73,10 @@ def _my_carrier(user_id: int, db: Session):
 @router.get("/me", response_model=CarrierResponse)
 async def get_my_carrier(
     current_user_id: CurrentUserId,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
 ) -> CarrierResponse:
     """The current user's carrier profile."""
-    return CarrierResponse.model_validate(_my_carrier(current_user_id, db))
+    return CarrierResponse.model_validate(await _my_carrier(current_user_id, db))
 
 
 @router.post("/me", response_model=CarrierResponse, status_code=status.HTTP_201_CREATED)
@@ -95,23 +91,20 @@ async def create_my_carrier(
     profile for someone else.
     """
     try:
-        service.get_carrier_by_user_id(current_user_id)
+        await service.get_carrier_by_user_id(current_user_id)
         raise HTTPException(status_code=status.HTTP_409_CONFLICT,
                             detail="This user already has a carrier profile.")
     except CarrierNotFoundError:
         pass
-    try:
-        carrier = service.create_carrier(
-            user_id=current_user_id,
-            company_name=data.company_name,
-            vehicle_type=data.vehicle_type,
-            license_plate=data.license_plate,
-            capacity_kg=data.capacity_kg,
-            capacity_volume_m3=data.capacity_volume_m3,
-        )
-        return CarrierResponse.model_validate(carrier)
-    except DomainException as e:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=e.message)
+    carrier = await service.create_carrier(
+        user_id=current_user_id,
+        company_name=data.company_name,
+        vehicle_type=data.vehicle_type,
+        license_plate=data.license_plate,
+        capacity_kg=data.capacity_kg,
+        capacity_volume_m3=data.capacity_volume_m3,
+    )
+    return CarrierResponse.model_validate(carrier)
 
 
 @router.patch("/me", response_model=CarrierResponse)
@@ -119,28 +112,25 @@ async def update_my_carrier(
     data: CarrierUpdate,
     current_user_id: CurrentUserId,
     service: CarrierService = Depends(get_carrier_service),
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
 ) -> CarrierResponse:
     """Update current user's carrier information."""
-    try:
-        carrier = _my_carrier(current_user_id, db)
-        updates = data.model_dump(exclude_unset=True)
-        updated_carrier = service.update_carrier(carrier.id, **updates)
-        return CarrierResponse.model_validate(updated_carrier)
-    except DomainException as e:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=e.message)
+    carrier = await _my_carrier(current_user_id, db)
+    updates = data.model_dump(exclude_unset=True)
+    updated_carrier = await service.update_carrier(carrier.id, **updates)
+    return CarrierResponse.model_validate(updated_carrier)
 
 
 @router.get("/me/feed", response_model=list[FeedItemResponse])
 async def my_feed(
     current_user_id: CurrentUserId,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
 ) -> list[FeedItemResponse]:
     """Pending shipments compatible with this carrier (RF-MAT-03, RF-CAR-03)."""
-    carrier = _my_carrier(current_user_id, db)
+    carrier = await _my_carrier(current_user_id, db)
     from src.app.modules.matching.repository import MatchingWeightsRepository
     from src.app.modules.matching.service import DEFAULT_WEIGHTS
-    weights = MatchingWeightsRepository(db).load(DEFAULT_WEIGHTS)
+    weights = await MatchingWeightsRepository(db).load(DEFAULT_WEIGHTS)
     
     matching = MatchingService(
         shipment_repo=ShipmentRepository(db),
@@ -148,27 +138,27 @@ async def my_feed(
         route_repo=RouteRepository(db),
         weights=weights,
     )
-    return matching.feed_for_carrier(carrier.id)
+    return await matching.feed_for_carrier(carrier.id)
 
 
 @router.get("/me/summary", response_model=CarrierSummaryResponse)
 async def my_summary(
     current_user_id: CurrentUserId,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
 ) -> CarrierSummaryResponse:
     """Carrier history: deliveries, earnings, reputation, CO2 (RF-CAR-06)."""
-    carrier = _my_carrier(current_user_id, db)
-    summary = CarrierService(CarrierRepository(db)).summary(carrier.id, ShipmentRepository(db))
+    carrier = await _my_carrier(current_user_id, db)
+    summary = await CarrierService(CarrierRepository(db)).summary(carrier.id, ShipmentRepository(db))
     return CarrierSummaryResponse(**summary)
 
 
 @router.get("/me/ratings", response_model=list[CarrierRatingResponse])
 async def my_ratings(
     current_user_id: CurrentUserId,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
 ) -> list[CarrierRatingResponse]:
     """Reviews received by the current carrier (RF-SHP-08), newest first."""
-    carrier = _my_carrier(current_user_id, db)
+    carrier = await _my_carrier(current_user_id, db)
     ratings = ShipmentRepository(db).list_ratings_by_carrier(carrier.id)
     return [CarrierRatingResponse.model_validate(r) for r in ratings]
 
@@ -177,7 +167,7 @@ async def my_ratings(
 async def register_availability_window(
     data: AvailabilityWindowRequest,
     current_user_id: CurrentUserId,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
 ) -> RouteResponse:
     """Register a habitual availability window for BY_AVAILABILITY matching (RF-CAR-02).
 
@@ -186,7 +176,7 @@ async def register_availability_window(
     Use `POST /routes` directly if you need finer control (e.g., updating an
     existing window or registering a collaborative route).
     """
-    carrier = _my_carrier(current_user_id, db)
+    carrier = await _my_carrier(current_user_id, db)
     route_data = RouteCreateRequest(
         kind="dedicated_window",
         origin_lat=data.origin_lat,
@@ -199,10 +189,7 @@ async def register_availability_window(
         route_repo=RouteRepository(db),
         carrier_repo=CarrierRepository(db),
     )
-    try:
-        return service.publish(carrier.id, route_data)
-    except ValueError as e:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+    return await service.publish(carrier.id, route_data)
 
 
 @router.get("/{carrier_id}", response_model=CarrierResponse)
@@ -211,11 +198,8 @@ async def get_carrier(
     service: CarrierService = Depends(get_carrier_service),
 ) -> CarrierResponse:
     """Get a carrier by ID."""
-    try:
-        carrier = service.get_carrier_by_id(carrier_id)
-        return CarrierResponse.model_validate(carrier)
-    except DomainException as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=e.message)
+    carrier = await service.get_carrier_by_id(carrier_id)
+    return CarrierResponse.model_validate(carrier)
 
 
 @router.get("/user/{user_id}", response_model=CarrierResponse)
@@ -224,11 +208,8 @@ async def get_carrier_by_user(
     service: CarrierService = Depends(get_carrier_service),
 ) -> CarrierResponse:
     """Get carrier profile by user ID."""
-    try:
-        carrier = service.get_carrier_by_user_id(user_id)
-        return CarrierResponse.model_validate(carrier)
-    except DomainException as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=e.message)
+    carrier = await service.get_carrier_by_user_id(user_id)
+    return CarrierResponse.model_validate(carrier)
 
 
 @router.patch("/{carrier_id}", response_model=CarrierResponse)
@@ -238,12 +219,9 @@ async def update_carrier(
     service: CarrierService = Depends(get_carrier_service),
 ) -> CarrierResponse:
     """Update carrier information."""
-    try:
-        updates = data.model_dump(exclude_unset=True)
-        carrier = service.update_carrier(carrier_id, **updates)
-        return CarrierResponse.model_validate(carrier)
-    except DomainException as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=e.message)
+    updates = data.model_dump(exclude_unset=True)
+    carrier = await service.update_carrier(carrier_id, **updates)
+    return CarrierResponse.model_validate(carrier)
 
 
 @router.delete("/{carrier_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -252,10 +230,7 @@ async def delete_carrier(
     service: CarrierService = Depends(get_carrier_service),
 ) -> None:
     """Deactivate a carrier (soft delete)."""
-    try:
-        service.update_carrier(carrier_id, is_active=False)
-    except DomainException as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=e.message)
+    await service.update_carrier(carrier_id, is_active=False)
 
 
 @router.post("/{carrier_id}/reputation", response_model=CarrierResponse)
@@ -265,8 +240,5 @@ async def update_reputation(
     service: CarrierService = Depends(get_carrier_service),
 ) -> CarrierResponse:
     """Update carrier reputation score."""
-    try:
-        carrier = service.update_reputation(carrier_id, rating)
-        return CarrierResponse.model_validate(carrier)
-    except DomainException as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=e.message)
+    carrier = await service.update_reputation(carrier_id, rating)
+    return CarrierResponse.model_validate(carrier)

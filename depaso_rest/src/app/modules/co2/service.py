@@ -12,8 +12,8 @@ This per-shipment quantification, fed back to the user on completion, is one
 of the five differentiators identified in the state-of-the-art review: no
 local platform nor reviewed academic work reports it.
 """
-from sqlalchemy import func
-from sqlalchemy.orm import Session
+from sqlalchemy import func, select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.app.modules.shipments.models import Shipment
 from src.app.shared.enums import ShipmentModality, ShipmentStatus, VehicleType
@@ -128,20 +128,25 @@ class CO2Service:
             "smartphone_charges": int(total_kg / SMARTPHONE_KG_PER_CHARGE),
         }
 
-    def client_impact(self, db: Session, client_id: int) -> dict:
+    async def client_impact(self, db: AsyncSession, client_id: int) -> dict:
         """Accumulated CO2 savings of a client over their delivered shipments."""
         delivered = Shipment.status == ShipmentStatus.DELIVERED
         mine = Shipment.client_id == client_id
         total_kg = float(
-            db.query(func.coalesce(func.sum(Shipment.co2_savings_kg), 0.0))
-            .filter(mine, delivered).scalar()
+            (await db.execute(
+                select(func.coalesce(func.sum(Shipment.co2_savings_kg), 0.0))
+                .where(mine, delivered)
+            )).scalar()
         )
-        delivered_count = db.query(func.count(Shipment.id)).filter(mine, delivered).scalar() or 0
+        delivered_count = (
+            await db.execute(select(func.count(Shipment.id)).where(mine, delivered))
+        ).scalar() or 0
         collaborative_count = (
-            db.query(func.count(Shipment.id))
-            .filter(mine, delivered, Shipment.modality == ShipmentModality.COLLABORATIVE)
-            .scalar() or 0
-        )
+            await db.execute(
+                select(func.count(Shipment.id))
+                .where(mine, delivered, Shipment.modality == ShipmentModality.COLLABORATIVE)
+            )
+        ).scalar() or 0
         return {
             "total_co2_saved_kg": round(total_kg, 3),
             "shipments_delivered": delivered_count,

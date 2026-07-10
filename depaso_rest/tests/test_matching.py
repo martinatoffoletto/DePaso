@@ -14,6 +14,7 @@ from src.app.modules.matching.service import (
     geo_score_dedicated,
     time_window_score,
 )
+from src.app.shared.exceptions import NotFoundError
 from src.app.shared.geo import Point
 
 # AMBA reference coordinates
@@ -26,19 +27,20 @@ LA_PLATA = (-34.9215, -57.9545)
 # --- fakes -------------------------------------------------------------------
 
 class FakeRepo:
+    """Fakes async: la interfaz real de los repos ahora es awaitable."""
     def __init__(self, items):
         self._items = {i.id: i for i in items}
 
-    def get_by_id(self, entity_id):
+    async def get_by_id(self, entity_id):
         return self._items.get(entity_id)
 
-    def get_by_ids(self, entity_ids):
+    async def get_by_ids(self, entity_ids):
         return {i: self._items[i] for i in entity_ids if i in self._items}
 
-    def list_available_with_location(self, min_capacity_kg):
+    async def list_available_with_location(self, min_capacity_kg):
         return [c for c in self._items.values() if c.capacity_kg >= min_capacity_kg]
 
-    def list_active_in_window(self, at=None):
+    async def list_active_in_window(self, at=None):
         return list(self._items.values())
 
 
@@ -119,90 +121,90 @@ def test_weights_sum_to_one():
 
 # --- dedicated matching ----------------------------------------------------------
 
-def test_dedicated_ranks_closer_carrier_first():
+async def test_dedicated_ranks_closer_carrier_first():
     near = make_carrier(id=1, lat=CABALLITO[0], lon=CABALLITO[1])
     far = make_carrier(id=2, lat=LA_PLATA[0], lon=LA_PLATA[1])
     shipment = make_shipment(modality="dedicated")
     service = make_service([near, far], [shipment])
 
-    ranked = service.rank_carriers(1)
+    ranked = await service.rank_carriers(1)
     assert [r.carrier_id for r in ranked] == [1, 2]
     assert ranked[0].eta_to_pickup_min is not None
 
 
-def test_dedicated_knockout_incompatible_vehicle():
+async def test_dedicated_knockout_incompatible_vehicle():
     moto = make_carrier(id=1, vehicle_type="motorcycle", lat=CABALLITO[0], lon=CABALLITO[1])
     shipment = make_shipment(package_size="l")  # L doesn't fit a motorcycle
     service = make_service([moto], [shipment])
-    assert service.rank_carriers(1) == []
+    assert await service.rank_carriers(1) == []
 
 
-def test_xl_requires_van_or_truck():
+async def test_xl_requires_van_or_truck():
     car = make_carrier(id=1, vehicle_type="car", lat=CABALLITO[0], lon=CABALLITO[1])
     truck = make_carrier(id=2, vehicle_type="truck", lat=CABALLITO[0], lon=CABALLITO[1])
     shipment = make_shipment(package_size="xl", modality="dedicated")
     service = make_service([car, truck], [shipment])
-    ranked = service.rank_carriers(1)
+    ranked = await service.rank_carriers(1)
     assert [r.carrier_id for r in ranked] == [2]
 
 
 # --- collaborative matching --------------------------------------------------------
 
-def test_collaborative_accepts_on_route_shipment():
+async def test_collaborative_accepts_on_route_shipment():
     carrier = make_carrier(id=1)
     route = make_route(carrier_id=1, origin=CABALLITO, destination=MICROCENTRO)
     shipment = make_shipment(modality="collaborative",
                              origin=CABALLITO, destination=MICROCENTRO)
     service = make_service([carrier], [shipment], [route])
 
-    ranked = service.rank_carriers(1)
+    ranked = await service.rank_carriers(1)
     assert len(ranked) == 1
     assert ranked[0].detour_ratio <= MAX_DETOUR_RATIO_COLLABORATIVE
     assert ranked[0].route_id == route.id
     assert ranked[0].explanation  # auditable assignment
 
 
-def test_collaborative_hard_filter_excessive_detour():
+async def test_collaborative_hard_filter_excessive_detour():
     # Route within CABA, shipment toward La Plata -> detour far above 15%
     carrier = make_carrier(id=1)
     route = make_route(carrier_id=1, origin=CABALLITO, destination=MICROCENTRO)
     shipment = make_shipment(modality="collaborative",
                              origin=QUILMES, destination=LA_PLATA)
     service = make_service([carrier], [shipment], [route])
-    assert service.rank_carriers(1) == []
+    assert await service.rank_carriers(1) == []
 
 
-def test_collaborative_never_assigns_xl():
+async def test_collaborative_never_assigns_xl():
     carrier = make_carrier(id=1, vehicle_type="truck")
     route = make_route(carrier_id=1)
     shipment = make_shipment(modality="collaborative", package_size="xl")
     service = make_service([carrier], [shipment], [route])
-    assert service.rank_carriers(1) == []
+    assert await service.rank_carriers(1) == []
 
 
-def test_collaborative_soft_mobility_distance_limit():
+async def test_collaborative_soft_mobility_distance_limit():
     # Caballito -> Microcentro is > 5 km road: bikes are excluded
     biker = make_carrier(id=1, vehicle_type="bike")
     route = make_route(carrier_id=1)
     shipment = make_shipment(modality="collaborative", package_size="s", weight_kg=0.5)
     service = make_service([biker], [shipment], [route])
-    assert service.rank_carriers(1) == []
+    assert await service.rank_carriers(1) == []
 
 
-def test_match_best_returns_ranked_list():
+async def test_match_best_returns_ranked_list():
     near = make_carrier(id=1, lat=CABALLITO[0], lon=CABALLITO[1])
     far = make_carrier(id=2, lat=QUILMES[0], lon=QUILMES[1])
     shipment = make_shipment(modality="dedicated")
     service = make_service([near, far], [shipment])
 
-    result = service.match_best(1)
+    result = await service.match_best(1)
     assert result.matched_carrier_id == 1
     assert len(result.ranked_carriers) == 2
     assert result.modality == "dedicated"
 
 
-def test_match_best_raises_when_no_candidates():
+async def test_match_best_raises_when_no_candidates():
     shipment = make_shipment(modality="dedicated")
     service = make_service([], [shipment])
-    with pytest.raises(ValueError):
-        service.match_best(1)
+    with pytest.raises(NotFoundError):
+        await service.match_best(1)

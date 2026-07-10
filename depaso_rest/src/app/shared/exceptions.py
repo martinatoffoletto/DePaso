@@ -39,3 +39,14 @@ class ForbiddenError(DomainException):
 
     def __init__(self, message: str = "Action not permitted", code: str = "FORBIDDEN") -> None:
         super().__init__(message, code)
+
+
+class UnauthorizedError(DomainException):
+    """Raised when authentication fails (missing/invalid credentials or token).
+
+    Deliberately generic: auth endpoints must not reveal whether an email
+    exists or an account is disabled.
+    """
+
+    def __init__(self, message: str = "Invalid credentials", code: str = "UNAUTHORIZED") -> None:
+        super().__init__(message, code)

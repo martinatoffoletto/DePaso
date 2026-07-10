@@ -9,7 +9,7 @@ from src.app.modules.shipments import pricing
 from src.app.modules.shipments.repository import ShipmentRepository
 from src.app.modules.shipments.models import Shipment, ShipmentEvent, Rating
 from src.app.modules.shipments.exceptions import ShipmentNotFoundError, InvalidShipmentStatusError
-from src.app.shared.exceptions import ValidationError
+from src.app.shared.exceptions import AlreadyExistsError, ForbiddenError, NotFoundError, ValidationError
 from src.app.modules.carriers.repository import CarrierRepository
 from src.app.modules.routes.repository import RouteRepository
 from src.app.modules.co2.service import CO2Service
@@ -54,7 +54,7 @@ class ShipmentService:
 
     # -- creation & queries -----------------------------------------------------
 
-    def create_shipment(self, client_id: int, package_size: str,
+    async def create_shipment(self, client_id: int, package_size: str,
                         modality: str, assignment_mode: str,
                         origin_lat: float, origin_lon: float,
                         destination_lat: float, destination_lon: float,
@@ -69,7 +69,7 @@ class ShipmentService:
             Point(destination_lat, destination_lon),
             package_size, modality,
         )
-        shipment = self.repository.create(
+        shipment = await self.repository.create(
             client_id=client_id,
             package_size=package_size,
             modality=modality,
@@ -87,20 +87,20 @@ class ShipmentService:
             estimated_price=estimated_price,
             status=ShipmentStatus.PENDING,
         )
-        self.repository.add_event(shipment.id, ShipmentStatus.PENDING, actor_user_id=client_id)
+        await self.repository.add_event(shipment.id, ShipmentStatus.PENDING, actor_user_id=client_id)
         return shipment
 
-    def get_shipment_by_id(self, shipment_id: int) -> Shipment:
-        shipment = self.repository.get_by_id(shipment_id)
+    async def get_shipment_by_id(self, shipment_id: int) -> Shipment:
+        shipment = await self.repository.get_by_id(shipment_id)
         if not shipment:
             raise ShipmentNotFoundError()
         return shipment
 
-    def update_shipment(self, shipment_id: int, client_id: int, **updates) -> Shipment:
+    async def update_shipment(self, shipment_id: int, client_id: int, **updates) -> Shipment:
         """Update a pending shipment. Re-calculates price if needed."""
-        shipment = self.get_shipment_by_id(shipment_id)
+        shipment = await self.get_shipment_by_id(shipment_id)
         if shipment.client_id != client_id:
-            raise ValueError("Only the shipment owner can update it.")
+            raise ForbiddenError("Only the shipment owner can update it.")
         if shipment.status != ShipmentStatus.PENDING:
             raise ValidationError(
                 "Only pending shipments can be updated.", "SHIPMENT_NOT_PENDING"
@@ -126,26 +126,26 @@ class ShipmentService:
             modality = updates.get("modality", shipment.modality)
             updates["estimated_price"] = pricing.price_for(origin, dest, pkg_size, modality)
 
-        updated = self.repository.update(shipment_id, **updates)
+        updated = await self.repository.update(shipment_id, **updates)
         return updated
 
-    def list_shipments_by_client(self, client_id: int, skip: int = 0, limit: int = 20) -> tuple[list[Shipment], int]:
-        return self.repository.list_by_client(client_id, skip, limit)
+    async def list_shipments_by_client(self, client_id: int, skip: int = 0, limit: int = 20) -> tuple[list[Shipment], int]:
+        return await self.repository.list_by_client(client_id, skip, limit)
 
-    def list_shipments_by_carrier(self, carrier_id: int, skip: int = 0, limit: int = 20) -> tuple[list[Shipment], int]:
-        return self.repository.list_by_carrier(carrier_id, skip, limit)
+    async def list_shipments_by_carrier(self, carrier_id: int, skip: int = 0, limit: int = 20) -> tuple[list[Shipment], int]:
+        return await self.repository.list_by_carrier(carrier_id, skip, limit)
 
-    def list_pending(self) -> list[Shipment]:
-        return self.repository.list_pending()
+    async def list_pending(self) -> list[Shipment]:
+        return await self.repository.list_pending()
 
-    def list_events(self, shipment_id: int) -> list[ShipmentEvent]:
+    async def list_events(self, shipment_id: int) -> list[ShipmentEvent]:
         """Status history (audit trail)."""
-        self.get_shipment_by_id(shipment_id)
-        return self.repository.list_events(shipment_id)
+        await self.get_shipment_by_id(shipment_id)
+        return await self.repository.list_events(shipment_id)
 
     # -- lifecycle ----------------------------------------------------------------
 
-    def update_status(self, shipment_id: int, new_status: str,
+    async def update_status(self, shipment_id: int, new_status: str,
                       actor_user_id: int | None = None,
                       lat: float | None = None, lon: float | None = None) -> Shipment:
         """Advance the state machine, recording the audit event.
@@ -153,75 +153,84 @@ class ShipmentService:
         On delivery: releases carrier capacity and persists CO2 savings for
         collaborative shipments (RF-CO2-01).
         """
-        shipment = self.get_shipment_by_id(shipment_id)
+        shipment = await self.get_shipment_by_id(shipment_id)
         allowed = VALID_TRANSITIONS.get(shipment.status, [])
         if new_status not in allowed:
             raise InvalidShipmentStatusError(shipment.status, new_status)
 
-        updated = self.repository.update_status(shipment_id, new_status)
-        self.repository.add_event(shipment_id, new_status, actor_user_id=actor_user_id,
+        # Compare-and-set: si otra request cambió el estado entre la lectura
+        # y este UPDATE, rowcount=0 y la transición se rechaza (sin race).
+        updated = await self.repository.transition_status(shipment_id, shipment.status, new_status)
+        if updated is None:
+            fresh = await self.get_shipment_by_id(shipment_id)
+            raise InvalidShipmentStatusError(fresh.status, new_status)
+        await self.repository.add_event(shipment_id, new_status, actor_user_id=actor_user_id,
                                   lat=lat, lon=lon)
 
         if new_status == ShipmentStatus.DELIVERED:
-            self._on_delivered(updated)
+            await self._on_delivered(updated)
         elif new_status == ShipmentStatus.CANCELLED:
             if shipment.carrier_id is not None:
-                self._release_capacity(shipment)
+                await self._release_capacity(shipment)
             # Refund a simulated payment when the shipment is cancelled.
             if updated.payment_status == PaymentStatus.PAID:
-                updated = self.repository.update(
+                updated = await self.repository.update(
                     shipment_id, payment_status=PaymentStatus.REFUNDED
                 )
         return updated
 
-    def get_assigned_carrier_contact(self, shipment_id: int, requester_user_id: int) -> dict | None:
+    async def get_assigned_carrier_contact(self, shipment_id: int, requester_user_id: int) -> dict | None:
         """Public contact of the carrier assigned to a shipment. Returns None if
         no carrier is assigned yet. Raises PermissionError if the requester is
         neither the shipment's client nor the assigned carrier (privacy)."""
-        shipment = self.get_shipment_by_id(shipment_id)  # raises ShipmentNotFoundError
+        shipment = await self.get_shipment_by_id(shipment_id)  # raises ShipmentNotFoundError
         if shipment.carrier_id is None or not self.carrier_repo:
             return None
-        carrier = self.carrier_repo.get_by_id(shipment.carrier_id)
+        carrier = await self.carrier_repo.get_by_id(shipment.carrier_id)
         if not carrier:
             return None
         if requester_user_id not in (shipment.client_id, carrier.user_id):
-            raise PermissionError("Not allowed to view this carrier")
-        user = self.user_repo.get_by_id(carrier.user_id) if self.user_repo else None
+            raise ForbiddenError("Not allowed to view this carrier")
+        user = await self.user_repo.get_by_id(carrier.user_id) if self.user_repo else None
         name = f"{user.first_name} {user.last_name}".strip() if user else None
         return {
             "carrier_id": carrier.id,
             "name": name or carrier.company_name or "Cadete",
             "phone": user.phone_number if user else None,
             "rating": round(carrier.reputation or 5.0, 1),
-            "trips": self.repository.count_delivered_by_carrier(carrier.id),
+            "trips": await self.repository.count_delivered_by_carrier(carrier.id),
         }
 
     # -- payment (simulated pasarela, RF-SHP) ------------------------------------
 
-    def pay_shipment(self, shipment_id: int, client_id: int) -> Shipment:
+    async def pay_shipment(self, shipment_id: int, client_id: int) -> Shipment:
         """Client pays for the shipment (simulated). Money is held by the
         platform until delivery, when the carrier's share is released."""
-        shipment = self.get_shipment_by_id(shipment_id)
+        shipment = await self.get_shipment_by_id(shipment_id)
         if shipment.client_id != client_id:
-            raise ValueError("Only the shipment owner can pay for it.")
+            raise ForbiddenError("Only the shipment owner can pay for it.")
         if shipment.status == ShipmentStatus.CANCELLED:
             raise ValidationError("Cannot pay a cancelled shipment.", "SHIPMENT_CANCELLED")
-        if shipment.payment_status != PaymentStatus.PENDING:
+        # Compare-and-set: dos pagos concurrentes -> solo uno pasa.
+        updated = await self.repository.mark_paid_if_pending(
+            shipment_id, PaymentStatus.PAID, PaymentStatus.PENDING
+        )
+        if updated is None:
             raise ValidationError(
                 "Shipment is not awaiting payment.", "PAYMENT_NOT_PENDING"
             )
-        return self.repository.update(shipment_id, payment_status=PaymentStatus.PAID)
+        return updated
 
-    def cancel_shipment(self, shipment_id: int, client_id: int) -> Shipment:
+    async def cancel_shipment(self, shipment_id: int, client_id: int) -> Shipment:
         """Client cancels before pickup (RF-SHP-07)."""
-        shipment = self.get_shipment_by_id(shipment_id)
+        shipment = await self.get_shipment_by_id(shipment_id)
         if shipment.client_id != client_id:
-            raise ValueError("Only the shipment owner can cancel it.")
-        return self.update_status(shipment_id, ShipmentStatus.CANCELLED, actor_user_id=client_id)
+            raise ForbiddenError("Only the shipment owner can cancel it.")
+        return await self.update_status(shipment_id, ShipmentStatus.CANCELLED, actor_user_id=client_id)
 
     # -- carrier accept / reject / cancel (RF-CAR-03/04/07) -------------------------
 
-    def accept_shipment(self, shipment_id: int, carrier_id: int,
+    async def accept_shipment(self, shipment_id: int, carrier_id: int,
                         route_id: int | None = None) -> Shipment:
         """Carrier accepts a pending shipment: assign + reserve capacity.
 
@@ -229,22 +238,27 @@ class ShipmentService:
         CO2 savings are computed at accept time (route geometry is known)
         and persisted on delivery.
         """
-        shipment = self.get_shipment_by_id(shipment_id)
+        shipment = await self.get_shipment_by_id(shipment_id)
         if shipment.status != ShipmentStatus.PENDING:
             raise InvalidShipmentStatusError(shipment.status, ShipmentStatus.ASSIGNED)
 
-        carrier = self._get_carrier(carrier_id)
-        available = self._available_capacity(carrier)
+        carrier = await self._get_carrier(carrier_id)
+        available = await self._available_capacity(carrier)
         if available < shipment.weight_kg:
-            raise ValueError("Carrier does not have enough available capacity.")
+            raise ValidationError("Carrier does not have enough available capacity.", code="INSUFFICIENT_CAPACITY")
 
-        updated = self.repository.assign_carrier(shipment_id, carrier_id)
-        self.repository.add_event(shipment_id, ShipmentStatus.ASSIGNED,
+        # Compare-and-set sobre status=PENDING: dos carriers aceptando a la
+        # vez -> el UPDATE solo matchea para uno; el otro recibe el error.
+        updated = await self.repository.assign_carrier_if_pending(shipment_id, carrier_id)
+        if updated is None:
+            fresh = await self.get_shipment_by_id(shipment_id)
+            raise InvalidShipmentStatusError(fresh.status, ShipmentStatus.ASSIGNED)
+        await self.repository.add_event(shipment_id, ShipmentStatus.ASSIGNED,
                                   actor_user_id=carrier.user_id)
-        self._reserve_capacity(carrier, shipment.weight_kg)
+        await self._reserve_capacity(carrier, shipment.weight_kg)
 
         if shipment.modality == ShipmentModality.COLLABORATIVE and route_id and self.route_repo:
-            route = self.route_repo.get_by_id(route_id)
+            route = await self.route_repo.get_by_id(route_id)
             if route and route.destination_lat is not None:
                 savings = self.co2.calculate_shipment_savings(
                     route_origin=Point(route.origin_lat, route.origin_lon),
@@ -253,83 +267,83 @@ class ShipmentService:
                     dropoff=Point(shipment.destination_lat, shipment.destination_lon),
                     vehicle_type=carrier.vehicle_type,
                 )
-                updated = self.repository.update(
+                updated = await self.repository.update(
                     shipment_id, co2_savings_kg=savings["savings_kg"]
                 )
         return updated
 
-    def carrier_cancel(self, shipment_id: int, carrier_id: int) -> Shipment:
+    async def carrier_cancel(self, shipment_id: int, carrier_id: int) -> Shipment:
         """Carrier cancels after accepting: reputation penalty (RF-CAR-07)."""
-        shipment = self.get_shipment_by_id(shipment_id)
+        shipment = await self.get_shipment_by_id(shipment_id)
         if shipment.carrier_id != carrier_id:
-            raise ValueError("Shipment is not assigned to this carrier.")
-        carrier = self._get_carrier(carrier_id)
+            raise ForbiddenError("Shipment is not assigned to this carrier.")
+        carrier = await self._get_carrier(carrier_id)
 
-        updated = self.update_status(shipment_id, ShipmentStatus.CANCELLED,
+        updated = await self.update_status(shipment_id, ShipmentStatus.CANCELLED,
                                      actor_user_id=carrier.user_id)
-        # re-open for other carriers
-        updated = self.repository.update_status(shipment_id, ShipmentStatus.PENDING)
-        self.repository.update(shipment_id, carrier_id=None)
+        # re-open for other carriers (clear_carrier también pone carrier_id=NULL;
+        # el update genérico saltea None y dejaba al carrier viejo pegado)
+        updated = await self.repository.reopen_for_matching(shipment_id)
         if self.carrier_repo:
             new_rep = max(0.0, (carrier.reputation or 5.0) - CARRIER_CANCEL_PENALTY)
-            self.carrier_repo.update(carrier_id, reputation=new_rep)
+            await self.carrier_repo.update(carrier_id, reputation=new_rep)
         return updated
 
     # -- ratings (RF-SHP-08) ----------------------------------------------------------
 
-    def rate_shipment(self, shipment_id: int, client_id: int,
+    async def rate_shipment(self, shipment_id: int, client_id: int,
                       stars: int, comment: str | None = None) -> Rating:
         """Client rates the carrier after delivery; updates carrier reputation."""
-        shipment = self.get_shipment_by_id(shipment_id)
+        shipment = await self.get_shipment_by_id(shipment_id)
         if shipment.client_id != client_id:
-            raise ValueError("Only the shipment owner can rate it.")
+            raise ForbiddenError("Only the shipment owner can rate it.")
         if shipment.status != ShipmentStatus.DELIVERED:
-            raise ValueError("Only delivered shipments can be rated.")
+            raise ValidationError("Only delivered shipments can be rated.", code="NOT_DELIVERED")
         if shipment.carrier_id is None:
-            raise ValueError("Shipment has no assigned carrier.")
-        if self.repository.get_rating_by_shipment(shipment_id):
-            raise ValueError("This shipment was already rated.")
+            raise ValidationError("Shipment has no assigned carrier.", code="NO_CARRIER")
+        if await self.repository.get_rating_by_shipment(shipment_id):
+            raise AlreadyExistsError("Rating", code="ALREADY_RATED")
         if not 1 <= stars <= 5:
-            raise ValueError("Stars must be between 1 and 5.")
+            raise ValidationError("Stars must be between 1 and 5.", code="INVALID_STARS")
 
-        rating = self.repository.add_rating(
+        rating = await self.repository.add_rating(
             shipment_id, shipment.carrier_id, client_id, stars, comment
         )
         if self.carrier_repo:
-            avg = self.repository.carrier_rating_avg(shipment.carrier_id)
+            avg = await self.repository.carrier_rating_avg(shipment.carrier_id)
             if avg is not None:
-                self.carrier_repo.update(shipment.carrier_id, reputation=round(avg, 2))
+                await self.carrier_repo.update(shipment.carrier_id, reputation=round(avg, 2))
         return rating
 
     # -- capacity (RF-CAP) ------------------------------------------------------------
 
-    def _get_carrier(self, carrier_id: int):
+    async def _get_carrier(self, carrier_id: int):
         if not self.carrier_repo:
             raise ValueError("Carrier repository not configured.")
-        carrier = self.carrier_repo.get_by_id(carrier_id)
+        carrier = await self.carrier_repo.get_by_id(carrier_id)
         if not carrier:
-            raise ValueError("Carrier not found.")
+            raise NotFoundError("Carrier")
         return carrier
 
-    def _available_capacity(self, carrier) -> float:
+    async def _available_capacity(self, carrier) -> float:
         reserved = sum(
-            s.weight_kg for s in self.repository.list_active_by_carrier(carrier.id)
+            s.weight_kg for s in await self.repository.list_active_by_carrier(carrier.id)
         )
         return carrier.capacity_kg - reserved
 
-    def _reserve_capacity(self, carrier, weight_kg: float) -> None:
+    async def _reserve_capacity(self, carrier, weight_kg: float) -> None:
         # Capacity is derived from active shipments (single source of truth),
         # so reserving is implicit in the assignment. Hook kept for clarity.
         pass
 
-    def _release_capacity(self, shipment: Shipment) -> None:
+    async def _release_capacity(self, shipment: Shipment) -> None:
         # Implicit: delivered/cancelled shipments leave list_active_by_carrier.
         pass
 
-    def _on_delivered(self, shipment: Shipment) -> None:
+    async def _on_delivered(self, shipment: Shipment) -> None:
         """Post-delivery side effects: capacity release is implicit; CO2 was
         computed at accept time for collaborative shipments. If the client paid,
         release the carrier's payout (simulated escrow)."""
-        self._release_capacity(shipment)
+        await self._release_capacity(shipment)
         if shipment.payment_status == PaymentStatus.PAID:
-            self.repository.update(shipment.id, payment_status=PaymentStatus.RELEASED)
+            await self.repository.update(shipment.id, payment_status=PaymentStatus.RELEASED)

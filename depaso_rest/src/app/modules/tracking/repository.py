@@ -1,7 +1,8 @@
 """
 Tracking module repository.
 """
-from sqlalchemy.orm import Session
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.app.shared.base_repository import BaseRepository
 from src.app.modules.tracking.models import GpsTrace
@@ -10,22 +11,23 @@ from src.app.modules.tracking.models import GpsTrace
 class TrackingRepository(BaseRepository[GpsTrace]):
     """Repository for GPS trace data."""
 
-    def __init__(self, db: Session) -> None:
+    def __init__(self, db: AsyncSession) -> None:
         super().__init__(GpsTrace, db)
 
-    def latest_for_shipment(self, shipment_id: int) -> GpsTrace | None:
-        return (
-            self.db.query(GpsTrace)
-            .filter(GpsTrace.shipment_id == shipment_id)
+    async def latest_for_shipment(self, shipment_id: int) -> GpsTrace | None:
+        result = await self.db.execute(
+            select(GpsTrace)
+            .where(GpsTrace.shipment_id == shipment_id)
             .order_by(GpsTrace.created_at.desc())
-            .first()
+            .limit(1)
         )
+        return result.scalars().first()
 
-    def history_for_shipment(self, shipment_id: int, limit: int = 500) -> list[GpsTrace]:
-        return (
-            self.db.query(GpsTrace)
-            .filter(GpsTrace.shipment_id == shipment_id)
+    async def history_for_shipment(self, shipment_id: int, limit: int = 500) -> list[GpsTrace]:
+        result = await self.db.execute(
+            select(GpsTrace)
+            .where(GpsTrace.shipment_id == shipment_id)
             .order_by(GpsTrace.created_at)
             .limit(limit)
-            .all()
         )
+        return list(result.scalars().all())

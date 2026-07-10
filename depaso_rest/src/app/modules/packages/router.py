@@ -1,20 +1,20 @@
 """
 Packages module API router — catálogo de categorías S..XL (spec 3.3).
 """
-from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.orm import Session
+from fastapi import APIRouter, Depends, status
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.app.core.database import get_db
 from src.app.modules.admin.router import require_admin
 from src.app.modules.packages.repository import PackageRepository
 from src.app.modules.packages.schemas import PackageCreate, PackageResponse
-from src.app.modules.packages.service import PackageNotFoundError, PackageService
+from src.app.modules.packages.service import PackageService
 from src.app.modules.users.models import User
 
 router = APIRouter(prefix="/packages", tags=["packages"])
 
 
-def get_package_service(db: Session = Depends(get_db)) -> PackageService:
+def get_package_service(db: AsyncSession = Depends(get_db)) -> PackageService:
     return PackageService(PackageRepository(db))
 
 
@@ -23,7 +23,7 @@ async def list_packages(
     service: PackageService = Depends(get_package_service),
 ):
     """List the active package size catalog (S..XL: límites y precio base)."""
-    packages, _ = service.list_packages(limit=50)
+    packages, _ = await service.list_packages(limit=50)
     return [PackageResponse.model_validate(p) for p in packages]
 
 
@@ -33,10 +33,7 @@ async def get_package(
     service: PackageService = Depends(get_package_service),
 ):
     """Get one package category spec by size (s, m, l, xl)."""
-    try:
-        return PackageResponse.model_validate(service.get_by_size(size.lower()))
-    except PackageNotFoundError:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Package size not found")
+    return PackageResponse.model_validate(await service.get_by_size(size.lower()))
 
 
 @router.post("", response_model=PackageResponse, status_code=status.HTTP_201_CREATED)
@@ -46,4 +43,4 @@ async def create_package(
     service: PackageService = Depends(get_package_service),
 ):
     """Create a package category (admin only)."""
-    return PackageResponse.model_validate(service.create_package(**data.model_dump()))
+    return PackageResponse.model_validate(await service.create_package(**data.model_dump()))
