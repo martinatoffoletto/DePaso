@@ -6,6 +6,9 @@ from datetime import datetime, timezone
 from pydantic import BaseModel, Field, field_validator, model_validator
 
 ROUTE_KIND_PATTERN = r"^(collaborative_route|dedicated_window)$"
+# CSV de días: la recurrencia se evalúa en el matching (routes/windows.py) —
+# un valor con formato libre nunca matchearía y la ruta quedaría muerta.
+RECURRENCE_PATTERN = r"^(mon|tue|wed|thu|fri|sat|sun)(,(mon|tue|wed|thu|fri|sat|sun))*$"
 
 
 def _to_naive_utc(dt: datetime | None) -> datetime | None:
@@ -31,7 +34,7 @@ class RouteCreateRequest(BaseModel):
     destination_lon: float | None = Field(default=None, ge=-180, le=180)
     window_start: datetime
     window_end: datetime
-    recurrence_days: str | None = None  # e.g. "mon,tue,wed,thu,fri"
+    recurrence_days: str | None = Field(default=None, pattern=RECURRENCE_PATTERN)
 
     _norm_windows = field_validator("window_start", "window_end")(_to_naive_utc)
 
@@ -48,13 +51,13 @@ class RouteCreateRequest(BaseModel):
 class RouteUpdate(BaseModel):
     """Schema for updating an existing route."""
 
-    origin_lat: float | None = None
-    origin_lon: float | None = None
-    destination_lat: float | None = None
-    destination_lon: float | None = None
+    origin_lat: float | None = Field(default=None, ge=-90, le=90)
+    origin_lon: float | None = Field(default=None, ge=-180, le=180)
+    destination_lat: float | None = Field(default=None, ge=-90, le=90)
+    destination_lon: float | None = Field(default=None, ge=-180, le=180)
     window_start: datetime | None = None
     window_end: datetime | None = None
-    recurrence_days: str | None = None
+    recurrence_days: str | None = Field(default=None, pattern=RECURRENCE_PATTERN)
 
     _norm_windows = field_validator("window_start", "window_end")(_to_naive_utc)
 

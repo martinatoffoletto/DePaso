@@ -2,12 +2,13 @@
 Carriers module API router.
 Full CRUD endpoints for carrier management.
 """
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.app.core.database import get_db
 from src.app.core.dependencies import AdminUserId, CurrentUserId
 from src.app.modules.carriers.exceptions import CarrierNotFoundError
+from src.app.shared.exceptions import AlreadyExistsError, NotFoundError
 from src.app.modules.carriers.schemas import (
     CarrierProfileCreate,
     CarrierRatingResponse,
@@ -50,8 +51,7 @@ async def list_carriers(
 async def _my_carrier(user_id: int, db: AsyncSession):
     carrier = await CarrierRepository(db).get_by_user_id(user_id)
     if not carrier:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
-                            detail="User has no carrier profile")
+        raise NotFoundError("Carrier profile", code="NO_CARRIER_PROFILE")
     return carrier
 
 
@@ -77,10 +77,11 @@ async def create_my_carrier(
     """
     try:
         await service.get_carrier_by_user_id(current_user_id)
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT,
-                            detail="This user already has a carrier profile.")
     except CarrierNotFoundError:
         pass
+    else:
+        # La constraint única de carriers.user_id respalda esto ante una race.
+        raise AlreadyExistsError("Carrier profile", code="CARRIER_PROFILE_EXISTS")
     carrier = await service.create_carrier(
         user_id=current_user_id,
         company_name=data.company_name,
@@ -102,7 +103,9 @@ async def update_my_carrier(
     """Update current user's carrier information."""
     carrier = await _my_carrier(current_user_id, db)
     updates = data.model_dump(exclude_unset=True)
-    updated_carrier = await service.update_carrier(carrier.id, **updates)
+    updated_carrier = await service.update_profile(
+        carrier, updates, shipment_repo=ShipmentRepository(db)
+    )
     return CarrierResponse.model_validate(updated_carrier)
 
 
@@ -189,8 +192,9 @@ async def update_carrier(
 ) -> CarrierResponse:
     """Update carrier by id (admin). El carrier se edita a sí mismo por PATCH /me."""
     updates = data.model_dump(exclude_unset=True)
-    carrier = await service.update_carrier(carrier_id, **updates)
-    return CarrierResponse.model_validate(carrier)
+    carrier = await service.get_carrier_by_id(carrier_id)
+    updated = await service.update_profile(carrier, updates)
+    return CarrierResponse.model_validate(updated)
 
 
 @router.delete("/{carrier_id}", status_code=status.HTTP_204_NO_CONTENT)

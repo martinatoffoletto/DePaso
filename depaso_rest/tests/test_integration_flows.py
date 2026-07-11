@@ -864,3 +864,168 @@ def test_carrier_cancel_keeps_payment_held(client: TestClient, db):
     res = client.post(f"/api/v1/shipments/{sid}/cancel", headers=client_headers)
     assert res.status_code == 200, res.text
     assert res.json()["payment_status"] == "refunded"
+
+
+# --- carriers flow (auditoría carriers) ----------------------------------------
+
+WEEKDAYS = ("mon", "tue", "wed", "thu", "fri", "sat", "sun")
+
+
+def test_availability_toggle_gates_on_demand_matching(client: TestClient, db):
+    """is_available no era escribible por API: el toggle "en línea" del rider
+    era cosmético y el pool ON_DEMAND del matching dedicado quedaba vacío."""
+    carrier_headers, carrier_id = _verified_carrier(
+        client, db, "ondemand@example.com", plate="OD-001")
+    client_headers, _ = _register(client, "ondemand_client@example.com")
+    ship = client.post("/api/v1/shipments", json={
+        "package_size": "m", "modality": "dedicated",
+        "assignment_mode": "on_demand",
+        "origin_lat": -34.6000, "origin_lon": -58.3850,
+        "destination_lat": -34.5900, "destination_lon": -58.3950,
+        "weight_kg": 5.0,
+    }, headers=client_headers)
+    assert ship.status_code == 201, ship.text
+    sid = ship.json()["id"]
+    admin = _make_admin(db)
+
+    # Offline (default): nadie en el ranking on-demand.
+    ranked = client.get(f"/api/v1/matching/{sid}/ranked", headers=admin)
+    assert ranked.status_code == 200, ranked.text
+    assert all(r["carrier_id"] != carrier_id for r in ranked.json())
+
+    # Se pone en línea + publica posición -> aparece en el ranking.
+    res = client.patch("/api/v1/carriers/me", json={"is_available": True},
+                       headers=carrier_headers)
+    assert res.status_code == 200, res.text
+    assert res.json()["is_available"] is True
+    pos = client.post("/api/v1/tracking/position",
+                      json={"lat": -34.6010, "lon": -58.3860}, headers=carrier_headers)
+    assert pos.status_code == 202, pos.text
+
+    ranked = client.get(f"/api/v1/matching/{sid}/ranked", headers=admin)
+    assert any(r["carrier_id"] == carrier_id for r in ranked.json()), ranked.json()
+
+
+def test_recurring_route_still_matches_after_first_window(client: TestClient, db):
+    """Una ruta habitual (recurrence_days) seguía viva solo hasta que expiraba
+    su primera ventana; después desaparecía del matching para siempre."""
+    carrier_headers, _ = _verified_carrier(client, db, "recur@example.com",
+                                           plate="RC-001")
+    now = datetime.now(timezone.utc)
+    today = WEEKDAYS[now.weekday()]
+    # Ventana de referencia hace UNA SEMANA, con la franja horaria cubriendo
+    # este momento, recurrente para el día de hoy.
+    start = (now - timedelta(days=7, hours=1)).strftime("%Y-%m-%dT%H:%M:%SZ")
+    end = (now - timedelta(days=7) + timedelta(hours=7)).strftime("%Y-%m-%dT%H:%M:%SZ")
+    route = client.post("/api/v1/routes", json={
+        "kind": "collaborative_route",
+        "origin_lat": -34.6037, "origin_lon": -58.3816,
+        "destination_lat": -34.5837, "destination_lon": -58.4016,
+        "window_start": start, "window_end": end,
+        "recurrence_days": today,
+    }, headers=carrier_headers)
+    assert route.status_code == 201, route.text
+
+    client_headers, _ = _register(client, "recur_client@example.com")
+    ship = client.post("/api/v1/shipments", json={
+        "package_size": "m", "modality": "collaborative",
+        "assignment_mode": "on_demand",
+        "origin_lat": -34.6000, "origin_lon": -58.3850,
+        "destination_lat": -34.5900, "destination_lon": -58.3950,
+        "weight_kg": 4.0,
+    }, headers=client_headers)
+    sid = ship.json()["id"]
+
+    feed = client.get("/api/v1/carriers/me/feed", headers=carrier_headers)
+    assert feed.status_code == 200, feed.text
+    assert sid in [i["shipment_id"] for i in feed.json()], feed.json()
+
+    # El mismo caso pero con recurrencia para OTRO día -> no se ofrece.
+    other_day = WEEKDAYS[(now.weekday() + 3) % 7]
+    upd = client.patch(f"/api/v1/routes/{route.json()['id']}",
+                       json={"recurrence_days": other_day}, headers=carrier_headers)
+    assert upd.status_code == 200, upd.text
+    feed = client.get("/api/v1/carriers/me/feed", headers=carrier_headers)
+    assert sid not in [i["shipment_id"] for i in feed.json()]
+
+
+def test_future_window_route_not_offered_now(client: TestClient, db):
+    """Una ruta cuya ventana empieza mañana no genera ofertas HOY (antes
+    list_active_in_window solo filtraba window_end >= now)."""
+    carrier_headers, _ = _verified_carrier(client, db, "future@example.com",
+                                           plate="FU-001")
+    now = datetime.now(timezone.utc)
+    start = (now + timedelta(hours=26)).strftime("%Y-%m-%dT%H:%M:%SZ")
+    end = (now + timedelta(hours=30)).strftime("%Y-%m-%dT%H:%M:%SZ")
+    res = client.post("/api/v1/routes", json={
+        "kind": "collaborative_route",
+        "origin_lat": -34.6037, "origin_lon": -58.3816,
+        "destination_lat": -34.5837, "destination_lon": -58.4016,
+        "window_start": start, "window_end": end,
+    }, headers=carrier_headers)
+    assert res.status_code == 201, res.text
+
+    client_headers, _ = _register(client, "future_client@example.com")
+    ship = client.post("/api/v1/shipments", json={
+        "package_size": "m", "modality": "collaborative",
+        "assignment_mode": "on_demand",
+        "origin_lat": -34.6000, "origin_lon": -58.3850,
+        "destination_lat": -34.5900, "destination_lon": -58.3950,
+        "weight_kg": 4.0,
+    }, headers=client_headers)
+    sid = ship.json()["id"]
+
+    feed = client.get("/api/v1/carriers/me/feed", headers=carrier_headers)
+    assert sid not in [i["shipment_id"] for i in feed.json()], feed.json()
+
+
+def test_carrier_update_enforces_plate_rule(client: TestClient, db):
+    """PATCH /carriers/me valida el estado mergeado: bici -> auto sin patente
+    era posible (la regla vivía solo en el create)."""
+    headers, _ = _register(client, "plateless@example.com")
+    res = client.post("/api/v1/carriers/me", json={
+        "company_name": "Bici Mensajería",
+        "vehicle_type": "bike",
+        "capacity_kg": 5.0,
+        "capacity_volume_m3": 0.1,
+    }, headers=headers)
+    assert res.status_code == 201, res.text
+
+    res = client.patch("/api/v1/carriers/me", json={"vehicle_type": "car"},
+                       headers=headers)
+    assert res.status_code == 400, res.text
+    assert res.json()["code"] == "LICENSE_PLATE_REQUIRED"
+
+    res = client.patch("/api/v1/carriers/me",
+                       json={"vehicle_type": "car", "license_plate": "ab123cd"},
+                       headers=headers)
+    assert res.status_code == 200, res.text
+    assert res.json()["license_plate"] == "AB123CD"
+
+    # Vuelta a movilidad blanda: la patente se limpia.
+    res = client.patch("/api/v1/carriers/me", json={"vehicle_type": "bike"},
+                       headers=headers)
+    assert res.status_code == 200, res.text
+    assert res.json()["license_plate"] is None
+
+
+def test_vehicle_change_blocked_with_active_shipments(client: TestClient, db):
+    """Cambiar de vehículo con entregas en curso rompería la compatibilidad
+    de carga chequeada al aceptar."""
+    carrier_headers, _ = _verified_carrier(client, db, "busy_switch@example.com",
+                                           plate="BS-001")
+    sid = _pending_shipment(client, "busy_client@example.com")
+    accept = client.post(f"/api/v1/shipments/{sid}/accept", json={},
+                         headers=carrier_headers)
+    assert accept.status_code == 200, accept.text
+
+    res = client.patch("/api/v1/carriers/me",
+                       json={"vehicle_type": "van", "license_plate": "VN-999"},
+                       headers=carrier_headers)
+    assert res.status_code == 400, res.text
+    assert res.json()["code"] == "CARRIER_HAS_ACTIVE_SHIPMENTS"
+
+    # Sin cambio de vehículo, el resto del perfil sí se puede editar.
+    res = client.patch("/api/v1/carriers/me", json={"company_name": "Nuevo Nombre"},
+                       headers=carrier_headers)
+    assert res.status_code == 200, res.text

@@ -11,7 +11,8 @@ import { useRiderStore } from "@/src/carrier/riderStore";
 import { toast } from "@/src/shared/ui/toastStore";
 import { carriersService, routesService } from "@/src/shared/api/carriers";
 import { shipmentsService } from "@/src/shared/api/shipments";
-import { Carrier, CarrierRoute, CarrierSummary, FeedItem, PLATFORM_COMMISSION_RATE, Shipment, ShipmentStatus } from "@/src/shared/types";
+import { Carrier, CarrierRoute, CarrierSummary, FeedItem, Shipment, ShipmentStatus } from "@/src/shared/types";
+import { carrierPayout } from "@/src/shared/utils/payout";
 import { reverseGeocode } from "@/src/shared/utils/geocoding";
 import { T } from "@/constants/tokens";
 import { IncomingOfferModal } from "./IncomingOfferModal";
@@ -93,7 +94,7 @@ function ActiveJobPanel({ shipment, advancing, onAdvance, onCancel }: {
           )}
         </View>
         {shipment.estimated_price != null && (
-          <Text className="text-[16px] font-extrabold text-ink tracking-[-0.4px]">{money(shipment.estimated_price)}</Text>
+          <Text className="text-[16px] font-extrabold text-ink tracking-[-0.4px]">{money(carrierPayout(shipment.estimated_price))}</Text>
         )}
       </View>
 
@@ -183,7 +184,7 @@ function OfferRow({ item, onPress }: { item: FeedItem; onPress: () => void }) {
       </View>
       <View className="items-end">
         <Text className="text-[15px] font-bold text-ink tracking-[-0.4px]">
-          {item.estimated_price != null ? money(item.estimated_price) : "—"}
+          {item.estimated_price != null ? money(carrierPayout(item.estimated_price)) : "—"}
         </Text>
         <Text className="text-[8.5px] tracking-[1px] text-emeraldDeep font-bold mt-px">VER</Text>
       </View>
@@ -235,6 +236,16 @@ export default function RiderHomeScreen() {
   const goOffline = useRiderStore((s) => s.goOffline);
   const firstName = user?.first_name ?? "Cadete";
 
+  // El toggle "en línea" también vive en el backend (is_available): es lo que
+  // mete al carrier en el pool on-demand del matching dedicado. Sin el sync,
+  // el botón era puramente cosmético y ningún carrier real era matcheable.
+  const setAvailability = useCallback((value: boolean) => {
+    if (value) goOnline(); else goOffline();
+    carriersService.updateProfile({ is_available: value }).catch(() => {
+      // sin red: el estado local manda; el próximo load() reconcilia
+    });
+  }, [goOnline, goOffline]);
+
   const [carrier, setCarrier] = useState<Carrier | null>(null);
   const [summary, setSummary] = useState<CarrierSummary | null>(null);
   const [routes, setRoutes] = useState<CarrierRoute[]>([]);
@@ -283,6 +294,11 @@ export default function RiderHomeScreen() {
     try {
       const profile = await carriersService.getMyProfile();
       setCarrier(profile);
+      // Reconciliar disponibilidad: si la app se cerró estando "en línea",
+      // el backend quedaba disponible para siempre.
+      if (profile.is_available !== online) {
+        carriersService.updateProfile({ is_available: online }).catch(() => {});
+      }
       const [sum, mine] = await Promise.all([
         carriersService.getSummary().catch(() => null),
         routesService.mine().catch(() => [] as CarrierRoute[]),
@@ -406,7 +422,7 @@ export default function RiderHomeScreen() {
       setOffer(null);
       setFeed((f) => f.filter((x) => x.shipment_id !== item.shipment_id));
       await loadActive();
-      if (!online) goOnline();
+      if (!online) setAvailability(true);
       toast.success("Pedido aceptado — gestionalo desde el mapa.");
     } catch (err: unknown) {
       const detail = (err as { response?: { data?: { detail?: unknown } } })?.response?.data?.detail;
@@ -436,7 +452,7 @@ export default function RiderHomeScreen() {
         // Lo que el carrier cobra es el precio menos la comisión (igual que
         // total_earnings del backend) — mostrar el bruto era engañoso.
         toast.success(shipment.estimated_price != null
-          ? `Entrega completada 🎉 Sumaste ${money(shipment.estimated_price * (1 - PLATFORM_COMMISSION_RATE))}.`
+          ? `Entrega completada 🎉 Sumaste ${money(carrierPayout(shipment.estimated_price))}.`
           : "Entrega completada 🎉");
       }
     } catch (err: unknown) {
@@ -556,7 +572,7 @@ export default function RiderHomeScreen() {
               </View>
               <TouchableOpacity
                 className="bg-red rounded-xl flex-row items-center gap-[6px] px-4 py-[10px]"
-                onPress={goOffline}
+                onPress={() => setAvailability(false)}
                 activeOpacity={0.85}
               >
                 <MaterialCommunityIcons name="pause" size={14} color="#F4EFE3" />
@@ -699,7 +715,7 @@ export default function RiderHomeScreen() {
             <View className="px-4 pt-3">
               <TouchableOpacity
                 className="bg-amberBg border-[1.2px] border-amber rounded-2xl px-4 py-[14px] flex-row items-center gap-3"
-                onPress={goOnline}
+                onPress={() => setAvailability(true)}
                 activeOpacity={0.85}
               >
                 <MaterialCommunityIcons name="map-marker-radius-outline" size={22} color={T.amberDeep} />
@@ -731,7 +747,7 @@ export default function RiderHomeScreen() {
               <TouchableOpacity
                 className="bg-lime rounded-2xl py-4 flex-row items-center justify-center gap-[10px] mb-[10px]"
                 style={{ shadowColor: T.lime, shadowOffset: { width: 0, height: 12 }, shadowOpacity: 0.45, shadowRadius: 26, elevation: 6 }}
-                onPress={goOnline}
+                onPress={() => setAvailability(true)}
                 activeOpacity={0.9}
               >
                 <MaterialCommunityIcons name="play" size={20} color={T.forest} />

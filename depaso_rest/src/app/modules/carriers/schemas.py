@@ -57,6 +57,8 @@ class CarrierUpdate(BaseModel):
     license_plate: str | None = None
     capacity_kg: float | None = Field(default=None, gt=0)
     capacity_volume_m3: float | None = None
+    # Toggle "en línea" del rider (pool ON_DEMAND del matching dedicado).
+    is_available: bool | None = None
 
 
 class CarrierResponse(CarrierBase):
@@ -67,6 +69,7 @@ class CarrierResponse(CarrierBase):
     reputation: float
     is_active: bool
     is_verified: bool
+    is_available: bool = False
     created_at: datetime
     updated_at: datetime
 

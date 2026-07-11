@@ -54,7 +54,7 @@ class RouteService:
         route = await self.route_repo.get_by_id(route_id)
         if not route or route.carrier_id != carrier_id:
             raise NotFoundError("Route")
-        
+
         # Clean None values
         updates = {k: v for k, v in updates.items() if v is not None}
         if not updates:
@@ -66,6 +66,22 @@ class RouteService:
         new_end = updates.get("window_end", route.window_end)
         if new_end <= new_start:
             raise ValidationError("window_end must be after window_start.")
+
+        # Mismo límite de movilidad blanda que el publish: mover los extremos
+        # por PATCH podía estirar una ruta de bici más allá de los 5 km.
+        if route.kind == "collaborative_route":
+            carrier = await self.carrier_repo.get_by_id(carrier_id)
+            if carrier and carrier.vehicle_type in SOFT_MOBILITY:
+                origin = Point(updates.get("origin_lat", route.origin_lat),
+                               updates.get("origin_lon", route.origin_lon))
+                dest = Point(updates.get("destination_lat", route.destination_lat),
+                             updates.get("destination_lon", route.destination_lon))
+                trip_km = road_km(origin, dest)
+                if trip_km > MAX_SOFT_MOBILITY_ROUTE_KM:
+                    raise ValidationError(
+                        f"Pedestrian/bike routes are limited to {MAX_SOFT_MOBILITY_ROUTE_KM} km "
+                        f"(this route is ~{trip_km:.1f} km)."
+                    )
 
         updated = await self.route_repo.update(route_id, **updates)
         return RouteResponse.model_validate(updated)

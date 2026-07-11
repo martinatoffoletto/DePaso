@@ -5,7 +5,9 @@ Business logic for carrier management.
 from src.app.modules.carriers.repository import CarrierRepository
 from src.app.modules.carriers.models import Carrier
 from src.app.modules.carriers.exceptions import CarrierNotFoundError
+from src.app.modules.carriers.schemas import MOTORIZED_VEHICLES
 from src.app.modules.shipments import pricing
+from src.app.shared.exceptions import ValidationError
 
 
 class CarrierService:
@@ -73,14 +75,41 @@ class CarrierService:
             raise CarrierNotFoundError()
         return carrier
 
-    async def update_reputation(self, carrier_id: int, new_rating: float) -> Carrier:
-        """Update carrier reputation score."""
-        await self.get_carrier_by_id(carrier_id)  # validates existence (raises if missing)
-        # Simple running average (can be improved with weighted average)
-        updated = await self.repository.update(carrier_id, reputation=new_rating)
-        if not updated:
-            raise CarrierNotFoundError()
-        return updated
+    async def update_profile(self, carrier: Carrier, updates: dict,
+                             shipment_repo=None) -> Carrier:
+        """Self-service PATCH del perfil, con reglas sobre el estado MERGEADO.
+
+        El schema de creación exige patente para motorizados, pero un update
+        parcial podía convertir una bici en auto sin patente, o cambiar de
+        vehículo con entregas en curso (rompiendo la compatibilidad de carga
+        ya chequeada al aceptar).
+        """
+        new_vehicle = updates.get("vehicle_type", carrier.vehicle_type)
+
+        if new_vehicle != carrier.vehicle_type and shipment_repo is not None:
+            active = await shipment_repo.list_active_by_carrier(carrier.id)
+            if active:
+                raise ValidationError(
+                    "Cannot change vehicle while there are active shipments.",
+                    code="CARRIER_HAS_ACTIVE_SHIPMENTS",
+                )
+
+        if new_vehicle in MOTORIZED_VEHICLES:
+            plate = updates.get("license_plate", carrier.license_plate)
+            if not plate or not str(plate).strip():
+                raise ValidationError(
+                    f"license_plate is required for vehicle_type '{new_vehicle}'",
+                    code="LICENSE_PLATE_REQUIRED",
+                )
+            if "license_plate" in updates:
+                updates["license_plate"] = str(plate).strip().upper()
+        elif carrier.license_plate is not None:
+            # movilidad blanda: la patente no aplica (update() saltea None,
+            # así que se limpia con un método explícito del repo)
+            updates.pop("license_plate", None)
+            await self.repository.clear_license_plate(carrier.id)
+
+        return await self.update_carrier(carrier.id, **updates)
 
     async def get_available_carriers(self, min_capacity_kg: float) -> list[Carrier]:
         """Get carriers with sufficient capacity for a shipment."""

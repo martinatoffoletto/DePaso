@@ -29,6 +29,13 @@ class CarrierRepository(BaseRepository[Carrier]):
         result = await self.db.execute(select(Carrier).where(Carrier.user_id == user_id))
         return result.scalar_one_or_none()
 
+    async def clear_license_plate(self, carrier_id: int) -> None:
+        """Set license_plate to NULL (BaseRepository.update saltea Nones)."""
+        carrier = await self.get_by_id(carrier_id)
+        if carrier:
+            carrier.license_plate = None
+            await self.db.flush()
+
     async def get_by_ids(self, carrier_ids: list[int]) -> dict[int, Carrier]:
         """Batch-fetch carriers by id, keyed by id (avoids N+1 in loops)."""
         if not carrier_ids:

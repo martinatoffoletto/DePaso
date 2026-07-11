@@ -1,11 +1,12 @@
 """
 Tracking module API router.
 """
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.app.core.database import get_db
 from src.app.core.dependencies import CurrentUserId
+from src.app.shared.exceptions import ForbiddenError
 from src.app.modules.tracking.schemas import PositionPublish, PositionResponse, TraceResponse
 from src.app.modules.tracking.service import TrackingService
 from src.app.modules.tracking.repository import TrackingRepository
@@ -33,8 +34,7 @@ async def publish_position(
     """Carrier publishes its GPS position every 15-30 s (RF-TRK-01)."""
     carrier = await CarrierRepository(db).get_by_user_id(current_user_id)
     if not carrier:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN,
-                            detail="User has no carrier profile")
+        raise ForbiddenError("User has no carrier profile", code="NO_CARRIER_PROFILE")
     traced = await service.publish_position(carrier.id, data.lat, data.lon)
     return {"traced_shipments": traced}
 

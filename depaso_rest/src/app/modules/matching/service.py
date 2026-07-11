@@ -30,6 +30,7 @@ from src.app.modules.matching.schemas import (
     ScoreBreakdown,
 )
 from src.app.modules.routes.repository import RouteRepository
+from src.app.modules.routes.windows import effective_window, window_contains
 from src.app.modules.shipments.exceptions import ShipmentNotFoundError
 from src.app.modules.shipments.models import Shipment
 from src.app.modules.shipments.repository import ShipmentRepository
@@ -195,11 +196,15 @@ class MatchingService:
         if carrier is None or not (carrier.is_active and carrier.is_verified):
             return []
 
+        now = _naive_utcnow()
         my_routes: list = []
         my_windows: list = []
         if self.route_repo is not None:
-            for r in await self.route_repo.list_active_in_window(_naive_utcnow()):
-                if r.carrier_id != carrier_id:
+            for r in await self.route_repo.list_active_in_window(now):
+                # El feed ofrece trabajo para AHORA: una ruta cuya ventana
+                # (efectiva, con recurrencia) no contiene este momento no
+                # genera ofertas — antes una ventana futura ofrecía ya.
+                if r.carrier_id != carrier_id or not window_contains(r, now):
                     continue
                 if r.kind == "collaborative_route":
                     my_routes.append(r)
@@ -379,7 +384,12 @@ class MatchingService:
 
             geo = geo_score_collaborative(pickup, dropoff, route_origin, route_dest)
             detour_component = 1.0 - min(1.0, detour.detour_ratio / MAX_DETOUR_RATIO_COLLABORATIVE)
-            time_c = time_window_score(route.window_start, route.window_end, now)
+            # Ventana efectiva (soporta recurrencia): la de referencia de una
+            # ruta habitual queda en el pasado y puntuaba siempre 0.
+            window = effective_window(route, now)
+            if window is None:
+                continue
+            time_c = time_window_score(window[0], window[1], now)
             results.append(await self._build_response(
                 carrier=carrier,
                 shipment=shipment,
@@ -469,7 +479,10 @@ class MatchingService:
                 if carrier.id in seen_carrier_ids:
                     # Already ranked as ON_DEMAND — avoid double-counting.
                     continue
-                time_c = time_window_score(route.window_start, route.window_end, now)
+                window = effective_window(route, now)
+                if window is None:
+                    continue
+                time_c = time_window_score(window[0], window[1], now)
                 if time_c == 0.0:
                     # Completely outside the time-decay window — skip.
                     continue
@@ -489,7 +502,7 @@ class MatchingService:
                     route_id=route.id,
                     extra_reasons=[
                         f"Disponible por ventana habitual hasta "
-                        f"{route.window_end.strftime('%H:%M')} (BY_AVAILABILITY)",
+                        f"{window[1].strftime('%H:%M')} (BY_AVAILABILITY)",
                     ],
                 ))
 

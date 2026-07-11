@@ -3,7 +3,7 @@ Routes module repository for data access.
 """
 from datetime import datetime, timezone
 
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.app.shared.base_repository import BaseRepository
@@ -26,17 +26,21 @@ class RouteRepository(BaseRepository[CarrierRoute]):
         return list(result.scalars().all())
 
     async def list_active_in_window(self, at: datetime | None = None) -> list[CarrierRoute]:
-        """Active routes whose time window contains the given moment (default: now).
+        """Active routes that may apply at the given moment (default: now).
 
-        Recurring routes are stored with a reference window; for the prototype
-        we match on time-of-day overlap handled at service level, so here we
-        only filter active ones whose window has not fully expired.
+        Incluye las recurrentes aunque su ventana de referencia haya expirado:
+        la vigencia real (día habilitado + franja horaria) la decide
+        routes.windows.effective_window en la capa de matching. Sin el OR,
+        una ruta habitual desaparecía para siempre tras su primera ventana.
         """
         at = at or datetime.now(timezone.utc).replace(tzinfo=None)
         result = await self.db.execute(
             select(CarrierRoute).where(
                 CarrierRoute.is_active == True,  # noqa: E712
-                CarrierRoute.window_end >= at,
+                or_(
+                    CarrierRoute.window_end >= at,
+                    CarrierRoute.recurrence_days.isnot(None),
+                ),
             )
         )
         return list(result.scalars().all())

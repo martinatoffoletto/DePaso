@@ -4,6 +4,7 @@ import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { DeliveryMode, FeedItem } from "@/src/shared/types";
 import { reverseGeocode } from "@/src/shared/utils/geocoding";
+import { carrierPayout } from "@/src/shared/utils/payout";
 import { T } from "@/constants/tokens";
 import { PACKAGE_LABEL_SHORT } from "@/src/shared/utils/packageCategory";
 
@@ -36,7 +37,11 @@ export function IncomingOfferModal({ item, accepting, onAccept, onReject }: Prop
   const isCollab = item.modality === DeliveryMode.COLLABORATIVE;
   const pickupAddr = useAddress(item.origin_lat, item.origin_lon);
   const dropoffAddr = useAddress(item.destination_lat, item.destination_lon);
-  const priceLabel = item.estimated_price != null ? `$${item.estimated_price.toLocaleString("es-AR")}` : "A convenir";
+  // "Ganás": neto de comisión — el bruto acá y el neto en el resumen hacían
+  // que al cadete no le cerraran los números.
+  const priceLabel = item.estimated_price != null
+    ? `$${Math.round(carrierPayout(item.estimated_price)).toLocaleString("es-AR")}`
+    : "A convenir";
 
   return (
     <Modal visible animationType="slide" transparent onRequestClose={onReject}>

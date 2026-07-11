@@ -117,8 +117,19 @@ export interface Carrier {
   reputation: number;
   is_active: boolean;
   is_verified: boolean;
+  /** Toggle "en línea" (pool on-demand del matching dedicado). */
+  is_available: boolean;
   created_at: string;
   updated_at: string;
+}
+
+export interface CarrierUpdatePayload {
+  company_name?: string;
+  vehicle_type?: TransportType;
+  license_plate?: string;
+  capacity_kg?: number;
+  capacity_volume_m3?: number;
+  is_available?: boolean;
 }
 
 export interface CarrierCreatePayload {

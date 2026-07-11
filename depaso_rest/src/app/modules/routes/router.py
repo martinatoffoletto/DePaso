@@ -1,7 +1,7 @@
 """
 Routes module API router.
 """
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.app.core.database import get_db
@@ -10,6 +10,7 @@ from src.app.modules.carriers.repository import CarrierRepository
 from src.app.modules.routes.repository import RouteRepository
 from src.app.modules.routes.schemas import RouteCreateRequest, RouteResponse, RouteUpdate
 from src.app.modules.routes.service import RouteService
+from src.app.shared.exceptions import ForbiddenError
 
 router = APIRouter(prefix="/routes", tags=["routes"])
 
@@ -24,10 +25,7 @@ def get_route_service(db: AsyncSession = Depends(get_db)) -> RouteService:
 async def _get_carrier_id(user_id: int, db: AsyncSession) -> int:
     carrier = await CarrierRepository(db).get_by_user_id(user_id)
     if not carrier:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="User has no carrier profile",
-        )
+        raise ForbiddenError("User has no carrier profile", code="NO_CARRIER_PROFILE")
     return carrier.id
 
 

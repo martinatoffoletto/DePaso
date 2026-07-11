@@ -4,6 +4,7 @@ import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useFocusEffect } from "@react-navigation/native";
 import { carriersService } from "@/src/shared/api/carriers";
+import { carrierPayout } from "@/src/shared/utils/payout";
 import { shipmentsService } from "@/src/shared/api/shipments";
 import { CarrierSummary, Shipment, ShipmentStatus } from "@/src/shared/types";
 import { EmptyState } from "@/src/shared/ui/EmptyState";
@@ -150,7 +151,7 @@ export default function RiderEarningsScreen() {
                     <Text className="text-[12px] text-inkMute mt-px">{SIZE_LABEL[sh.package_size]} · Entregado</Text>
                   </View>
                   {sh.estimated_price != null && (
-                    <Text className="text-sm font-bold text-emeraldDeep">+{money(sh.estimated_price)}</Text>
+                    <Text className="text-sm font-bold text-emeraldDeep">+{money(carrierPayout(sh.estimated_price))}</Text>
                   )}
                 </View>
               ))}

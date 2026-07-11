@@ -6,6 +6,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useFocusEffect } from "@react-navigation/native";
 import { useRouter } from "expo-router";
 import { carriersService } from "@/src/shared/api/carriers";
+import { carrierPayout } from "@/src/shared/utils/payout";
 import { shipmentsService } from "@/src/shared/api/shipments";
 import { CarrierSummary, Shipment, ShipmentStatus } from "@/src/shared/types";
 import { reverseGeocode } from "@/src/shared/utils/geocoding";
@@ -57,7 +58,7 @@ function HistoryRow({ shipment }: { shipment: Shipment }) {
           </View>
         </View>
         {shipment.estimated_price != null && delivered && (
-          <Text className="text-sm font-bold text-emeraldDeep">+${shipment.estimated_price.toLocaleString("es-AR")}</Text>
+          <Text className="text-sm font-bold text-emeraldDeep">+${Math.round(carrierPayout(shipment.estimated_price)).toLocaleString("es-AR")}</Text>
         )}
       </View>
       <View className="gap-[5px] mb-2">

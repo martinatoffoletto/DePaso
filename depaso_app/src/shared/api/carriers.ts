@@ -5,6 +5,7 @@ import {
   CarrierRating,
   CarrierRoute,
   CarrierSummary,
+  CarrierUpdatePayload,
   FeedItem,
   RouteCreatePayload,
   TrackedPosition,
@@ -14,6 +15,12 @@ export const carriersService = {
   async createProfile(payload: CarrierCreatePayload): Promise<Carrier> {
     // /carriers/me: el user_id sale del JWT, no del body (self-service).
     const response = await apiClient.post<Carrier>("/carriers/me", payload);
+    return response.data;
+  },
+
+  /** PATCH del perfil propio — incluye el toggle is_available (en línea). */
+  async updateProfile(payload: CarrierUpdatePayload): Promise<Carrier> {
+    const response = await apiClient.patch<Carrier>("/carriers/me", payload);
     return response.data;
   },
 
