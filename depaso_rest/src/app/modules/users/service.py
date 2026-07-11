@@ -50,9 +50,9 @@ class UserService:
         return await self.repository.list_active(skip, limit)
 
     async def update_user(self, user_id: int, first_name: str | None = None,
-                    last_name: str | None = None, phone_number: str | None = None,
-                    user_type: str | None = None) -> User:
-        """Update user information."""
+                    last_name: str | None = None,
+                    phone_number: str | None = None) -> User:
+        """Update user information (nombre/teléfono; el rol no se edita acá)."""
         await self.get_user_by_id(user_id)  # validates existence (raises if missing)
         updates = {}
         if first_name:
@@ -61,8 +61,6 @@ class UserService:
             updates["last_name"] = last_name
         if phone_number:
             updates["phone_number"] = phone_number
-        if user_type:
-            updates["user_type"] = user_type
 
         updated_user = await self.repository.update(user_id, **updates)
         if not updated_user:

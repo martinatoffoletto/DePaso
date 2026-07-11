@@ -30,6 +30,10 @@ export function ChangePasswordModal({ visible, onClose }: { visible: boolean; on
   const [saving, setSaving] = useState(false);
 
   const save = async () => {
+    if (!current) {
+      Alert.alert("Falta tu contraseña actual", "Ingresala para confirmar el cambio.");
+      return;
+    }
     if (next.length < 8) {
       Alert.alert("Contraseña corta", "La nueva contraseña debe tener al menos 8 caracteres.");
       return;

@@ -17,12 +17,16 @@ class UserBase(BaseModel):
 
 
 class UserUpdate(BaseModel):
-    """Schema for user updates."""
+    """Schema for user updates.
+
+    user_type NO es editable por acá: el rol se elige al registrarse y el modo
+    cadete requiere perfil de carrier + verificación (POST /carriers/me). Un
+    self-PATCH del rol dejaba la UI de carrier sin perfil detrás.
+    """
 
     first_name: str | None = None
     last_name: str | None = None
     phone_number: str | None = None
-    user_type: str | None = Field(default=None, pattern="^(client|carrier)$")
 
 
 class UserResponse(UserBase):

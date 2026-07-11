@@ -1029,3 +1029,16 @@ def test_vehicle_change_blocked_with_active_shipments(client: TestClient, db):
     res = client.patch("/api/v1/carriers/me", json={"company_name": "Nuevo Nombre"},
                        headers=carrier_headers)
     assert res.status_code == 200, res.text
+
+
+def test_user_cannot_self_change_role(client: TestClient, db):
+    """PATCH /users/me ya no acepta user_type: un cliente podía flipear su rol
+    a carrier sin perfil ni verificación (la UI de cadete quedaba rota)."""
+    headers, _ = _register(client, "roleflip@example.com")
+    res = client.patch("/api/v1/users/me",
+                       json={"user_type": "carrier", "first_name": "Flip"},
+                       headers=headers)
+    assert res.status_code == 200, res.text
+    body = res.json()
+    assert body["user_type"] == "client"   # el campo extra se ignora
+    assert body["first_name"] == "Flip"    # el resto del update sí aplica

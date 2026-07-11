@@ -10,6 +10,7 @@ import { AppErrorBoundary } from "@/src/shared/errors/AppErrorBoundary";
 import { Toast } from "@/src/shared/ui/Toast";
 import { useAuthStore } from "@/src/shared/session/authStore";
 import { useSettingsStore } from "@/src/shared/session/settingsStore";
+import { useAddressBookStore } from "@/src/shared/profile/addressBookStore";
 
 export default function RootLayout() {
   // Route gating uses Stack.Protected (Expo Router's recommended pattern):
@@ -18,11 +19,13 @@ export default function RootLayout() {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   const restoreToken = useAuthStore((s) => s.restoreToken);
   const hydrateSettings = useSettingsStore((s) => s.hydrate);
+  const hydrateAddressBook = useAddressBookStore((s) => s.hydrate);
 
   useEffect(() => {
     restoreToken();
     hydrateSettings();
-  }, [restoreToken, hydrateSettings]);
+    hydrateAddressBook();
+  }, [restoreToken, hydrateSettings, hydrateAddressBook]);
 
   return (
     <AppErrorBoundary>

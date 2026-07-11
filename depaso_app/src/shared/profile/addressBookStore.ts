@@ -1,4 +1,7 @@
 import { create } from "zustand";
+import * as SecureStore from "expo-secure-store";
+
+const KEY = "depaso_address_book";
 
 export type SavedAddress = {
   id: string;
@@ -17,28 +20,56 @@ export type SavedContact = {
 type AddressBookStore = {
   addresses: SavedAddress[];
   contacts: SavedContact[];
+  hydrated: boolean;
+  hydrate: () => Promise<void>;
   addAddress: (a: Omit<SavedAddress, "id">) => void;
   removeAddress: (id: string) => void;
   addContact: (c: Omit<SavedContact, "id">) => void;
   removeContact: (id: string) => void;
 };
 
+function persist() {
+  const { addresses, contacts } = useAddressBookStore.getState();
+  SecureStore.setItemAsync(KEY, JSON.stringify({ addresses, contacts })).catch(() => {});
+}
+
+/**
+ * Direcciones y personas guardadas del usuario, persistidas en el dispositivo.
+ * Empieza VACÍO: los datos de ejemplo hardcodeados aparecían como atajos
+ * reales en el flujo de envío (y todo se perdía al reiniciar la app).
+ */
 export const useAddressBookStore = create<AddressBookStore>((set) => ({
-  addresses: [
-    { id: "1", label: "CASA",    address: "Soler 4221, Palermo", icon: "home-outline" },
-    { id: "2", label: "TRABAJO", address: "Sarmiento 824, CABA", icon: "store-outline" },
-    { id: "3", label: "MAMÁ",    address: "Belgrano R, CABA",    icon: "map-marker-outline" },
-  ],
-  contacts: [
-    { id: "1", label: "MAMÁ",    name: "Claudia García", phone: "1156781234" },
-    { id: "2", label: "TRABAJO", name: "Recepción Of.",  phone: "1143219900" },
-  ],
-  addAddress: (a) =>
-    set((s) => ({ addresses: [...s.addresses, { ...a, id: Date.now().toString() }] })),
-  removeAddress: (id) =>
-    set((s) => ({ addresses: s.addresses.filter((a) => a.id !== id) })),
-  addContact: (c) =>
-    set((s) => ({ contacts: [...s.contacts, { ...c, id: Date.now().toString() }] })),
-  removeContact: (id) =>
-    set((s) => ({ contacts: s.contacts.filter((c) => c.id !== id) })),
+  addresses: [],
+  contacts: [],
+  hydrated: false,
+
+  hydrate: async () => {
+    try {
+      const raw = await SecureStore.getItemAsync(KEY);
+      if (raw) {
+        const data = JSON.parse(raw) as { addresses?: SavedAddress[]; contacts?: SavedContact[] };
+        set({ addresses: data.addresses ?? [], contacts: data.contacts ?? [] });
+      }
+    } catch {
+      // datos corruptos/ausentes: arranca vacío
+    }
+    set({ hydrated: true });
+  },
+
+  addAddress: (a) => {
+    set((s) => ({ addresses: [...s.addresses, { ...a, id: Date.now().toString() }] }));
+    persist();
+  },
+  removeAddress: (id) => {
+    set((s) => ({ addresses: s.addresses.filter((a) => a.id !== id) }));
+    persist();
+  },
+  addContact: (c) => {
+    set((s) => ({ contacts: [...s.contacts, { ...c, id: Date.now().toString() }] }));
+    persist();
+  },
+  removeContact: (id) => {
+    set((s) => ({ contacts: s.contacts.filter((c) => c.id !== id) }));
+    persist();
+  },
 }));

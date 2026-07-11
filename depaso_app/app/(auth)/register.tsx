@@ -10,16 +10,8 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAuthStore } from "@/src/shared/session/authStore";
 import { carriersService } from "@/src/shared/api/carriers";
 import { TransportType, UserType } from "@/src/shared/types";
+import { VEHICLES, vehicleNeedsPlate } from "@/src/shared/utils/vehicles";
 import { T } from "@/constants/tokens";
-
-const VEHICLES: { type: TransportType; label: string; icon: any; capacityKg: number }[] = [
-  { type: TransportType.PEDESTRIAN, label: "A pie",     icon: "walk",          capacityKg: 5 },
-  { type: TransportType.BIKE,       label: "Bici",      icon: "bike",          capacityKg: 8 },
-  { type: TransportType.MOTORCYCLE, label: "Moto",      icon: "motorbike",     capacityKg: 15 },
-  { type: TransportType.CAR,        label: "Auto",      icon: "car",           capacityKg: 80 },
-  { type: TransportType.VAN,        label: "Camioneta", icon: "van-utility",   capacityKg: 600 },
-  { type: TransportType.TRUCK,      label: "Camión",    icon: "truck",         capacityKg: 2000 },
-];
 
 function pwdStrength(pwd: string): number {
   if (!pwd) return 0;
@@ -78,7 +70,7 @@ export default function RegisterScreen() {
   const [licensePlate, setLicensePlate] = useState("");
 
   const isCarrier = form.user_type === UserType.CARRIER;
-  const needsPlate = ![TransportType.PEDESTRIAN, TransportType.BIKE].includes(vehicleType);
+  const needsPlate = vehicleNeedsPlate(vehicleType);
   const strength = pwdStrength(form.password);
 
   const update = (field: string, value: string) => {
@@ -96,6 +88,7 @@ export default function RegisterScreen() {
     else if (form.password.length < 8)          e.password = "Mínimo 8 caracteres";
     if (form.password !== form.confirmPassword) e.confirmPassword = "No coinciden";
     if (isCarrier && needsPlate && !licensePlate.trim()) e.license_plate = "Obligatorio";
+    if (!accepted) e.terms = "Tenés que aceptar los términos para continuar";
     setErrors(e);
     return Object.keys(e).length === 0;
   };
@@ -116,12 +109,18 @@ export default function RegisterScreen() {
         const me = useAuthStore.getState().user;
         const vehicle = VEHICLES.find(v => v.type === vehicleType)!;
         if (me) {
-          await carriersService.createProfile({
-            company_name: `${form.first_name.trim()} ${form.last_name.trim()}`,
-            vehicle_type: vehicleType,
-            license_plate: needsPlate ? licensePlate.trim().toUpperCase() : null,
-            capacity_kg: vehicle.capacityKg,
-          });
+          try {
+            await carriersService.createProfile({
+              company_name: `${form.first_name.trim()} ${form.last_name.trim()}`,
+              vehicle_type: vehicleType,
+              license_plate: needsPlate ? licensePlate.trim().toUpperCase() : null,
+              capacity_kg: vehicle.capacityKg,
+            });
+          } catch {
+            // La cuenta ya se creó y la navegación al home es inmediata:
+            // si esto falla (ej. patente duplicada), el home de cadete
+            // detecta el perfil faltante y ofrece completarlo ahí.
+          }
         }
       }
     } catch (error: any) {
@@ -140,13 +139,6 @@ export default function RegisterScreen() {
           >
             <MaterialCommunityIcons name="arrow-left" size={18} color="#F4EFE3" />
           </TouchableOpacity>
-          {/* Step dots */}
-          <View style={{ flexDirection: "row", alignItems: "center", gap: 5 }}>
-            <View style={{ width: 20, height: 6, borderRadius: 4, backgroundColor: "#F4EFE3" }} />
-            <View style={{ width: 6, height: 6, borderRadius: 4, backgroundColor: "rgba(244,239,227,0.25)" }} />
-            <View style={{ width: 6, height: 6, borderRadius: 4, backgroundColor: "rgba(244,239,227,0.25)" }} />
-            <Text style={{ fontSize: 10, letterSpacing: 1.5, color: "rgba(244,239,227,0.7)", marginLeft: 4 }}>01/03</Text>
-          </View>
           <View style={{ width: 38 }} />
         </View>
 
@@ -157,7 +149,7 @@ export default function RegisterScreen() {
           Creá tu cuenta
         </Text>
         <Text style={{ fontSize: 13.5, color: "rgba(244,239,227,0.8)", marginTop: 8, lineHeight: 19 }}>
-          En 3 pasos. Después empezás a enviar.
+          Un solo paso y empezás a enviar.
         </Text>
       </View>
 
@@ -363,10 +355,10 @@ export default function RegisterScreen() {
         {/* ── Terms ── */}
         <TouchableOpacity
           style={{ flexDirection: "row", alignItems: "flex-start", gap: 12, marginTop: 20 }}
-          onPress={() => setAccepted(v => !v)}
+          onPress={() => { setAccepted(v => !v); if (errors.terms) setErrors(p => ({ ...p, terms: "" })); }}
           activeOpacity={0.8}
         >
-          <View style={{ width: 22, height: 22, borderRadius: 7, borderWidth: 1.5, borderColor: accepted ? T.forest : T.border, backgroundColor: accepted ? T.forest : T.card, alignItems: "center", justifyContent: "center", flexShrink: 0, marginTop: 1 }}>
+          <View style={{ width: 22, height: 22, borderRadius: 7, borderWidth: 1.5, borderColor: errors.terms ? T.red : accepted ? T.forest : T.border, backgroundColor: accepted ? T.forest : T.card, alignItems: "center", justifyContent: "center", flexShrink: 0, marginTop: 1 }}>
             {accepted && <MaterialCommunityIcons name="check" size={13} color="#F4EFE3" />}
           </View>
           <Text style={{ flex: 1, fontSize: 13, color: T.inkSoft, lineHeight: 19 }}>
@@ -377,6 +369,7 @@ export default function RegisterScreen() {
             {" de DePaso."}
           </Text>
         </TouchableOpacity>
+        {errors.terms ? <Text style={{ fontSize: 11, color: T.red, marginTop: 6, paddingLeft: 34 }}>{errors.terms}</Text> : null}
       </ScrollView>
 
       {/* ── Sticky CTA ── */}
@@ -390,7 +383,7 @@ export default function RegisterScreen() {
           {isLoading
             ? <ActivityIndicator color="#F4EFE3" />
             : <>
-                <Text style={{ color: "#F4EFE3", fontWeight: "700", fontSize: 15 }}>Continuar al paso 2</Text>
+                <Text style={{ color: "#F4EFE3", fontWeight: "700", fontSize: 15 }}>Crear mi cuenta</Text>
                 <MaterialCommunityIcons name="arrow-right" size={18} color="#F4EFE3" />
               </>
           }

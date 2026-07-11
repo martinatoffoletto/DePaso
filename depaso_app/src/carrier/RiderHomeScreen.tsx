@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { View, ScrollView, TouchableOpacity, ActivityIndicator, Alert, RefreshControl, Linking, Text } from "react-native";
+import { View, ScrollView, TouchableOpacity, ActivityIndicator, Alert, RefreshControl, Linking, Text, TextInput as RNTextInput } from "react-native";
 import MapView, { Marker, Polyline, Region } from "react-native-maps";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -11,8 +11,9 @@ import { useRiderStore } from "@/src/carrier/riderStore";
 import { toast } from "@/src/shared/ui/toastStore";
 import { carriersService, routesService } from "@/src/shared/api/carriers";
 import { shipmentsService } from "@/src/shared/api/shipments";
-import { Carrier, CarrierRoute, CarrierSummary, FeedItem, Shipment, ShipmentStatus } from "@/src/shared/types";
+import { Carrier, CarrierRoute, CarrierSummary, FeedItem, Shipment, ShipmentStatus, TransportType } from "@/src/shared/types";
 import { carrierPayout } from "@/src/shared/utils/payout";
+import { VEHICLES, vehicleNeedsPlate } from "@/src/shared/utils/vehicles";
 import { reverseGeocode } from "@/src/shared/utils/geocoding";
 import { T } from "@/constants/tokens";
 import { IncomingOfferModal } from "./IncomingOfferModal";
@@ -58,6 +59,109 @@ function useAddress(lat: number, lon: number): string {
     return () => { alive = false; };
   }, [lat, lon]);
   return addr;
+}
+
+/** El registro crea la cuenta y DESPUÉS el perfil de cadete; si ese segundo
+ * paso falló (ej. patente duplicada, sin red), el usuario quedaba en una UI
+ * de cadete vacía y sin salida. Este formulario completa el perfil acá. */
+function CompleteCarrierProfile({ userName, onDone }: { userName: string; onDone: () => void }) {
+  const insets = useSafeAreaInsets();
+  const [vehicleType, setVehicleType] = useState<TransportType>(TransportType.MOTORCYCLE);
+  const [plate, setPlate] = useState("");
+  const [saving, setSaving] = useState(false);
+  const needsPlate = vehicleNeedsPlate(vehicleType);
+
+  async function submit() {
+    if (needsPlate && !plate.trim()) {
+      Alert.alert("Falta la patente", "Ingresá la patente de tu vehículo.");
+      return;
+    }
+    setSaving(true);
+    try {
+      const vehicle = VEHICLES.find((v) => v.type === vehicleType)!;
+      await carriersService.createProfile({
+        company_name: userName,
+        vehicle_type: vehicleType,
+        license_plate: needsPlate ? plate.trim().toUpperCase() : null,
+        capacity_kg: vehicle.capacityKg,
+      });
+      onDone();
+    } catch (err: unknown) {
+      const detail = (err as { response?: { data?: { detail?: unknown } } })?.response?.data?.detail;
+      Alert.alert("No se pudo crear el perfil",
+        typeof detail === "string" ? detail : "Intentá de nuevo.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <ScrollView
+      className="flex-1 bg-bg"
+      contentContainerStyle={{ paddingTop: insets.top + 24, paddingHorizontal: 24, paddingBottom: insets.bottom + 32, gap: 16 }}
+      keyboardShouldPersistTaps="handled"
+    >
+      <View className="items-center gap-[10px]">
+        <View className="w-[72px] h-[72px] rounded-[22px] bg-cardSoft items-center justify-center border border-border">
+          <MaterialCommunityIcons name="truck-outline" size={34} color={T.forest} />
+        </View>
+        <Text className="text-base text-ink font-bold tracking-[-0.3px] text-center">Completá tu perfil de cadete</Text>
+        <Text className="text-[13px] text-inkMute text-center leading-[19px]">
+          Tu cuenta se creó pero falta registrar tu vehículo para poder trabajar.
+        </Text>
+      </View>
+
+      <View>
+        <Text className="text-[9.5px] tracking-[1.5px] text-inkMute uppercase font-bold mb-2">Tu vehículo</Text>
+        <View className="flex-row flex-wrap gap-2">
+          {VEHICLES.map((v) => {
+            const active = vehicleType === v.type;
+            return (
+              <TouchableOpacity
+                key={v.type}
+                className={`flex-row items-center gap-[6px] rounded-xl px-3 py-[9px] border-[1.2px] ${active ? "bg-forest border-forest" : "bg-card border-border"}`}
+                onPress={() => setVehicleType(v.type)}
+                activeOpacity={0.8}
+              >
+                <MaterialCommunityIcons name={v.icon as IconName} size={14} color={active ? T.lime : T.inkSoft} />
+                <Text className={`text-[12.5px] font-semibold ${active ? "text-[#F4EFE3]" : "text-inkSoft"}`}>{v.label}</Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+      </View>
+
+      {needsPlate && (
+        <View>
+          <Text className="text-[9.5px] tracking-[1.5px] text-inkMute uppercase font-bold mb-2">Patente</Text>
+          <View className="flex-row items-center gap-3 bg-card rounded-2xl border-[1.2px] border-border px-[14px] h-[52px]">
+            <MaterialCommunityIcons name="card-text-outline" size={18} color={T.inkMute} />
+            <RNTextInput
+              className="flex-1 text-[15px] text-ink font-medium"
+              placeholder="AB123CD"
+              placeholderTextColor={T.inkFaint}
+              value={plate}
+              onChangeText={setPlate}
+              autoCapitalize="characters"
+              autoCorrect={false}
+            />
+          </View>
+        </View>
+      )}
+
+      <TouchableOpacity
+        className="bg-forest rounded-2xl h-[54px] items-center justify-center"
+        style={{ opacity: saving ? 0.7 : 1 }}
+        onPress={submit}
+        disabled={saving}
+        activeOpacity={0.88}
+      >
+        {saving
+          ? <ActivityIndicator color="#F4EFE3" />
+          : <Text className="text-[#F4EFE3] font-bold text-[15px]">Crear perfil de cadete</Text>}
+      </TouchableOpacity>
+    </ScrollView>
+  );
 }
 
 function shiftLabel(startedAt: number | null, now: number): string {
@@ -247,6 +351,7 @@ export default function RiderHomeScreen() {
   }, [goOnline, goOffline]);
 
   const [carrier, setCarrier] = useState<Carrier | null>(null);
+  const [profileMissing, setProfileMissing] = useState(false);
   const [summary, setSummary] = useState<CarrierSummary | null>(null);
   const [routes, setRoutes] = useState<CarrierRoute[]>([]);
   const [feed, setFeed] = useState<FeedItem[]>([]);
@@ -294,6 +399,7 @@ export default function RiderHomeScreen() {
     try {
       const profile = await carriersService.getMyProfile();
       setCarrier(profile);
+      setProfileMissing(false);
       // Reconciliar disponibilidad: si la app se cerró estando "en línea",
       // el backend quedaba disponible para siempre.
       if (profile.is_available !== online) {
@@ -307,8 +413,12 @@ export default function RiderHomeScreen() {
       setRoutes(mine);
       await loadActive();
       if (profile.is_verified && online) await loadFeed();
-    } catch {
+    } catch (err: unknown) {
       setCarrier(null);
+      // 404 = la cuenta existe pero el perfil de cadete nunca se creó
+      // (falló en el registro): ofrecemos completarlo acá.
+      const status = (err as { response?: { status?: number } })?.response?.status;
+      setProfileMissing(status === 404);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -489,6 +599,16 @@ export default function RiderHomeScreen() {
       <View className="flex-1 bg-bg items-center justify-center" style={{ paddingTop: insets.top }}>
         <ActivityIndicator size="large" color={T.forest} />
       </View>
+    );
+  }
+
+  // El perfil de cadete no existe (falló al registrarse): completarlo acá.
+  if (profileMissing) {
+    return (
+      <CompleteCarrierProfile
+        userName={`${user?.first_name ?? ""} ${user?.last_name ?? ""}`.trim() || "Cadete"}
+        onDone={() => load()}
+      />
     );
   }
 

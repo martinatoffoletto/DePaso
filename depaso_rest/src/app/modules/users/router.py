@@ -45,7 +45,6 @@ async def update_me(
         first_name=user_data.first_name,
         last_name=user_data.last_name,
         phone_number=user_data.phone_number,
-        user_type=user_data.user_type,
     )
     return UserResponse.model_validate(user)
 

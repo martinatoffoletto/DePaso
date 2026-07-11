@@ -6,6 +6,7 @@ import {
 import { Text } from "react-native-paper";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
+import Constants from "expo-constants";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAuthStore } from "@/src/shared/session/authStore";
 import { useAddressBookStore } from "@/src/shared/profile/addressBookStore";
@@ -358,7 +359,10 @@ export default function ProfileScreen() {
   const email      = user?.email ?? "";
   const reputation = stats.reputation;
   // Eco level derived from real CO2 saved (1 base, +1 every 20 kg).
-  const ecoLevel = Math.max(1, Math.floor(stats.co2 / 20) + 1);
+  const KG_PER_LEVEL = 20;
+  const ecoLevel = Math.max(1, Math.floor(stats.co2 / KG_PER_LEVEL) + 1);
+  const kgIntoLevel = stats.co2 % KG_PER_LEVEL;
+  const ecoProgress = Math.min(100, Math.round((kgIntoLevel / KG_PER_LEVEL) * 100));
 
   return (
     <>
@@ -380,16 +384,11 @@ export default function ProfileScreen() {
           <View className="absolute bottom-7 -left-5 -right-5 h-5 rounded-[10px] bg-white/5 -rotate-3" />
           <View className="absolute bottom-2 -left-5 -right-5 h-5 rounded-[10px] bg-white/[0.04] -rotate-3" />
           <View className="flex-row items-center gap-[14px] relative">
-            <View className="relative">
-              <View
-                className="w-16 h-16 rounded-[20px] bg-lime items-center justify-center"
-                style={{ shadowColor: "#000", shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.3, shadowRadius: 16, elevation: 4 }}
-              >
-                <Text className="text-[26px] font-extrabold text-forest tracking-[-0.5px]">{initials}</Text>
-              </View>
-              <View className="absolute -bottom-[2px] -right-[2px] w-[22px] h-[22px] rounded-full bg-[#F4EFE3] border-2 border-forest items-center justify-center">
-                <MaterialCommunityIcons name="camera-outline" size={11} color={T.forest} />
-              </View>
+            <View
+              className="w-16 h-16 rounded-[20px] bg-lime items-center justify-center"
+              style={{ shadowColor: "#000", shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.3, shadowRadius: 16, elevation: 4 }}
+            >
+              <Text className="text-[26px] font-extrabold text-forest tracking-[-0.5px]">{initials}</Text>
             </View>
             <View className="flex-1">
               <Text className="text-[22px] font-bold text-[#F4EFE3] tracking-[-0.6px] leading-6">{fullName}</Text>
@@ -422,7 +421,7 @@ export default function ProfileScreen() {
           </View>
         </View>
 
-        {/* ── Eco progress card ── */}
+        {/* ── Eco progress card — derivado del CO2 real ahorrado ── */}
         <View className="mx-4 mt-3 bg-cardSoft border border-border rounded-2xl p-[14px]">
           <View className="flex-row items-center justify-between mb-2">
             <View className="flex-row items-center gap-2">
@@ -430,13 +429,15 @@ export default function ProfileScreen() {
                 <MaterialCommunityIcons name="leaf" size={12} color={T.forest} />
               </View>
               <Text className="text-[13px] text-ink font-semibold">
-                Próximo nivel: <Text className="text-emeraldDeep">Forestero</Text>
+                Próximo nivel eco: <Text className="text-emeraldDeep">Nivel {ecoLevel + 1}</Text>
               </Text>
             </View>
-            <Text className="text-[10px] tracking-[1px] text-inkMute font-bold">8 / 15 envíos</Text>
+            <Text className="text-[10px] tracking-[1px] text-inkMute font-bold">
+              {kgIntoLevel} / {KG_PER_LEVEL} kg CO₂
+            </Text>
           </View>
           <View className="h-[6px] bg-border rounded-md overflow-hidden">
-            <View className="w-[53%] h-full bg-emerald rounded-md" />
+            <View className="h-full bg-emerald rounded-md" style={{ width: `${ecoProgress}%` }} />
           </View>
         </View>
 
@@ -483,7 +484,9 @@ export default function ProfileScreen() {
           <Text className="text-red font-semibold text-sm">Cerrar sesión</Text>
         </TouchableOpacity>
 
-        <Text className="text-center mt-[14px] text-[9px] tracking-[2px] text-inkMute uppercase">DEPASO V1.0.0 · BUILD 4821</Text>
+        <Text className="text-center mt-[14px] text-[9px] tracking-[2px] text-inkMute uppercase">
+          DEPASO V{Constants.expoConfig?.version ?? "1.0.0"}
+        </Text>
       </ScrollView>
 
       <AddressModal visible={addrModal}   onClose={() => setAddrModal(false)} />
