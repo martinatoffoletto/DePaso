@@ -605,3 +605,20 @@ def test_matching_inspection_endpoints_require_admin(client: TestClient, db):
     # admin -> 200
     admin = _make_admin(db)
     assert client.get(f"/api/v1/matching/{sid}/ranked", headers=admin).status_code == 200
+
+
+def test_co2_summary_endpoint(client: TestClient, db):
+    """GET /co2/me/summary — estaba roto por un await faltante (client_impact
+    es async). Un cliente sin envíos entregados ve total 0 y equivalencias."""
+    headers, _ = _register(client, "co2user@example.com")
+    res = client.get("/api/v1/co2/me/summary", headers=headers)
+    assert res.status_code == 200, res.text
+    body = res.json()
+    assert body["total_co2_saved_kg"] == 0.0
+    assert body["shipments_delivered"] == 0
+    assert "equivalences" in body
+    assert set(body["equivalences"]) == {"car_km", "tree_months", "smartphone_charges"}
+
+
+def test_co2_summary_requires_auth(client: TestClient):
+    assert client.get("/api/v1/co2/me/summary").status_code == 401

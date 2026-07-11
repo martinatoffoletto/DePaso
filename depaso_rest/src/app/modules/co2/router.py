@@ -43,7 +43,7 @@ async def my_impact(
     db: AsyncSession = Depends(get_db),
 ):
     """Accumulated CO2 savings of the authenticated client + equivalences (RF-CO2-02)."""
-    impact = CO2Service().client_impact(db, current_user_id)
+    impact = await CO2Service().client_impact(db, current_user_id)
     return ClientImpactResponse(
         total_co2_saved_kg=impact["total_co2_saved_kg"],
         shipments_delivered=impact["shipments_delivered"],
