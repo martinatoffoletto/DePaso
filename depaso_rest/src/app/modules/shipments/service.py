@@ -278,6 +278,15 @@ class ShipmentService:
         # sobre datos viejos. Se libera al commitear la request.
         carrier = await self._get_carrier(carrier_id, for_update=True)
 
+        # El matching filtra carriers suspendidos/sin verificar del ranking,
+        # pero el accept es la transición autoritativa: sin este chequeo un
+        # carrier suspendido podía seguir tomando envíos por API directa.
+        if not carrier.is_active:
+            raise ForbiddenError("Carrier is suspended.", code="CARRIER_SUSPENDED")
+        if not carrier.is_verified:
+            raise ForbiddenError("Carrier must be verified to accept shipments.",
+                                 code="CARRIER_NOT_VERIFIED")
+
         active = await self.repository.list_active_by_carrier(carrier_id)
 
         # Exclusividad del dedicado (spec 3.3: "te desplazás especialmente"):

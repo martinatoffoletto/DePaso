@@ -19,7 +19,6 @@ from src.app.core.security import get_password_hash
 from src.app.shared.base_model import Base
 from src.app.modules.users.models import User
 from src.app.modules.carriers.models import Carrier
-from src.app.modules.packages.models import Package
 from src.app.modules.shipments.models import Shipment
 
 
@@ -136,7 +135,7 @@ def seed():
 
         # ── Usuarios ──────────────────────────────────────────────────────────
         if has_users:
-            print("ℹ️  Usuarios ya existentes, salteando creación de usuarios/carriers/packages.")
+            print("ℹ️  Usuarios ya existentes, salteando creación de usuarios/carriers.")
             # Recuperar usuarios y carriers existentes para crear envíos
             client_user = db.query(User).filter(User.email == "cliente@depaso.com").first()
             carriers = db.query(Carrier).order_by(Carrier.id).all()
@@ -335,57 +334,6 @@ def seed():
         db.add_all(carriers)
         db.commit()
         print(f"✅ {len(carriers)} carriers creados (verificados, disponibles, con ubicación)")
-
-        # ── Catálogo de paquetes ───────────────────────────────────────────────
-        packages = [
-            Package(
-                size="s",
-                description="Paquetes pequeños y documentos",
-                max_weight_kg=3.0,
-                max_length_cm=35,
-                max_width_cm=25,
-                max_height_cm=15,
-                estimated_volume_m3=0.013,
-                base_price=2500.0,
-                is_active=True,
-            ),
-            Package(
-                size="m",
-                description="Caja mediana / electrodoméstico chico",
-                max_weight_kg=10.0,
-                max_length_cm=60,
-                max_width_cm=40,
-                max_height_cm=40,
-                estimated_volume_m3=0.096,
-                base_price=3900.0,
-                is_active=True,
-            ),
-            Package(
-                size="l",
-                description="Caja grande / TV / valija",
-                max_weight_kg=30.0,
-                max_length_cm=100,
-                max_width_cm=60,
-                max_height_cm=60,
-                estimated_volume_m3=0.36,
-                base_price=5500.0,
-                is_active=True,
-            ),
-            Package(
-                size="xl",
-                description="Muebles / mudanzas",
-                max_weight_kg=200.0,
-                max_length_cm=200,
-                max_width_cm=150,
-                max_height_cm=150,
-                estimated_volume_m3=4.5,
-                base_price=15000.0,
-                is_active=True,
-            ),
-        ]
-        db.add_all(packages)
-        db.commit()
-        print(f"✅ {len(packages)} categorías de paquetes creadas")
 
         _seed_shipments(db, users[0], carriers)
 

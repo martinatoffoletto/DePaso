@@ -25,6 +25,8 @@ class RouteService:
         carrier = await self.carrier_repo.get_by_id(carrier_id)
         if not carrier:
             raise NotFoundError("Carrier")
+        if not carrier.is_active:
+            raise ForbiddenError("Carrier is suspended.", code="CARRIER_SUSPENDED")
         if not carrier.is_verified:
             raise ForbiddenError("Carrier must be verified before publishing routes.")
 

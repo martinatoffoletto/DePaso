@@ -5,7 +5,7 @@ Admin access: users with user_type == "admin". For the prototype demo an
 admin is created by the seed script. All logic lives in AdminService — the
 router only handles auth and HTTP mapping.
 """
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.app.core.database import get_db
@@ -55,8 +55,6 @@ async def moderate_carrier(
 ):
     """Verify, suspend or reactivate a carrier (RF-USR-07, RF-ADM-03)."""
     carrier = await service.moderate_carrier(carrier_id, data.action)
-    if carrier is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Carrier not found")
     return CarrierResponse.model_validate(carrier)
 
 

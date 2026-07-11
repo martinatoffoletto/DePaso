@@ -58,7 +58,7 @@
 - [x] Gap C1 cerrado: knockout movilidad suave (peatón/bici <5km) en el check compartido de **todos** los paths de matching, incluido `_rank_dedicated`.
 - [x] `datetime.utcnow()` → `datetime.now(timezone.utc)` (0 llamadas reales restantes).
 - [x] Hardening: guard de producción que rechaza `JWT_SECRET` default inseguro y CORS `*`.
-- [~] Overlap `packages`/`freight` vs `shipments`: convive sin romper el frontend (limpieza opcional, no bloquea MVP).
+- [x] Overlap `packages` vs `shipments`: módulo `packages` eliminado (código muerto — ningún front ni módulo lo consumía; el pricing vive en `shipments/pricing.py`).
 
 ### C. Panel web `depaso_web` completo — owner: **depaso-web** ✅ (commit 18010fe)
 - [x] `main.tsx` + `App.tsx` + react-router + guard de auth, login (`POST /auth/login`), layout con sidebar (`AppShell`).

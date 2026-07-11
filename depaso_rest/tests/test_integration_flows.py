@@ -638,3 +638,83 @@ def test_availability_alias_removed(client: TestClient, db):
     headers, _ = _verified_carrier(client, db, "avail_gone@example.com", plate="AV-001")
     res = client.post("/api/v1/carriers/me/availability", json={}, headers=headers)
     assert res.status_code in (404, 405)
+
+
+def _pending_shipment(client: TestClient, email: str) -> int:
+    """A client creates a small pending collaborative shipment; returns its id."""
+    headers, _ = _register(client, email)
+    ship = client.post("/api/v1/shipments", json={
+        "package_size": "s",
+        "modality": "collaborative",
+        "assignment_mode": "manual",
+        "origin_lat": -34.6000, "origin_lon": -58.3850,
+        "destination_lat": -34.5900, "destination_lon": -58.3950,
+        "weight_kg": 2.0,
+    }, headers=headers)
+    assert ship.status_code == 201, ship.text
+    return ship.json()["id"]
+
+
+def test_suspended_carrier_cannot_accept(client: TestClient, db):
+    """El matching filtra carriers suspendidos del ranking, pero el accept es
+    la transición autoritativa: un carrier suspendido no puede aceptar por API."""
+    carrier_headers, carrier_id = _verified_carrier(
+        client, db, "suspended_acc@example.com", plate="SU-001")
+    sid = _pending_shipment(client, "victim_client@example.com")
+
+    admin = _make_admin(db)
+    res = client.patch(f"/api/v1/admin/carriers/{carrier_id}",
+                       json={"action": "suspend"}, headers=admin)
+    assert res.status_code == 200, res.text
+
+    res = client.post(f"/api/v1/shipments/{sid}/accept", json={},
+                      headers=carrier_headers)
+    assert res.status_code == 403, res.text
+    assert res.json()["code"] == "CARRIER_SUSPENDED"
+
+
+def test_unverified_carrier_cannot_accept(client: TestClient, db):
+    headers, _ = _register(client, "unver_acc@example.com")
+    res = client.post("/api/v1/carriers/me", json={
+        "company_name": "Sin Verificar SRL",
+        "vehicle_type": "car",
+        "license_plate": "UV-001",
+        "capacity_kg": 25.0,
+        "capacity_volume_m3": 2.0,
+    }, headers=headers)
+    assert res.status_code == 201, res.text
+
+    sid = _pending_shipment(client, "unver_client@example.com")
+    res = client.post(f"/api/v1/shipments/{sid}/accept", json={}, headers=headers)
+    assert res.status_code == 403, res.text
+    assert res.json()["code"] == "CARRIER_NOT_VERIFIED"
+
+
+def test_suspended_carrier_cannot_publish_route(client: TestClient, db):
+    carrier_headers, carrier_id = _verified_carrier(
+        client, db, "suspended_pub@example.com", plate="SU-002")
+    admin = _make_admin(db)
+    client.patch(f"/api/v1/admin/carriers/{carrier_id}",
+                 json={"action": "suspend"}, headers=admin)
+
+    start, end = _wide_window()
+    res = client.post("/api/v1/routes", json={
+        "kind": "collaborative_route",
+        "origin_lat": -34.6037, "origin_lon": -58.3816,
+        "destination_lat": -34.5837, "destination_lon": -58.4016,
+        "window_start": start, "window_end": end,
+    }, headers=carrier_headers)
+    assert res.status_code == 403, res.text
+    assert res.json()["code"] == "CARRIER_SUSPENDED"
+
+
+def test_moderate_missing_carrier_uses_error_envelope(client: TestClient, db):
+    """El 404 de moderación sale por el handler global con el envelope estándar
+    (antes era un HTTPException crudo con {'detail': ...} sin 'code')."""
+    admin = _make_admin(db)
+    res = client.patch("/api/v1/admin/carriers/999999",
+                       json={"action": "verify"}, headers=admin)
+    assert res.status_code == 404, res.text
+    body = res.json()
+    assert body["success"] is False
+    assert body["code"] == "NOT_FOUND"

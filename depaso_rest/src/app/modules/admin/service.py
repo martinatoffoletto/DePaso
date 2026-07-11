@@ -14,7 +14,7 @@ from src.app.modules.shipments.models import Shipment, ShipmentEvent
 from src.app.modules.users.models import User
 from src.app.modules.vision.models import Classification
 from src.app.shared.enums import ShipmentStatus
-from src.app.shared.exceptions import ValidationError
+from src.app.shared.exceptions import NotFoundError, ValidationError
 
 ACTIVE_STATUSES = (
     ShipmentStatus.ASSIGNED,
@@ -72,16 +72,15 @@ class AdminService:
         )
         return list(result.scalars().all())
 
-    async def moderate_carrier(self, carrier_id: int, action: str) -> Carrier | None:
-        """Verify / suspend / reactivate a carrier. Returns None if not found;
-        raises ValidationError for an invalid action."""
+    async def moderate_carrier(self, carrier_id: int, action: str) -> Carrier:
+        """Verify / suspend / reactivate a carrier."""
         if action not in VALID_MODERATION_ACTIONS:
             raise ValidationError("action must be verify | suspend | reactivate", code="INVALID_ACTION")
         carrier = (
             await self.db.execute(select(Carrier).where(Carrier.id == carrier_id))
         ).scalar_one_or_none()
         if not carrier:
-            return None
+            raise NotFoundError("Carrier")
         if action == "verify":
             carrier.is_verified = True
         elif action == "suspend":

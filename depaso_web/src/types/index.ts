@@ -108,13 +108,42 @@ export interface Shipment {
   updated_at: string;
 }
 
-// main.py :: /health  (+ campos opcionales que rm puede agregar)
-export interface HealthResponse {
-  status: string;
-  service: string;
-  version: string;
-  vision_model_loaded?: boolean;
-  database?: string;
+// admin/schemas.py :: SystemStatusResponse
+export interface AdminSystemStatus {
+  api: string;
+  environment: string;
+  debug: boolean;
+  database: string;
+  vision_model_loaded: boolean;
+  vision_model_path: string;
+}
+
+// admin/schemas.py :: ClassificationActivityItem
+export interface AdminClassificationActivity {
+  id: number;
+  shipment_id: number | null;
+  user_id: number | null;
+  predicted_category: string;
+  confidence: number;
+  model_loaded: boolean;
+  accepted: boolean | null;
+  manual_category: string | null;
+  created_at: string;
+}
+
+// admin/schemas.py :: ShipmentEventActivityItem
+export interface AdminShipmentEventActivity {
+  id: number;
+  shipment_id: number;
+  status: ShipmentStatus;
+  actor_user_id: number | null;
+  created_at: string;
+}
+
+// admin/schemas.py :: ActivityResponse
+export interface AdminActivity {
+  recent_classifications: AdminClassificationActivity[];
+  recent_events: AdminShipmentEventActivity[];
 }
 
 /* ---------------------------------------------------------------------------

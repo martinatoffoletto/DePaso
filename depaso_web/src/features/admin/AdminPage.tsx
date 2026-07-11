@@ -3,6 +3,7 @@ import {
   Activity,
   CheckCircle2,
   Cpu,
+  Database,
   Leaf,
   Loader2,
   PauseCircle,
@@ -13,16 +14,12 @@ import {
   Users,
 } from "lucide-react";
 import { api, apiErrorMessage } from "@/lib/api";
-import { formatInt, formatKg, formatPercent } from "@/lib/utils";
+import { formatDateTime, formatInt, formatKg, formatPercent } from "@/lib/utils";
+import { packageSizeLabel, shipmentStatusMeta } from "@/lib/status";
 import { useToast } from "@/components/ui/toast";
 import { PageHeader } from "@/components/PageHeader";
 import { StatCard } from "@/components/StatCard";
-import {
-  EmptyState,
-  ErrorState,
-  NotAvailableNotice,
-  TableSkeleton,
-} from "@/components/states";
+import { EmptyState, ErrorState, TableSkeleton } from "@/components/states";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -36,9 +33,10 @@ import {
 } from "@/components/ui/table";
 import { MatchingWeightsCard } from "@/features/admin/MatchingWeightsCard";
 import type {
+  AdminActivity,
   AdminDashboard,
+  AdminSystemStatus,
   Carrier,
-  HealthResponse,
   ModerationAction,
 } from "@/types";
 
@@ -222,13 +220,13 @@ function PendingCarriersCard() {
 
 function SystemStatusCard() {
   const { data, isLoading, isError } = useQuery({
-    queryKey: ["health"],
-    // El health vive fuera del prefijo de módulos: /api/v1/health.
-    queryFn: async () => (await api.get<HealthResponse>("/health")).data,
+    queryKey: ["admin", "status"],
+    queryFn: async () => (await api.get<AdminSystemStatus>("/admin/status")).data,
     refetchInterval: 20_000,
   });
 
-  const apiOk = !isError && data?.status != null;
+  const apiOk = !isError && data?.api === "ok";
+  const dbOk = data?.database === "ok";
 
   return (
     <Card>
@@ -254,30 +252,124 @@ function SystemStatusCard() {
 
         <div className="flex items-center justify-between">
           <span className="flex items-center gap-2 text-sm text-ink">
+            <Database className="size-4 text-ink-mute" /> Base de datos
+          </span>
+          {isLoading || isError ? (
+            <Badge tone="neutral">…</Badge>
+          ) : dbOk ? (
+            <Badge tone="emerald">Conectada</Badge>
+          ) : (
+            <Badge tone="red">Error</Badge>
+          )}
+        </div>
+
+        <div className="flex items-center justify-between">
+          <span className="flex items-center gap-2 text-sm text-ink">
             <Cpu className="size-4 text-ink-mute" /> Modelo de visión
           </span>
-          {data?.vision_model_loaded == null ? (
-            <Badge tone="neutral">No informado</Badge>
-          ) : data.vision_model_loaded ? (
+          {isLoading || isError ? (
+            <Badge tone="neutral">…</Badge>
+          ) : data?.vision_model_loaded ? (
             <Badge tone="emerald">Cargado</Badge>
           ) : (
             <Badge tone="amber">Fallback (stub)</Badge>
           )}
         </div>
 
-        {data?.version && (
+        {data && (
           <p className="text-xs text-ink-mute">
-            {data.service} · v{data.version}
+            Entorno: {data.environment}
+            {data.debug && " · debug"}
           </p>
         )}
+      </CardContent>
+    </Card>
+  );
+}
 
-        {data?.vision_model_loaded == null && (
-          <NotAvailableNotice>
-            El endpoint de health todavía no expone el estado del modelo de visión ni
-            la actividad reciente de clasificaciones. Cuando el backend agregue
-            <span className="font-medium"> GET /admin/system</span> y
-            <span className="font-medium"> GET /admin/activity</span>, se muestran acá.
-          </NotAvailableNotice>
+function ActivityCard() {
+  const { data, isLoading, isError, error, refetch } = useQuery({
+    queryKey: ["admin", "activity"],
+    queryFn: async () => (await api.get<AdminActivity>("/admin/activity?limit=8")).data,
+    refetchInterval: 30_000,
+  });
+
+  const events = data?.recent_events ?? [];
+  const classifications = data?.recent_classifications ?? [];
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Activity className="size-4.5 text-forest" />
+          Actividad reciente
+        </CardTitle>
+        <p className="text-sm text-ink-mute">
+          Últimos cambios de estado de envíos y clasificaciones del modelo de visión.
+        </p>
+      </CardHeader>
+      <CardContent>
+        {isLoading ? (
+          <TableSkeleton rows={4} cols={2} />
+        ) : isError ? (
+          <ErrorState error={error} onRetry={() => refetch()} />
+        ) : events.length === 0 && classifications.length === 0 ? (
+          <EmptyState
+            title="Sin actividad todavía"
+            description="Los eventos de envíos y clasificaciones van a aparecer acá."
+            icon={<Activity className="size-6" />}
+          />
+        ) : (
+          <div className="grid gap-6 md:grid-cols-2">
+            <div>
+              <h3 className="mb-2 text-sm font-medium text-ink">Envíos</h3>
+              {events.length === 0 ? (
+                <p className="text-sm text-ink-mute">Sin eventos recientes.</p>
+              ) : (
+                <ul className="space-y-2">
+                  {events.map((e) => {
+                    const meta = shipmentStatusMeta(e.status);
+                    return (
+                      <li key={e.id} className="flex items-center justify-between gap-2 text-sm">
+                        <span className="text-ink">
+                          Envío #{e.shipment_id}{" "}
+                          <Badge tone={meta.tone}>{meta.label}</Badge>
+                        </span>
+                        <span className="shrink-0 text-xs text-ink-mute">
+                          {formatDateTime(e.created_at)}
+                        </span>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </div>
+            <div>
+              <h3 className="mb-2 text-sm font-medium text-ink">Clasificaciones</h3>
+              {classifications.length === 0 ? (
+                <p className="text-sm text-ink-mute">Sin clasificaciones recientes.</p>
+              ) : (
+                <ul className="space-y-2">
+                  {classifications.map((c) => (
+                    <li key={c.id} className="flex items-center justify-between gap-2 text-sm">
+                      <span className="flex items-center gap-2 text-ink">
+                        <Badge tone={c.model_loaded ? "forest" : "amber"}>
+                          {packageSizeLabel(c.predicted_category)}
+                        </Badge>
+                        {formatPercent(c.confidence)} de confianza
+                        {!c.model_loaded && (
+                          <span className="text-xs text-ink-mute">(stub)</span>
+                        )}
+                      </span>
+                      <span className="shrink-0 text-xs text-ink-mute">
+                        {formatDateTime(c.created_at)}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </div>
         )}
       </CardContent>
     </Card>
@@ -300,6 +392,8 @@ export function AdminPage() {
         </div>
         <SystemStatusCard />
       </div>
+
+      <ActivityCard />
 
       <MatchingWeightsCard />
     </div>

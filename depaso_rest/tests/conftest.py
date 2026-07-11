@@ -25,7 +25,6 @@ from src.app.shared.base_model import Base
 from src.app.modules.auth.models import PasswordResetToken  # noqa: F401
 from src.app.modules.carriers.models import Carrier  # noqa: F401
 from src.app.modules.matching.models import MatchingWeight  # noqa: F401
-from src.app.modules.packages.models import Package  # noqa: F401
 from src.app.modules.routes.models import CarrierRoute  # noqa: F401
 from src.app.modules.shipments.models import Rating, Shipment, ShipmentEvent  # noqa: F401
 from src.app.modules.tracking.models import GpsTrace  # noqa: F401
