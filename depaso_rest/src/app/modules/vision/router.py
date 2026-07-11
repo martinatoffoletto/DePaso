@@ -1,6 +1,7 @@
 """
 Vision module API router.
 """
+import structlog
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -16,6 +17,7 @@ from src.app.modules.vision.schemas import (
 )
 
 router = APIRouter(prefix="/vision", tags=["vision"])
+logger = structlog.get_logger(__name__)
 
 MAX_IMAGE_BYTES = 10 * 1024 * 1024  # 10 MB
 
@@ -34,16 +36,33 @@ async def classify_image(
     (RF-VIS-04). When confidence < threshold the response sets needs_manual
     so the UI offers manual category input (RF-VIS-02 / RF-SHP-03).
     """
-    image_bytes = await image.read()
+    if not (image.content_type or "").startswith("image/"):
+        raise HTTPException(status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
+                            detail="File must be an image")
+
+    # Leer con límite: read(N) no carga en RAM más de N bytes. Sin esto,
+    # image.read() cargaría el archivo ENTERO antes de validar el tamaño
+    # (un upload gigante tumbaría el proceso por OOM).
+    image_bytes = await image.read(MAX_IMAGE_BYTES + 1)
     if len(image_bytes) > MAX_IMAGE_BYTES:
         raise HTTPException(status_code=status.HTTP_413_CONTENT_TOO_LARGE,
                             detail="Image too large (max 10 MB)")
+    if not image_bytes:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                            detail="Empty image")
 
     classifier = request.app.state.classifier
     # model.predict es CPU-bound: al threadpool, así no congela el event loop.
-    result = await run_in_threadpool(
-        classifier.classify, image_bytes, has_reference_object=has_reference_object
-    )
+    try:
+        result = await run_in_threadpool(
+            classifier.classify, image_bytes, has_reference_object=has_reference_object
+        )
+    except Exception as exc:
+        # Imagen ilegible/corrupta (decode falla): 422, no un 500 genérico.
+        # Se loguea para no perder de vista un fallo real del modelo en la demo.
+        logger.warning("vision_classify_failed", error=str(exc))
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                            detail="Could not process image")
 
     record = Classification(
         user_id=current_user_id,

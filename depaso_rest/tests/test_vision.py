@@ -247,3 +247,41 @@ def test_feedback_wrong_user_returns_404(client: TestClient):
         headers=other_headers,
     )
     assert patch_res.status_code == 404
+
+
+# --- Robustez de la subida (auditoría: superficie de archivos) ----------------
+
+def test_classify_rejects_non_image(client: TestClient):
+    """Un archivo que no es imagen -> 415 (antes: 500 o basura clasificada)."""
+    headers = _register_and_get_token(client, "vis_pdf@example.com")
+    res = client.post(
+        "/api/v1/vision/classify",
+        files={"image": ("malware.pdf", b"%PDF-1.4 fake", "application/pdf")},
+        data={"has_reference_object": "false"},
+        headers=headers,
+    )
+    assert res.status_code == 415
+
+
+def test_classify_rejects_empty_image(client: TestClient):
+    headers = _register_and_get_token(client, "vis_empty@example.com")
+    res = client.post(
+        "/api/v1/vision/classify",
+        files={"image": ("empty.jpg", b"", "image/jpeg")},
+        data={"has_reference_object": "false"},
+        headers=headers,
+    )
+    assert res.status_code == 422
+
+
+def test_classify_rejects_oversized_image(client: TestClient):
+    """Un archivo > 10 MB -> 413 sin cargarlo entero en RAM."""
+    headers = _register_and_get_token(client, "vis_big@example.com")
+    big = b"x" * (10 * 1024 * 1024 + 100)
+    res = client.post(
+        "/api/v1/vision/classify",
+        files={"image": ("huge.jpg", big, "image/jpeg")},
+        data={"has_reference_object": "false"},
+        headers=headers,
+    )
+    assert res.status_code == 413
