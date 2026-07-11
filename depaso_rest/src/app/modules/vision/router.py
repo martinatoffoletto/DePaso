@@ -1,6 +1,9 @@
 """
 Vision module API router.
 """
+from pathlib import Path
+from uuid import uuid4
+
 import structlog
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile, status
 from sqlalchemy import select
@@ -20,6 +23,9 @@ router = APIRouter(prefix="/vision", tags=["vision"])
 logger = structlog.get_logger(__name__)
 
 MAX_IMAGE_BYTES = 10 * 1024 * 1024  # 10 MB
+
+# Las fotos de paquetes se sirven estáticamente desde /media (mount en main.py).
+MEDIA_PACKAGES_DIR = Path("uploads") / "packages"
 
 
 @router.post("/classify", response_model=ClassificationResponse)
@@ -75,7 +81,20 @@ async def classify_image(
     await db.flush()
     await db.refresh(record)
 
-    return ClassificationResponse(classification_id=record.id, **result)
+    # Persistir la foto para adjuntarla al envío: sin esto la imagen moría
+    # tras clasificar y el photo_url del shipment quedaba siempre vacío
+    # (el feed del carrier y "Mis envíos" la renderizan).
+    photo_url: str | None = None
+    try:
+        name = f"{uuid4().hex}.jpg"
+        path = MEDIA_PACKAGES_DIR / name
+        await run_in_threadpool(path.write_bytes, image_bytes)
+        photo_url = f"{request.base_url}media/packages/{name}"
+    except OSError as exc:
+        # La foto es accesoria: si el disco falla, la clasificación igual sale.
+        logger.warning("vision_photo_save_failed", error=str(exc))
+
+    return ClassificationResponse(classification_id=record.id, photo_url=photo_url, **result)
 
 
 @router.patch("/classifications/{classification_id}", response_model=ClassificationLogEntry)

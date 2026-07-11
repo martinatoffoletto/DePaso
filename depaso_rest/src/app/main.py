@@ -6,6 +6,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from fastapi.responses import JSONResponse
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
@@ -26,6 +27,7 @@ from src.app.modules.shipments.router import router as shipments_router
 from src.app.modules.tracking.router import router as tracking_router
 from src.app.modules.users.router import router as users_router
 from src.app.modules.vision.router import router as vision_router
+from src.app.modules.vision.router import MEDIA_PACKAGES_DIR
 from src.app.shared.exceptions import (
     AlreadyExistsError,
     DomainException,
@@ -203,6 +205,10 @@ def create_app() -> FastAPI:
     app.include_router(tracking_router, prefix=api_prefix)
     app.include_router(routes_router, prefix=api_prefix)
     app.include_router(admin_router, prefix=api_prefix)
+
+    # Fotos de paquetes subidas al clasificar (vision) — servidas estáticas.
+    MEDIA_PACKAGES_DIR.mkdir(parents=True, exist_ok=True)
+    app.mount("/media", StaticFiles(directory=MEDIA_PACKAGES_DIR.parent), name="media")
 
     logger.info("✅ FastAPI application configured")
     return app

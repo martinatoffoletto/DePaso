@@ -129,15 +129,22 @@ class ShipmentRepository(BaseRepository[Shipment]):
         await self.db.flush()
         return await self.get_by_id(shipment_id)
 
-    async def reopen_for_matching(self, shipment_id: int) -> Shipment | None:
+    async def release_to_pending(self, shipment_id: int, carrier_id: int) -> Shipment | None:
         """Back to PENDING with no carrier (after a carrier cancels).
 
-        Explicit UPDATE because the generic update() skips None values and
-        would silently keep the old carrier_id.
+        Compare-and-set: only fires while the shipment is still assigned to
+        THIS carrier and before it is in transit — a concurrent delivery or
+        client cancellation makes the UPDATE match zero rows. Explicit UPDATE
+        because the generic update() skips None values and would silently
+        keep the old carrier_id.
         """
         result = await self.db.execute(
             update(Shipment)
-            .where(Shipment.id == shipment_id)
+            .where(
+                Shipment.id == shipment_id,
+                Shipment.carrier_id == carrier_id,
+                Shipment.status.in_([ShipmentStatus.ASSIGNED, ShipmentStatus.PICKUP_ARRIVED]),
+            )
             .values(status=ShipmentStatus.PENDING, carrier_id=None)
         )
         if result.rowcount == 0:

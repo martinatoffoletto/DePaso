@@ -11,7 +11,7 @@ import { useRiderStore } from "@/src/carrier/riderStore";
 import { toast } from "@/src/shared/ui/toastStore";
 import { carriersService, routesService } from "@/src/shared/api/carriers";
 import { shipmentsService } from "@/src/shared/api/shipments";
-import { Carrier, CarrierRoute, CarrierSummary, FeedItem, Shipment, ShipmentStatus } from "@/src/shared/types";
+import { Carrier, CarrierRoute, CarrierSummary, FeedItem, PLATFORM_COMMISSION_RATE, Shipment, ShipmentStatus } from "@/src/shared/types";
 import { reverseGeocode } from "@/src/shared/utils/geocoding";
 import { T } from "@/constants/tokens";
 import { IncomingOfferModal } from "./IncomingOfferModal";
@@ -433,8 +433,10 @@ export default function RiderHomeScreen() {
       await loadActive();
       if (next === ShipmentStatus.DELIVERED) {
         carriersService.getSummary().then(setSummary).catch(() => {});
+        // Lo que el carrier cobra es el precio menos la comisión (igual que
+        // total_earnings del backend) — mostrar el bruto era engañoso.
         toast.success(shipment.estimated_price != null
-          ? `Entrega completada 🎉 Sumaste ${money(shipment.estimated_price)}.`
+          ? `Entrega completada 🎉 Sumaste ${money(shipment.estimated_price * (1 - PLATFORM_COMMISSION_RATE))}.`
           : "Entrega completada 🎉");
       }
     } catch (err: unknown) {

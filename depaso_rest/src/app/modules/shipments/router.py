@@ -1,11 +1,12 @@
 """
 Shipments module API router.
 """
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.app.core.database import get_db
 from src.app.core.dependencies import CurrentUserId
+from src.app.shared.exceptions import ForbiddenError, NotFoundError
 from src.app.shared.geo import Point
 from src.app.modules.shipments import pricing
 from src.app.modules.shipments.schemas import (
@@ -44,8 +45,7 @@ def get_shipment_service(db: AsyncSession = Depends(get_db)) -> ShipmentService:
 async def _carrier_for_user(user_id: int, db: AsyncSession):
     carrier = await CarrierRepository(db).get_by_user_id(user_id)
     if not carrier:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN,
-                            detail="User has no carrier profile")
+        raise ForbiddenError("User has no carrier profile", code="NO_CARRIER_PROFILE")
     return carrier
 
 
@@ -159,8 +159,7 @@ async def get_assigned_carrier(
     client or the carrier themselves may read it (the phone is private)."""
     contact = await service.get_assigned_carrier_contact(shipment_id, current_user_id)
     if contact is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
-                            detail="No carrier assigned yet")
+        raise NotFoundError("Assigned carrier", code="NO_CARRIER_ASSIGNED")
     return AssignedCarrierResponse(**contact)
 
 
@@ -173,14 +172,10 @@ async def update_status(
     service: ShipmentService = Depends(get_shipment_service),
 ):
     """Carrier advances the shipment through its milestones (RF-CAR-05)."""
-    shipment = await service.get_shipment_by_id(shipment_id)
     carrier = await _carrier_for_user(current_user_id, db)
-    if shipment.carrier_id != carrier.id:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN,
-                            detail="Shipment is not assigned to this carrier")
-    updated = await service.update_status(shipment_id, data.new_status,
-                                    actor_user_id=current_user_id,
-                                    lat=data.lat, lon=data.lon)
+    updated = await service.advance_status_as_carrier(
+        shipment_id, carrier, data.new_status, lat=data.lat, lon=data.lon
+    )
     return ShipmentResponse.model_validate(updated)
 
 

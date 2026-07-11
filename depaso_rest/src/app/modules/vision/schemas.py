@@ -13,6 +13,8 @@ class ClassificationResponse(BaseModel):
     confidence: float = Field(..., ge=0, le=1)
     needs_manual: bool          # confidence < threshold -> suggest manual input (RF-VIS-02)
     model_loaded: bool          # False = stub fallback (dev without the trained model)
+    # URL pública de la foto guardada, para adjuntarla al envío (photo_url).
+    photo_url: str | None = None
 
 
 class ClassificationFeedback(BaseModel):

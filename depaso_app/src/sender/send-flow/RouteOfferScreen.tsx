@@ -47,7 +47,13 @@ type Props = {
 
 export function RouteOfferScreen({ origin, destination, originCoords, destinationCoords, categoryId, initialMode, onBack, onNext }: Props) {
   const insets = useSafeAreaInsets();
-  const [mode, setMode] = useState<DeliveryMode>(initialMode ?? "colaborativa");
+  // Mudanzas/fletes (XL) van siempre en viaje dedicado (spec 3.3) — el
+  // backend rechaza XL colaborativo, así que acá ni se ofrece.
+  const isXl = categoryId === "xl";
+  const [mode, setMode] = useState<DeliveryMode>(isXl ? "dedicada" : (initialMode ?? "colaborativa"));
+  useEffect(() => {
+    if (isXl) setMode("dedicada");
+  }, [isXl]);
   const [quote, setQuote] = useState<Quote | null>(null);
   const [quoteLoading, setQuoteLoading] = useState(true);
   const [quoteError, setQuoteError] = useState(false);
@@ -142,9 +148,8 @@ export function RouteOfferScreen({ origin, destination, originCoords, destinatio
           <StepDots current={3} total={4} />
         </View>
 
-        <TouchableOpacity className="w-10 h-10 rounded-[14px] border border-border bg-[#F4EFE3]/95 items-center justify-center" style={FLOAT_SHADOW} hitSlop={8}>
-          <MaterialCommunityIcons name="navigation-outline" size={18} color={T.ink} />
-        </TouchableOpacity>
+        {/* spacer para centrar el pill de pasos (simetría con el botón back) */}
+        <View className="w-10 h-10" />
       </View>
 
       {/* Distance / route float card */}
@@ -225,7 +230,18 @@ export function RouteOfferScreen({ origin, destination, originCoords, destinatio
                 : <Text className="text-lg font-bold text-ink tracking-[-0.5px]">{fmtPrice(quote?.price_dedicated)}</Text>}
             </TouchableOpacity>
 
-            {/* Colaborativa card */}
+            {/* Colaborativa card — no disponible para fletes (XL) */}
+            {isXl ? (
+              <View className="rounded-2xl border border-border border-dashed bg-cardSoft p-3 px-[14px] flex-row items-center gap-3">
+                <MaterialCommunityIcons name="account-group-outline" size={20} color={T.inkMute} />
+                <View className="flex-1">
+                  <Text className="text-[13.5px] font-semibold text-inkSoft">Compartir viaje no disponible</Text>
+                  <Text className="text-[11.5px] text-inkMute mt-[2px]">
+                    Las mudanzas y fletes van siempre en un viaje dedicado, por su volumen.
+                  </Text>
+                </View>
+              </View>
+            ) : (
             <TouchableOpacity
               className={`rounded-2xl border-[1.5px] p-3 px-[14px] flex-row items-center gap-3 overflow-hidden ${isCollab ? "bg-forest border-forest" : "bg-card border-border"}`}
               style={isCollab ? { shadowColor: T.forest, shadowOffset: { width: 0, height: 12 }, shadowOpacity: 0.4, shadowRadius: 24, elevation: 5 } : undefined}
@@ -261,25 +277,19 @@ export function RouteOfferScreen({ origin, destination, originCoords, destinatio
                     </>}
               </View>
             </TouchableOpacity>
+            )}
 
             {/* Eco strip */}
-            <View className="bg-cardSoft rounded-xl border border-border border-dashed p-[10px] px-3 flex-row items-center gap-[10px]">
-              <View className="flex-row">
-                {[
-                  { initials: "MA", bg: T.amber },
-                  { initials: "FC", bg: T.violet },
-                  { initials: "RP", bg: T.emerald },
-                ].map((av, i) => (
-                  <View key={i} className="w-[22px] h-[22px] rounded-full border-2 border-bg items-center justify-center" style={{ backgroundColor: av.bg, marginLeft: i === 0 ? 0 : -8 }}>
-                    <Text className="text-[7px] font-bold text-[#F4EFE3]">{av.initials}</Text>
-                  </View>
-                ))}
+            {!isXl && (
+              <View className="bg-cardSoft rounded-xl border border-border border-dashed p-[10px] px-3 flex-row items-center gap-[10px]">
+                <View className="w-[26px] h-[26px] rounded-lg bg-mint items-center justify-center">
+                  <MaterialCommunityIcons name="leaf" size={15} color={T.forest} />
+                </View>
+                <Text className="flex-1 text-[11.5px] text-inkSoft leading-4">
+                  Al sumar tu paquete a un viaje que ya existe, evitás un vehículo extra en la calle.
+                </Text>
               </View>
-              <Text className="flex-1 text-[11.5px] text-inkSoft leading-4">
-                <Text className="text-ink font-semibold">3 cadetes </Text>
-                están haciendo esta ruta ahora
-              </Text>
-            </View>
+            )}
           </ScrollView>
         </View>
       </View>

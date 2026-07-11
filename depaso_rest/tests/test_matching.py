@@ -61,10 +61,12 @@ def make_carrier(id=1, vehicle_type="car", lat=None, lon=None, **kw):
 
 
 def make_shipment(id=1, modality="dedicated", package_size="m",
-                  origin=CABALLITO, destination=MICROCENTRO, weight_kg=5.0):
+                  origin=CABALLITO, destination=MICROCENTRO, weight_kg=5.0,
+                  assignment_mode="on_demand"):
     return SimpleNamespace(
         id=id,
         modality=modality,
+        assignment_mode=assignment_mode,
         package_size=package_size,
         origin_lat=origin[0], origin_lon=origin[1],
         destination_lat=destination[0], destination_lon=destination[1],

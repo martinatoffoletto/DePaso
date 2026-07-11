@@ -284,7 +284,12 @@ export interface ClassificationResult {
   confidence: number;
   needs_manual: boolean;
   model_loaded: boolean;
+  /** URL pública de la foto guardada — se adjunta al envío como photo_url. */
+  photo_url?: string | null;
 }
+
+/** Comisión de la plataforma (espejo de PLATFORM_COMMISSION_RATE del backend). */
+export const PLATFORM_COMMISSION_RATE = 0.15;
 
 export interface Location {
   latitude: number;

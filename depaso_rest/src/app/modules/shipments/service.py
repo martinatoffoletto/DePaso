@@ -3,7 +3,19 @@ Shipments module service.
 Business logic: lifecycle state machine, accept/reject, ratings, capacity,
 pricing and CO2 persistence.
 """
-from src.app.shared.enums import ShipmentStatus, ShipmentModality, PaymentStatus
+from src.app.shared.enums import (
+    AssignmentMode,
+    PackageSize,
+    PaymentStatus,
+    ShipmentModality,
+    ShipmentStatus,
+)
+from src.app.shared.cargo import (
+    COLLABORATIVE_FORBIDDEN_SIZES,
+    MAX_WEIGHT_KG,
+    XL_MIN_WEIGHT_KG,
+    cargo_compatible,
+)
 from src.app.shared.geo import Point
 from src.app.modules.shipments import pricing
 from src.app.modules.shipments.repository import ShipmentRepository
@@ -35,6 +47,53 @@ CARRIER_STATUSES = {
 # Cancelling after accepting penalizes the carrier's reputation (RF-CAR-07).
 CARRIER_CANCEL_PENALTY = 0.3
 
+_VALID_SIZES = {s.value for s in PackageSize}
+_VALID_MODALITIES = {m.value for m in ShipmentModality}
+_VALID_ASSIGNMENT_MODES = {a.value for a in AssignmentMode}
+
+
+def _validate_shipment_fields(package_size: str, modality: str,
+                              assignment_mode: str, weight_kg: float) -> None:
+    """Domain validation shared by create and update (both routers funnel here).
+
+    El matching filtra combinaciones inválidas del ranking, pero la creación
+    es la escritura autoritativa: sin esto un POST directo persistía tamaños
+    o modalidades inexistentes (y el pricing explotaba con un 500).
+    """
+    if package_size not in _VALID_SIZES:
+        raise ValidationError(
+            f"package_size must be one of {sorted(_VALID_SIZES)}.",
+            code="INVALID_PACKAGE_SIZE",
+        )
+    if modality not in _VALID_MODALITIES:
+        raise ValidationError(
+            f"modality must be one of {sorted(_VALID_MODALITIES)}.",
+            code="INVALID_MODALITY",
+        )
+    if assignment_mode not in _VALID_ASSIGNMENT_MODES:
+        raise ValidationError(
+            f"assignment_mode must be one of {sorted(_VALID_ASSIGNMENT_MODES)}.",
+            code="INVALID_ASSIGNMENT_MODE",
+        )
+    # Mudanzas/fletes son siempre dedicados (spec 3.3) — nunca colaborativos.
+    if modality == ShipmentModality.COLLABORATIVE and package_size in COLLABORATIVE_FORBIDDEN_SIZES:
+        raise ValidationError(
+            "Moves/freight (xl) must use the dedicated modality.",
+            code="XL_MUST_BE_DEDICATED",
+        )
+    max_kg = MAX_WEIGHT_KG[package_size]
+    if weight_kg > max_kg:
+        raise ValidationError(
+            f"weight_kg exceeds the {package_size} category limit ({max_kg} kg).",
+            code="WEIGHT_EXCEEDS_CATEGORY",
+        )
+    if package_size == PackageSize.XL and weight_kg < XL_MIN_WEIGHT_KG:
+        raise ValidationError(
+            f"An xl shipment (move/freight) weighs at least {XL_MIN_WEIGHT_KG} kg — "
+            "use s/m/l for lighter packages.",
+            code="XL_MIN_WEIGHT",
+        )
+
 
 class ShipmentService:
     """Service for shipment business logic."""
@@ -64,6 +123,7 @@ class ShipmentService:
                         recipient_name: str | None = None,
                         recipient_phone: str | None = None) -> Shipment:
         """Create a new shipment with its estimated price (RF-SHP-01)."""
+        _validate_shipment_fields(package_size, modality, assignment_mode, weight_kg)
         estimated_price = pricing.price_for(
             Point(origin_lat, origin_lon),
             Point(destination_lat, destination_lon),
@@ -138,6 +198,15 @@ class ShipmentService:
         if not updates:
             return shipment
 
+        # Validate the MERGED result (an update can flip modality or size and
+        # land in an invalid combination, e.g. xl + collaborative).
+        _validate_shipment_fields(
+            updates.get("package_size", shipment.package_size),
+            updates.get("modality", shipment.modality),
+            updates.get("assignment_mode", shipment.assignment_mode),
+            updates.get("weight_kg", shipment.weight_kg),
+        )
+
         # If origin, destination, package_size or modality changed, recalculate price
         needs_repricing = any(k in updates for k in ("origin_lat", "origin_lon", "destination_lat", "destination_lon", "package_size", "modality"))
         if needs_repricing:
@@ -208,6 +277,27 @@ class ShipmentService:
                     shipment_id, payment_status=PaymentStatus.REFUNDED
                 )
         return updated
+
+    async def advance_status_as_carrier(self, shipment_id: int, carrier,
+                                        new_status: str,
+                                        lat: float | None = None,
+                                        lon: float | None = None) -> Shipment:
+        """Carrier milestone update (RF-CAR-05): pickup_arrived / in_transit /
+        delivered. Cancelar NO pasa por acá: el carrier usa /carrier-cancel
+        (penalidad + reapertura) — sin esta restricción podía cancelar por
+        /status esquivando la penalidad y dejando el envío muerto."""
+        shipment = await self.get_shipment_by_id(shipment_id)
+        if shipment.carrier_id != carrier.id:
+            raise ForbiddenError("Shipment is not assigned to this carrier.")
+        if new_status not in CARRIER_STATUSES:
+            raise ForbiddenError(
+                "Carriers can only advance delivery milestones "
+                "(pickup_arrived, in_transit, delivered). To back out, use carrier-cancel.",
+                code="CARRIER_STATUS_NOT_ALLOWED",
+            )
+        return await self.update_status(shipment_id, new_status,
+                                        actor_user_id=carrier.user_id,
+                                        lat=lat, lon=lon)
 
     async def get_assigned_carrier_contact(self, shipment_id: int, requester_user_id: int) -> dict | None:
         """Public contact of the carrier assigned to a shipment. Returns None if
@@ -287,6 +377,21 @@ class ShipmentService:
             raise ForbiddenError("Carrier must be verified to accept shipments.",
                                  code="CARRIER_NOT_VERIFIED")
 
+        # El feed/ranking ya filtran por compatibilidad, pero el accept es la
+        # transición autoritativa: un accept directo por API no puede asignar
+        # un flete a un peatón ni un XL colaborativo (datos legacy).
+        if not cargo_compatible(carrier.vehicle_type, shipment.package_size):
+            raise ValidationError(
+                f"A {carrier.vehicle_type} cannot carry a {shipment.package_size} package.",
+                code="VEHICLE_INCOMPATIBLE",
+            )
+        if (shipment.modality == ShipmentModality.COLLABORATIVE
+                and shipment.package_size in COLLABORATIVE_FORBIDDEN_SIZES):
+            raise ValidationError(
+                "Moves/freight (xl) must use the dedicated modality.",
+                code="XL_MUST_BE_DEDICATED",
+            )
+
         active = await self.repository.list_active_by_carrier(carrier_id)
 
         # Exclusividad del dedicado (spec 3.3: "te desplazás especialmente"):
@@ -333,17 +438,29 @@ class ShipmentService:
         return updated
 
     async def carrier_cancel(self, shipment_id: int, carrier_id: int) -> Shipment:
-        """Carrier cancels after accepting: reputation penalty (RF-CAR-07)."""
+        """Carrier backs out after accepting: the shipment reopens for matching
+        and the carrier takes a reputation penalty (RF-CAR-07).
+
+        El pago NO se reintegra: el envío sigue vivo (vuelve a PENDING) y el
+        monto queda retenido para el próximo carrier. Antes esto pasaba por la
+        rama CANCELLED de update_status, que devolvía la plata y dejaba un
+        envío "refunded" que luego se entregaba sin liberar el payout.
+        """
         shipment = await self.get_shipment_by_id(shipment_id)
         if shipment.carrier_id != carrier_id:
             raise ForbiddenError("Shipment is not assigned to this carrier.")
         carrier = await self._get_carrier(carrier_id)
 
-        updated = await self.update_status(shipment_id, ShipmentStatus.CANCELLED,
-                                     actor_user_id=carrier.user_id)
-        # re-open for other carriers (clear_carrier también pone carrier_id=NULL;
-        # el update genérico saltea None y dejaba al carrier viejo pegado)
-        updated = await self.repository.reopen_for_matching(shipment_id)
+        # CAS atómico: ASSIGNED/PICKUP_ARRIVED -> PENDING + carrier_id=NULL.
+        # Una vez en tránsito no se puede abandonar (igual que antes).
+        updated = await self.repository.release_to_pending(shipment_id, carrier_id)
+        if updated is None:
+            fresh = await self.get_shipment_by_id(shipment_id)
+            raise InvalidShipmentStatusError(fresh.status, ShipmentStatus.PENDING)
+        await self.repository.add_event(
+            shipment_id, ShipmentStatus.PENDING, actor_user_id=carrier.user_id,
+            notes="El transportista canceló; el envío vuelve a estar disponible.",
+        )
         if self.carrier_repo:
             new_rep = max(0.0, (carrier.reputation or 5.0) - CARRIER_CANCEL_PENALTY)
             await self.carrier_repo.update(carrier_id, reputation=new_rep)

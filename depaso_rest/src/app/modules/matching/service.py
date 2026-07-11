@@ -33,7 +33,12 @@ from src.app.modules.routes.repository import RouteRepository
 from src.app.modules.shipments.exceptions import ShipmentNotFoundError
 from src.app.modules.shipments.models import Shipment
 from src.app.modules.shipments.repository import ShipmentRepository
-from src.app.shared.enums import PackageSize, ShipmentModality, VehicleType
+from src.app.shared.cargo import (
+    CARGO_COMPATIBILITY,  # noqa: F401 - re-exported for existing importers
+    COLLABORATIVE_FORBIDDEN_SIZES,
+    cargo_compatible,
+)
+from src.app.shared.enums import AssignmentMode, ShipmentModality, VehicleType
 from src.app.shared.exceptions import NotFoundError
 from src.app.shared.geo import (
     Point,
@@ -78,19 +83,6 @@ SOFT_MOBILITY = {VehicleType.PEDESTRIAN, VehicleType.BIKE}
 # rider is never sent to a completely different zone mid-route.
 MAX_CHAIN_PICKUP_KM = 5.0
 
-# Vehicle -> categories it may carry (spec 3.3). Empty intersection = knockout.
-CARGO_COMPATIBILITY: dict[str, set[str]] = {
-    VehicleType.PEDESTRIAN: {PackageSize.S},
-    VehicleType.BIKE:       {PackageSize.S},
-    VehicleType.MOTORCYCLE: {PackageSize.S, PackageSize.M},
-    VehicleType.CAR:        {PackageSize.S, PackageSize.M, PackageSize.L},
-    VehicleType.VAN:        {PackageSize.S, PackageSize.M, PackageSize.L, PackageSize.XL},
-    VehicleType.TRUCK:      {PackageSize.S, PackageSize.M, PackageSize.L, PackageSize.XL},
-}
-
-# Moves/freight (XL) are always dedicated, never collaborative (spec 3.3).
-COLLABORATIVE_FORBIDDEN_SIZES = {PackageSize.XL}
-
 # --- Soft scoring parameters ------------------------------------------------
 
 # compat_geo: 1.0 when pickup is on the route, linearly down to 0 at this distance.
@@ -99,11 +91,6 @@ MAX_GEO_DISTANCE_KM = 15.0
 MAX_PICKUP_DISTANCE_KM = 15.0
 # compat_time: full score inside the window, decaying to 0 this many hours outside.
 TIME_DECAY_HOURS = 3.0
-
-
-def cargo_compatible(vehicle_type: str, package_size: str) -> bool:
-    """Hard filter: can this vehicle carry this package category? (spec 3.3)"""
-    return package_size in CARGO_COMPATIBILITY.get(vehicle_type, set())
 
 
 def geo_score_collaborative(pickup: Point, dropoff: Point,
@@ -208,12 +195,16 @@ class MatchingService:
         if carrier is None or not (carrier.is_active and carrier.is_verified):
             return []
 
-        my_routes = []
+        my_routes: list = []
+        my_windows: list = []
         if self.route_repo is not None:
-            my_routes = [
-                r for r in await self.route_repo.list_active_in_window(_naive_utcnow())
-                if r.carrier_id == carrier_id and r.kind == "collaborative_route"
-            ]
+            for r in await self.route_repo.list_active_in_window(_naive_utcnow()):
+                if r.carrier_id != carrier_id:
+                    continue
+                if r.kind == "collaborative_route":
+                    my_routes.append(r)
+                elif r.kind == "dedicated_window":
+                    my_windows.append(r)
 
         # Active deliveries shape what can still be offered: they consume
         # capacity and anchor the zone where chained pickups make sense.
@@ -279,6 +270,11 @@ class MatchingService:
                     ],
                 ))
             else:
+                # BY_AVAILABILITY: el cliente pidió un carrier con ventana de
+                # disponibilidad publicada — sin ventana activa no se ofrece.
+                if (shipment.assignment_mode == AssignmentMode.BY_AVAILABILITY
+                        and not my_windows):
+                    continue
                 geo = geo_score_dedicated(carrier_pos, pickup)
                 distance = road_km(carrier_pos, pickup) if carrier_pos else None
                 score = (self.weights["geo"] * geo
@@ -406,10 +402,11 @@ class MatchingService:
     async def _rank_dedicated(self, shipment: Shipment) -> list[CarrierScoreResponse]:
         """Score dedicated-mode candidates.
 
-        Two sub-modalities (spec 3):
+        Two sub-modalities (spec 3), selected by shipment.assignment_mode:
         - ON_DEMAND: carrier flagged is_available=True with a real-time location.
         - BY_AVAILABILITY: carrier has published a dedicated_window route that
           covers the shipment's request time (spec 3.3, RF-CAR-02).
+        A legacy/unknown mode ranks both pools.
         """
         pickup = Point(shipment.origin_lat, shipment.origin_lon)
         # Use naive UTC for DB comparisons (stored datetimes are naive UTC).
@@ -419,8 +416,12 @@ class MatchingService:
         seen_carrier_ids: set[int] = set()
 
         # --- 1. ON_DEMAND ---------------------------------------------------
-        candidates = await self.carrier_repo.list_available_with_location(
-            min_capacity_kg=shipment.weight_kg
+        candidates = (
+            []
+            if shipment.assignment_mode == AssignmentMode.BY_AVAILABILITY
+            else await self.carrier_repo.list_available_with_location(
+                min_capacity_kg=shipment.weight_kg
+            )
         )
         for carrier in candidates:
             if not await self._passes_common_knockouts(carrier, shipment):
@@ -455,7 +456,8 @@ class MatchingService:
         # Carriers who registered a habitual availability window are ranked even
         # if they don't have is_available=True in their carrier profile — their
         # commitment is the window itself (spec 3.3, RF-CAR-02).
-        if self.route_repo is not None:
+        if (self.route_repo is not None
+                and shipment.assignment_mode != AssignmentMode.ON_DEMAND):
             windows = [r for r in await self.route_repo.list_active_in_window(now)
                        if r.kind == "dedicated_window"]
             # Batch-fetch the carriers of all windows in one query (no N+1).

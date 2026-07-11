@@ -130,6 +130,9 @@ def test_classify_endpoint_succeeds_with_valid_token(client: TestClient):
     assert "needs_manual" in body
     assert "model_loaded" in body
     assert "classification_id" in body
+    # La foto se persiste para adjuntarla al envío como photo_url.
+    assert body["photo_url"] is not None
+    assert "/media/packages/" in body["photo_url"]
 
 
 def test_classify_logs_returns_classification_id(client: TestClient):

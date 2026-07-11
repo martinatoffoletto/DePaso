@@ -8,7 +8,7 @@ import { useFocusEffect } from "@react-navigation/native";
 import { useRouter } from "expo-router";
 import { shipmentsService } from "@/src/shared/api/shipments";
 import { trackingService } from "@/src/shared/api/carriers";
-import { AssignedCarrier, Shipment, ShipmentStatus, DeliveryMode, TrackedPosition } from "@/src/shared/types";
+import { AssignedCarrier, PaymentStatus, Shipment, ShipmentStatus, DeliveryMode, TrackedPosition } from "@/src/shared/types";
 import { co2EquivalenceLabel } from "@/src/sender/co2";
 import { T } from "@/constants/tokens";
 import { PACKAGE_LABEL_SHORT } from "@/src/shared/utils/packageCategory";
@@ -120,7 +120,7 @@ function LiveShipmentCard({ shipment, onPress }: { shipment: Shipment; onPress: 
   );
 }
 
-function ShipmentDetailModal({ shipment, onClose, onCancel }: { shipment: Shipment; onClose: () => void; onCancel: () => void }) {
+function ShipmentDetailModal({ shipment, onClose, onCancel, onPaid }: { shipment: Shipment; onClose: () => void; onCancel: () => void; onPaid: () => void }) {
   const insets = useSafeAreaInsets();
   const origAddr = useAddress(shipment.origin_lat, shipment.origin_lon);
   const destAddr = useAddress(shipment.destination_lat, shipment.destination_lon);
@@ -131,7 +131,29 @@ function ShipmentDetailModal({ shipment, onClose, onCancel }: { shipment: Shipme
   // Cancelling is only allowed before pickup (RF-SHP-07)
   const canCancel = [ShipmentStatus.PENDING, ShipmentStatus.ASSIGNED, ShipmentStatus.PICKUP_ARRIVED].includes(shipment.status);
   const [cancelLoading, setCancelLoading] = useState(false);
+  // "Pagar más tarde" en el flujo de creación termina acá: sin este botón
+  // un envío impago no se podía pagar nunca (el escrow no se fondeaba).
+  const needsPayment = shipment.payment_status === PaymentStatus.PENDING
+    && shipment.status !== ShipmentStatus.CANCELLED;
+  const [payLoading, setPayLoading] = useState(false);
   const steps = timelineSteps(shipment.status);
+
+  async function payNow() {
+    setPayLoading(true);
+    try {
+      const b = await shipmentsService.paySimulated(shipment.id);
+      Alert.alert(
+        "Pago confirmado",
+        `Pagaste $${b.amount.toLocaleString("es-AR")} ARS.\n` +
+          "El monto queda protegido y se libera al cadete al completar la entrega.",
+      );
+      onPaid();
+    } catch {
+      Alert.alert("Error", "No se pudo procesar el pago. Intentá de nuevo.");
+    } finally {
+      setPayLoading(false);
+    }
+  }
 
   // Live carrier position — polling every 15 s while the shipment is trackable (RF-TRK-02)
   const [carrierPos, setCarrierPos] = useState<TrackedPosition | null>(null);
@@ -323,7 +345,7 @@ function ShipmentDetailModal({ shipment, onClose, onCancel }: { shipment: Shipme
               )}
             </View>
 
-            {/* Price */}
+            {/* Price + payment status */}
             {shipment.estimated_price != null && (
               <>
                 <View className="h-px bg-borderSoft" />
@@ -336,6 +358,21 @@ function ShipmentDetailModal({ shipment, onClose, onCancel }: { shipment: Shipme
                       <Text className="text-[11px] font-normal text-inkMute"> ARS</Text>
                     </Text>
                   </View>
+                  {needsPayment ? (
+                    <View className="bg-amberBg rounded-lg px-2 py-1">
+                      <Text className="text-[9px] tracking-[1px] font-bold uppercase" style={{ color: T.amber }}>Pago pendiente</Text>
+                    </View>
+                  ) : shipment.payment_status !== PaymentStatus.REFUNDED ? (
+                    <View className="bg-mint rounded-lg px-2 py-1">
+                      <Text className="text-[9px] tracking-[1px] text-forest font-bold uppercase">
+                        {shipment.payment_status === PaymentStatus.RELEASED ? "Pagado y liberado" : "Pagado"}
+                      </Text>
+                    </View>
+                  ) : (
+                    <View className="bg-cardSoft border border-border rounded-lg px-2 py-1">
+                      <Text className="text-[9px] tracking-[1px] text-inkSoft font-bold uppercase">Reintegrado</Text>
+                    </View>
+                  )}
                 </View>
               </>
             )}
@@ -410,6 +447,24 @@ function ShipmentDetailModal({ shipment, onClose, onCancel }: { shipment: Shipme
             <Text className="text-[10px] tracking-[1.5px] text-inkMute uppercase mb-3 font-semibold">ESTADO DEL ENVÍO</Text>
             <StatusTimeline steps={steps} dotBase={12} />
           </View>
+
+          {/* Pagar (simulado) — el pago quedó pendiente al crear el envío */}
+          {needsPayment && (
+            <TouchableOpacity
+              className="flex-row items-center justify-center gap-2 bg-forest rounded-[14px] py-[15px]"
+              onPress={payNow}
+              activeOpacity={0.88}
+              disabled={payLoading}
+            >
+              {payLoading
+                ? <ActivityIndicator size="small" color={T.lime} />
+                : <>
+                    <MaterialCommunityIcons name="credit-card-check-outline" size={18} color="#F4EFE3" />
+                    <Text className="text-sm font-semibold text-[#F4EFE3]">Pagar (simulado)</Text>
+                  </>
+              }
+            </TouchableOpacity>
+          )}
 
           {/* Cancelar envío */}
           {canCancel && (
@@ -798,6 +853,7 @@ export default function MisEnviosScreen() {
           shipment={selectedShipment}
           onClose={() => setSelectedShipment(null)}
           onCancel={() => { setSelectedShipment(null); load(); }}
+          onPaid={() => { setSelectedShipment(null); load(); }}
         />
       )}
 

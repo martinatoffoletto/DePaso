@@ -41,6 +41,7 @@ type SummaryScreenProps = {
   description?: string;
   declaredValue?: number | null;
   photoUri?: string | null;
+  photoServerUrl?: string | null;
   mode: "dedicada" | "colaborativa";
   quote: Quote | null;
   recipientName?: string;
@@ -61,7 +62,7 @@ function Row({ icon, label, value }: { icon: IconName; label: string; value: str
 
 export function SummaryScreen({
   origin, destination, originCoords, destinationCoords,
-  categoryId, weightKg, description, declaredValue, photoUri, mode, quote, recipientName, recipientPhone,
+  categoryId, weightKg, description, declaredValue, photoUri, photoServerUrl, mode, quote, recipientName, recipientPhone,
   onBack, onConfirm,
 }: SummaryScreenProps) {
   const insets = useSafeAreaInsets();
@@ -93,6 +94,7 @@ export function SummaryScreen({
         destination_lat: destinationCoords.latitude,
         destination_lon: destinationCoords.longitude,
         weight_kg: weightKg,
+        photo_url: photoServerUrl ?? undefined,
         description: description || undefined,
         declared_value: declaredValue ?? undefined,
         recipient_name: recipientName || undefined,

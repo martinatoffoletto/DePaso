@@ -163,7 +163,7 @@ def test_integration_flow_carrier_capacity_and_matching(client: TestClient, db):
     s1 = client.post("/api/v1/shipments", json={
         "package_size": "m",
         "modality": "collaborative",
-        "assignment_mode": "manual",
+        "assignment_mode": "on_demand",
         "origin_lat": -34.6000,
         "origin_lon": -58.3850,
         "destination_lat": -34.5900,
@@ -175,7 +175,7 @@ def test_integration_flow_carrier_capacity_and_matching(client: TestClient, db):
     s2 = client.post("/api/v1/shipments", json={
         "package_size": "l",
         "modality": "collaborative",
-        "assignment_mode": "manual",
+        "assignment_mode": "on_demand",
         "origin_lat": -34.6000,
         "origin_lon": -58.3850,
         "destination_lat": -34.5900,
@@ -183,11 +183,11 @@ def test_integration_flow_carrier_capacity_and_matching(client: TestClient, db):
         "weight_kg": 15.0
     }, headers=client_headers).json()
 
-    # Shipment 3: 5kg
+    # Shipment 3: 5kg (m: el peso debe respetar el tope de la categoría)
     s3 = client.post("/api/v1/shipments", json={
-        "package_size": "s",
+        "package_size": "m",
         "modality": "collaborative",
-        "assignment_mode": "manual",
+        "assignment_mode": "on_demand",
         "origin_lat": -34.6000,
         "origin_lon": -58.3850,
         "destination_lat": -34.5900,
@@ -259,7 +259,7 @@ def test_client_lifecycle_quote_create_edit_cancel(client: TestClient):
     created = client.post("/api/v1/shipments", json={
         "package_size": "s",
         "modality": "collaborative",
-        "assignment_mode": "manual",
+        "assignment_mode": "on_demand",
         "origin_lat": -34.6037, "origin_lon": -58.3816,
         "destination_lat": -34.5837, "destination_lon": -58.4016,
         "weight_kg": 3.0,
@@ -327,7 +327,7 @@ def test_admin_weights_then_collaborative_happy_path(client: TestClient, db):
     ship = client.post("/api/v1/shipments", json={
         "package_size": "m",
         "modality": "collaborative",
-        "assignment_mode": "manual",
+        "assignment_mode": "on_demand",
         "origin_lat": -34.6000, "origin_lon": -58.3850,
         "destination_lat": -34.5900, "destination_lon": -58.3950,
         "weight_kg": 4.0,
@@ -381,7 +381,7 @@ def test_carrier_late_cancellation_penalty(client: TestClient, db):
     ship = client.post("/api/v1/shipments", json={
         "package_size": "m",
         "modality": "collaborative",
-        "assignment_mode": "manual",
+        "assignment_mode": "on_demand",
         "origin_lat": -34.6000, "origin_lon": -58.3850,
         "destination_lat": -34.5900, "destination_lon": -58.3950,
         "weight_kg": 4.0,
@@ -410,7 +410,7 @@ def test_carrier_late_cancellation_penalty(client: TestClient, db):
 
 SHIP_BASE = {
     "package_size": "m",
-    "assignment_mode": "manual",
+    "assignment_mode": "on_demand",
     "origin_lat": -34.6000, "origin_lon": -58.3850,
     "destination_lat": -34.5900, "destination_lon": -58.3950,
     "weight_kg": 5.0,
@@ -646,7 +646,7 @@ def _pending_shipment(client: TestClient, email: str) -> int:
     ship = client.post("/api/v1/shipments", json={
         "package_size": "s",
         "modality": "collaborative",
-        "assignment_mode": "manual",
+        "assignment_mode": "on_demand",
         "origin_lat": -34.6000, "origin_lon": -58.3850,
         "destination_lat": -34.5900, "destination_lon": -58.3950,
         "weight_kg": 2.0,
@@ -718,3 +718,149 @@ def test_moderate_missing_carrier_uses_error_envelope(client: TestClient, db):
     body = res.json()
     assert body["success"] is False
     assert body["code"] == "NOT_FOUND"
+
+
+# --- validación de dominio en creación (auditoría shipments) ------------------
+
+def test_create_shipment_invalid_enums_rejected(client: TestClient, db):
+    """Valores inventados de size/modality/assignment_mode -> 400 con código
+    (antes: size inválido explotaba con KeyError 500 y el resto se persistía)."""
+    headers, _ = _register(client, "invalid_enums@example.com")
+    base = {
+        "origin_lat": -34.6000, "origin_lon": -58.3850,
+        "destination_lat": -34.5900, "destination_lon": -58.3950,
+        "weight_kg": 2.0,
+    }
+    cases = [
+        ({"package_size": "xs", "modality": "collaborative",
+          "assignment_mode": "on_demand"}, "INVALID_PACKAGE_SIZE"),
+        ({"package_size": "m", "modality": "banana",
+          "assignment_mode": "on_demand"}, "INVALID_MODALITY"),
+        ({"package_size": "m", "modality": "collaborative",
+          "assignment_mode": "manual"}, "INVALID_ASSIGNMENT_MODE"),
+    ]
+    for payload, code in cases:
+        res = client.post("/api/v1/shipments", json={**base, **payload}, headers=headers)
+        assert res.status_code == 400, res.text
+        assert res.json()["code"] == code
+
+
+def test_xl_must_be_dedicated(client: TestClient, db):
+    """Mudanzas/fletes (xl) nunca colaborativos (spec 3.3) — en create y update."""
+    headers, _ = _register(client, "xl_collab@example.com")
+    base = {
+        "origin_lat": -34.6000, "origin_lon": -58.3850,
+        "destination_lat": -34.5900, "destination_lon": -58.3950,
+        "weight_kg": 80.0,
+    }
+    res = client.post("/api/v1/shipments", json={
+        **base, "package_size": "xl", "modality": "collaborative",
+        "assignment_mode": "on_demand",
+    }, headers=headers)
+    assert res.status_code == 400, res.text
+    assert res.json()["code"] == "XL_MUST_BE_DEDICATED"
+
+    # Crear dedicado y tratar de flipear la modalidad por PATCH.
+    created = client.post("/api/v1/shipments", json={
+        **base, "package_size": "xl", "modality": "dedicated",
+        "assignment_mode": "on_demand",
+    }, headers=headers)
+    assert created.status_code == 201, created.text
+    res = client.patch(f"/api/v1/shipments/{created.json()['id']}",
+                       json={"modality": "collaborative"}, headers=headers)
+    assert res.status_code == 400, res.text
+    assert res.json()["code"] == "XL_MUST_BE_DEDICATED"
+
+
+def test_weight_must_match_category(client: TestClient, db):
+    """El peso respeta la categoría: s<=3kg, xl>=30kg."""
+    headers, _ = _register(client, "weights_cat@example.com")
+    base = {
+        "modality": "dedicated", "assignment_mode": "on_demand",
+        "origin_lat": -34.6000, "origin_lon": -58.3850,
+        "destination_lat": -34.5900, "destination_lon": -58.3950,
+    }
+    res = client.post("/api/v1/shipments", json={
+        **base, "package_size": "s", "weight_kg": 20.0,
+    }, headers=headers)
+    assert res.status_code == 400, res.text
+    assert res.json()["code"] == "WEIGHT_EXCEEDS_CATEGORY"
+
+    res = client.post("/api/v1/shipments", json={
+        **base, "package_size": "xl", "weight_kg": 1.4,
+    }, headers=headers)
+    assert res.status_code == 400, res.text
+    assert res.json()["code"] == "XL_MIN_WEIGHT"
+
+
+def test_accept_rejects_incompatible_vehicle(client: TestClient, db):
+    """El accept es autoritativo: una moto no puede llevar un flete XL aunque
+    lo pida por API directa (el feed ya lo filtraba, el accept no)."""
+    carrier_headers, _ = _verified_carrier(client, db, "moto_xl@example.com",
+                                           vehicle="motorcycle", plate="MT-XL1",
+                                           capacity_kg=200.0)
+    client_headers, _ = _register(client, "xl_owner@example.com")
+    ship = client.post("/api/v1/shipments", json={
+        "package_size": "xl", "modality": "dedicated",
+        "assignment_mode": "on_demand",
+        "origin_lat": -34.6000, "origin_lon": -58.3850,
+        "destination_lat": -34.5900, "destination_lon": -58.3950,
+        "weight_kg": 80.0,
+    }, headers=client_headers)
+    assert ship.status_code == 201, ship.text
+    res = client.post(f"/api/v1/shipments/{ship.json()['id']}/accept",
+                      json={}, headers=carrier_headers)
+    assert res.status_code == 400, res.text
+    assert res.json()["code"] == "VEHICLE_INCOMPATIBLE"
+
+
+def test_carrier_cannot_cancel_via_status_endpoint(client: TestClient, db):
+    """POST /status solo avanza hitos de entrega: cancelar por ahí esquivaba
+    la penalidad de reputación y dejaba el envío muerto (sin reapertura)."""
+    carrier_headers, _ = _verified_carrier(client, db, "sneaky@example.com",
+                                           plate="SN-001")
+    sid = _pending_shipment(client, "sneaky_client@example.com")
+    accept = client.post(f"/api/v1/shipments/{sid}/accept", json={},
+                         headers=carrier_headers)
+    assert accept.status_code == 200, accept.text
+
+    res = client.post(f"/api/v1/shipments/{sid}/status",
+                      json={"new_status": "cancelled"}, headers=carrier_headers)
+    assert res.status_code == 403, res.text
+    assert res.json()["code"] == "CARRIER_STATUS_NOT_ALLOWED"
+
+
+def test_carrier_cancel_keeps_payment_held(client: TestClient, db):
+    """Si el carrier se baja, el envío se reabre y el pago sigue retenido
+    (antes se marcaba refunded y el próximo carrier entregaba sin cobrar)."""
+    carrier_headers, _ = _verified_carrier(client, db, "bailer@example.com",
+                                           plate="BL-001")
+    client_headers, _ = _register(client, "paid_client@example.com")
+    ship = client.post("/api/v1/shipments", json={
+        "package_size": "s", "modality": "collaborative",
+        "assignment_mode": "on_demand",
+        "origin_lat": -34.6000, "origin_lon": -58.3850,
+        "destination_lat": -34.5900, "destination_lon": -58.3950,
+        "weight_kg": 2.0,
+    }, headers=client_headers).json()
+    sid = ship["id"]
+
+    pay = client.post(f"/api/v1/shipments/{sid}/pay", headers=client_headers)
+    assert pay.status_code == 200, pay.text
+
+    accept = client.post(f"/api/v1/shipments/{sid}/accept", json={},
+                         headers=carrier_headers)
+    assert accept.status_code == 200, accept.text
+
+    cancel = client.post(f"/api/v1/shipments/{sid}/carrier-cancel",
+                         headers=carrier_headers)
+    assert cancel.status_code == 200, cancel.text
+    body = cancel.json()
+    assert body["status"] == "pending"        # reabierto para matching
+    assert body["carrier_id"] is None
+    assert body["payment_status"] == "paid"   # el pago sigue retenido, NO refunded
+
+    # El cliente cancela de verdad -> ahí sí se reintegra.
+    res = client.post(f"/api/v1/shipments/{sid}/cancel", headers=client_headers)
+    assert res.status_code == 200, res.text
+    assert res.json()["payment_status"] == "refunded"

@@ -22,6 +22,10 @@ const CATEGORIES: Category[] = [
   { id: "xl", label: "Flete",   sub: "> 30 kg",  icon: "wardrobe-outline" },
 ];
 
+// Debe coincidir con shared/cargo.py del backend (MAX_WEIGHT_KG / XL_MIN_WEIGHT_KG).
+const MAX_WEIGHT_KG: Record<string, number> = { s: 3, m: 10, l: 30, xl: 2000 };
+const XL_MIN_WEIGHT_KG = 30;
+
 const CATEGORY_AI_LABEL: Record<string, string> = {
   s: "un paquete pequeño o documento", m: "una carga mediana",
   l: "una carga grande o voluminosa", xl: "una mudanza o flete",
@@ -73,6 +77,8 @@ export type PackagePayload = {
   description: string;
   declaredValue: number | null;
   photoUri: string | null;
+  /** URL pública de la foto (subida al clasificar) — va en photo_url del envío. */
+  photoServerUrl: string | null;
 };
 
 type Props = {
@@ -84,11 +90,16 @@ type Props = {
 export function PackageScreen({ initial, onBack, onNext }: Props) {
   const insets = useSafeAreaInsets();
   const [photoUri, setPhotoUri] = useState<string | null>(initial?.photoUri ?? null);
-  const [aiActive, setAiActive] = useState(false);
   const [classifying, setClassifying] = useState(false);
   const [classificationId, setClassificationId] = useState<number | null>(null);
+  // Lo que la IA sugirió, separado de lo que el usuario eligió: comparar
+  // selected contra sí mismo hacía que el feedback (RF-VIS-04) siempre
+  // reportara "aceptado" aunque el usuario corrigiera la categoría.
+  const [aiCategory, setAiCategory] = useState<string | null>(null);
   const [aiConfidence, setAiConfidence] = useState<number | null>(null);
   const [selected, setSelected] = useState<string>(initial?.categoryId ?? "m");
+  const [serverPhotoUrl, setServerPhotoUrl] = useState<string | null>(initial?.photoServerUrl ?? null);
+  const aiActive = aiCategory !== null && selected === aiCategory;
   const [showDim, setShowDim] = useState(false);
   const [dimL, setDimL] = useState("24");
   const [dimW, setDimW] = useState("18");
@@ -135,19 +146,20 @@ export function PackageScreen({ initial, onBack, onNext }: Props) {
       const result = await visionService.classifyPackage(resized.uri);
       setClassificationId(result.classification_id);
       setAiConfidence(result.confidence);
+      setServerPhotoUrl(result.photo_url ?? null);
       if (!result.needs_manual) {
-        setAiActive(true);
+        setAiCategory(result.category);
         setSelected(result.category);
       } else {
         // low confidence (RF-VIS-02): keep manual selection, inform the user
-        setAiActive(false);
+        setAiCategory(null);
         Alert.alert(
           "No estamos seguros",
           "La IA no pudo clasificar el paquete con confianza. Elegí la categoría manualmente.",
         );
       }
     } catch {
-      setAiActive(false);
+      setAiCategory(null);
       Alert.alert("Error", "No se pudo clasificar la imagen. Elegí la categoría manualmente.");
     } finally {
       setClassifying(false);
@@ -171,21 +183,43 @@ export function PackageScreen({ initial, onBack, onNext }: Props) {
   }
 
   function handleNext() {
+    const kg = parseFloat(dimKg);
+    const weightKg = isNaN(kg) ? 1 : kg;
+
+    // El peso debe coincidir con la categoría (mismas reglas que el backend).
+    const cat = CATEGORIES.find((c) => c.id === selected)!;
+    if (weightKg > MAX_WEIGHT_KG[selected]) {
+      Alert.alert(
+        "Revisá el peso",
+        `Un paquete ${cat.label.toLowerCase()} pesa hasta ${MAX_WEIGHT_KG[selected]} kg. ` +
+          "Ajustá el peso o elegí una categoría más grande.",
+      );
+      return;
+    }
+    if (selected === "xl" && weightKg < XL_MIN_WEIGHT_KG) {
+      Alert.alert(
+        "Revisá el peso",
+        `Un flete o mudanza pesa al menos ${XL_MIN_WEIGHT_KG} kg. ` +
+          "Indicá el peso estimado o elegí una categoría más chica.",
+      );
+      return;
+    }
+
     if (classificationId !== null) {
       // RF-VIS-04: record whether the user kept the AI suggestion or corrected it
-      const accepted = aiActive && selected === selectedCat.id;
+      const accepted = aiCategory !== null && selected === aiCategory;
       visionService
         .sendFeedback(classificationId, accepted, accepted ? undefined : selected)
         .catch(() => {});
     }
-    const kg = parseFloat(dimKg);
     const value = parseFloat(declaredValue.replace(",", "."));
     onNext({
       categoryId: selected,
-      weightKg: isNaN(kg) ? 1 : kg,
+      weightKg,
       description,
       declaredValue: isNaN(value) || value <= 0 ? null : value,
       photoUri,
+      photoServerUrl: serverPhotoUrl,
     });
   }
 
@@ -274,7 +308,7 @@ export function PackageScreen({ initial, onBack, onNext }: Props) {
               <View className="flex-1">
                 <Text className="text-[9px] tracking-[1.5px] text-inkMute uppercase">ANÁLISIS DE VISIÓN</Text>
                 <Text className="text-[12.5px] text-ink font-medium mt-px">
-                  {aiActive ? `Detectamos ${CATEGORY_AI_LABEL[selected] ?? "un paquete"}` : "Analizando imagen..."}
+                  {aiActive ? `Detectamos ${CATEGORY_AI_LABEL[aiCategory!] ?? "un paquete"}` : "Analizando imagen..."}
                 </Text>
               </View>
               {aiActive && aiConfidence !== null && (
@@ -343,7 +377,13 @@ export function PackageScreen({ initial, onBack, onNext }: Props) {
                 key={cat.id}
                 className="bg-card rounded-2xl border border-border p-[10px] gap-1"
                 style={{ width: "30.5%" }}
-                onPress={() => setSelected(cat.id)}
+                onPress={() => {
+                  setSelected(cat.id);
+                  // Un flete arranca en >30 kg: si venía un peso de paquete
+                  // chico, proponemos uno acorde (editable en la tarjeta).
+                  const kg = parseFloat(dimKg);
+                  if (cat.id === "xl" && (isNaN(kg) || kg < XL_MIN_WEIGHT_KG)) setDimKg("40");
+                }}
                 activeOpacity={0.75}
               >
                 <MaterialCommunityIcons name={cat.icon} size={18} color={T.inkSoft} />
@@ -354,14 +394,15 @@ export function PackageScreen({ initial, onBack, onNext }: Props) {
           </View>
         </View>
 
-        {/* Dimensions card — oculto para Flete */}
-        {selected !== "xl" && (
-          <View
-            className="bg-cardSoft rounded-2xl p-[14px]"
+        {/* Dimensions card — para Flete solo el peso (las medidas no aplican) */}
+        <View
+          className="bg-cardSoft rounded-2xl p-[14px]"
             style={{ borderWidth: 1, borderColor: T.border, borderStyle: "dashed" }}
           >
             <View className="flex-row items-center justify-between mb-[10px]">
-              <Text className="text-[10px] tracking-[1.5px] text-inkMute uppercase">MEDIDAS · IA</Text>
+              <Text className="text-[10px] tracking-[1.5px] text-inkMute uppercase">
+                {selected === "xl" ? "PESO ESTIMADO" : "MEDIDAS · IA"}
+              </Text>
               <Text className="text-[9px] tracking-[1px] text-emeraldDeep uppercase font-bold">EDITAR</Text>
             </View>
             <View className="flex-row gap-2">
@@ -370,7 +411,7 @@ export function PackageScreen({ initial, onBack, onNext }: Props) {
                 { l: "ANCHO", v: dimW, set: setDimW, u: "cm" },
                 { l: "ALTO",  v: dimH, set: setDimH, u: "cm" },
                 { l: "PESO",  v: dimKg, set: setDimKg, u: "kg" },
-              ].map((d) => (
+              ].filter((d) => selected !== "xl" || d.l === "PESO").map((d) => (
                 <View key={d.l} className="flex-1 bg-card rounded-[10px] p-2 border border-borderSoft">
                   <Text className="text-[8px] tracking-[1px] text-inkMute mb-[3px] uppercase">{d.l}</Text>
                   <View className="flex-row items-baseline gap-0.5">
@@ -385,9 +426,8 @@ export function PackageScreen({ initial, onBack, onNext }: Props) {
                   </View>
                 </View>
               ))}
-            </View>
           </View>
-        )}
+        </View>
 
         {/* Description — obligatoria */}
         <View className="gap-2">
