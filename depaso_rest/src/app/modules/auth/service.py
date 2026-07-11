@@ -65,8 +65,13 @@ class AuthService:
         )
         return access_token, refresh_token, settings.jwt_expire_minutes * 60
 
-    async def refresh_tokens(self, refresh_token: str) -> tuple[str, str, int]:
-        """Issue a new token pair from a valid refresh token."""
+    async def refresh_tokens(self, refresh_token: str):
+        """Issue a new token pair from a valid refresh token.
+
+        Devuelve (access, refresh, expires_in, user): el user ya se carga acá
+        para validar is_active, así el router no lo vuelve a decodificar ni a
+        buscar (un refresh por sesión cada 30 min).
+        """
         from jose import JWTError
 
         from src.app.core.security import decode_access_token
@@ -81,7 +86,8 @@ class AuthService:
         user = await self.user_repository.get_by_id(int(payload["sub"]))
         if not user or not user.is_active:
             raise InvalidCredentialsError()
-        return await self.create_tokens(user.id)
+        access_token, refresh_token, expires_in = await self.create_tokens(user.id)
+        return access_token, refresh_token, expires_in, user
 
     async def change_password(self, user_id: int, current_password: str, new_password: str) -> bool:
         """Change password for an authenticated user."""

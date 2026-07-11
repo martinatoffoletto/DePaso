@@ -84,14 +84,11 @@ async def login(
 async def refresh(
     request: RefreshRequest,
     service: AuthService = Depends(get_auth_service),
-    user_service: UserService = Depends(get_user_service),
 ) -> TokenResponse:
     """Exchange a refresh token for a new token pair (RNF-SEC-03)."""
-    access_token, refresh_token, expires_in = await service.refresh_tokens(request.refresh_token)
-    from src.app.core.security import decode_access_token
-
-    user_id = int(decode_access_token(access_token)["sub"])
-    user = await user_service.get_user_by_id(user_id)
+    access_token, refresh_token, expires_in, user = await service.refresh_tokens(
+        request.refresh_token
+    )
     return TokenResponse(
         access_token=access_token,
         refresh_token=refresh_token,
