@@ -9,7 +9,6 @@ from src.app.core.database import get_db
 from src.app.core.dependencies import AdminUserId, CurrentUserId
 from src.app.modules.carriers.exceptions import CarrierNotFoundError
 from src.app.modules.carriers.schemas import (
-    AvailabilityWindowRequest,
     CarrierProfileCreate,
     CarrierRatingResponse,
     CarrierResponse,
@@ -22,8 +21,6 @@ from src.app.modules.matching.schemas import FeedItemResponse
 from src.app.modules.matching.service import MatchingService
 from src.app.modules.shipments.repository import ShipmentRepository
 from src.app.modules.routes.repository import RouteRepository
-from src.app.modules.routes.schemas import RouteCreateRequest, RouteResponse
-from src.app.modules.routes.service import RouteService
 
 router = APIRouter(prefix="/carriers", tags=["carriers"])
 
@@ -147,37 +144,13 @@ async def my_ratings(
 ) -> list[CarrierRatingResponse]:
     """Reviews received by the current carrier (RF-SHP-08), newest first."""
     carrier = await _my_carrier(current_user_id, db)
-    ratings = ShipmentRepository(db).list_ratings_by_carrier(carrier.id)
+    ratings = await ShipmentRepository(db).list_ratings_by_carrier(carrier.id)
     return [CarrierRatingResponse.model_validate(r) for r in ratings]
 
 
-@router.post("/me/availability", response_model=RouteResponse, status_code=status.HTTP_201_CREATED)
-async def register_availability_window(
-    data: AvailabilityWindowRequest,
-    current_user_id: CurrentUserId,
-    db: AsyncSession = Depends(get_db),
-) -> RouteResponse:
-    """Register a habitual availability window for BY_AVAILABILITY matching (RF-CAR-02).
-
-    Creates a `dedicated_window` entry in carrier_routes so the matching engine
-    can assign dedicated shipments whose request time falls within this window.
-    Use `POST /routes` directly if you need finer control (e.g., updating an
-    existing window or registering a collaborative route).
-    """
-    carrier = await _my_carrier(current_user_id, db)
-    route_data = RouteCreateRequest(
-        kind="dedicated_window",
-        origin_lat=data.origin_lat,
-        origin_lon=data.origin_lon,
-        window_start=data.window_start,
-        window_end=data.window_end,
-        recurrence_days=data.recurrence_days,
-    )
-    service = RouteService(
-        route_repo=RouteRepository(db),
-        carrier_repo=CarrierRepository(db),
-    )
-    return await service.publish(carrier.id, route_data)
+# La ventana de disponibilidad (BY_AVAILABILITY, RF-CAR-02) se publica con
+# POST /routes {kind: "dedicated_window"} — que es lo que usa el front. El
+# alias POST /me/availability duplicaba ese flujo y se eliminó.
 
 
 @router.get("/{carrier_id}", response_model=CarrierResponse)

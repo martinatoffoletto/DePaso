@@ -622,3 +622,19 @@ def test_co2_summary_endpoint(client: TestClient, db):
 
 def test_co2_summary_requires_auth(client: TestClient):
     assert client.get("/api/v1/co2/me/summary").status_code == 401
+
+
+def test_carrier_ratings_endpoint(client: TestClient, db):
+    """GET /carriers/me/ratings estaba roto por un await faltante
+    (list_ratings_by_carrier es async). Un carrier sin reseñas ve []."""
+    headers, _ = _verified_carrier(client, db, "ratings_carrier@example.com", plate="CR-001")
+    res = client.get("/api/v1/carriers/me/ratings", headers=headers)
+    assert res.status_code == 200, res.text
+    assert res.json() == []
+
+
+def test_availability_alias_removed(client: TestClient, db):
+    """POST /carriers/me/availability se eliminó (duplicaba POST /routes)."""
+    headers, _ = _verified_carrier(client, db, "avail_gone@example.com", plate="AV-001")
+    res = client.post("/api/v1/carriers/me/availability", json={}, headers=headers)
+    assert res.status_code in (404, 405)
