@@ -120,7 +120,9 @@ function LinkCarrierDialog({ linkedIds }: { linkedIds: Set<number> }) {
 function FleetInner({ org }: { org: MyOrganization }) {
   const qc = useQueryClient();
   const toast = useToast();
-  const isFleet = org.kind === "fleet" || org.kind === "both";
+  const isFleet = org.kind === "fleet";
+  // Confirmación antes de la baja: es una acción con efecto en el negocio.
+  const [pendingUnlink, setPendingUnlink] = useState<OrgCarrier | null>(null);
 
   const { data, isLoading, isError, error, refetch } = useQuery({
     queryKey: ["org", "carriers"],
@@ -132,14 +134,21 @@ function FleetInner({ org }: { org: MyOrganization }) {
       (await api.delete<OrgCarrier>(`/organizations/me/carriers/${carrierId}`)).data,
     onSuccess: () => {
       toast.success("Transportista dado de baja");
+      setPendingUnlink(null);
       qc.invalidateQueries({ queryKey: ["org", "carriers"] });
       qc.invalidateQueries({ queryKey: ["org", "dashboard"] });
     },
     onError: (err) => toast.error(apiErrorMessage(err, "No se pudo dar de baja")),
   });
 
+  // Solo los vínculos ACTIVOS bloquean re-vincular: el backend reactiva un
+  // vínculo inactivo, así que un carrier dado de baja tiene que reaparecer
+  // en el diálogo de vinculación.
   const linkedIds = useMemo(
-    () => new Set((data ?? []).map((c) => c.carrier_id)),
+    () =>
+      new Set(
+        (data ?? []).filter((c) => c.status === "active").map((c) => c.carrier_id),
+      ),
     [data],
   );
 
@@ -216,14 +225,9 @@ function FleetInner({ org }: { org: MyOrganization }) {
                           variant="ghost"
                           className="text-red hover:bg-red-bg"
                           disabled={unlinkMutation.isPending}
-                          onClick={() => unlinkMutation.mutate(c.carrier_id)}
+                          onClick={() => setPendingUnlink(c)}
                         >
-                          {unlinkMutation.isPending &&
-                          unlinkMutation.variables === c.carrier_id ? (
-                            <Loader2 className="size-4 animate-spin" />
-                          ) : (
-                            <UserMinus className="size-4" />
-                          )}
+                          <UserMinus className="size-4" />
                           Baja
                         </Button>
                       )}
@@ -235,6 +239,38 @@ function FleetInner({ org }: { org: MyOrganization }) {
           </Table>
         )}
       </Card>
+
+      <Dialog
+        open={pendingUnlink != null}
+        onOpenChange={(o) => {
+          if (!o) setPendingUnlink(null);
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Dar de baja a {pendingUnlink?.company_name}</DialogTitle>
+            <DialogDescription>
+              El transportista deja de contar en tu flota y sus futuras entregas
+              no suman a tus finanzas. Podés volver a vincularlo cuando quieras.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex justify-end gap-2 pt-2">
+            <Button variant="outline" onClick={() => setPendingUnlink(null)}>
+              Cancelar
+            </Button>
+            <Button
+              className="bg-red text-white hover:opacity-90"
+              disabled={unlinkMutation.isPending}
+              onClick={() => {
+                if (pendingUnlink) unlinkMutation.mutate(pendingUnlink.carrier_id);
+              }}
+            >
+              {unlinkMutation.isPending && <Loader2 className="size-4 animate-spin" />}
+              Confirmar baja
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

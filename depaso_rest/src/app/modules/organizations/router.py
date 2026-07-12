@@ -5,7 +5,7 @@ Auth model: any authenticated user can create an organization and thereby
 become its owner. The "org" role is derived from organization_members via the
 `get_current_org` dependency — it is never carried in the JWT.
 """
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.app.core.database import get_db
@@ -14,6 +14,7 @@ from src.app.modules.carriers.repository import CarrierRepository
 from src.app.modules.organizations.exceptions import (
     NotAnOrgMemberError,
 )
+from src.app.shared.exceptions import NotFoundError
 from src.app.modules.organizations.models import Organization
 from src.app.modules.organizations.repository import OrganizationRepository
 from src.app.modules.organizations.schemas import (
@@ -58,10 +59,7 @@ async def get_current_org(
     """Resolve the caller's active organization from their membership (403 if none)."""
     resolved = await service.resolve_membership(current_user_id)
     if resolved is None:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=NotAnOrgMemberError().message,
-        )
+        raise NotAnOrgMemberError()
     org, _ = resolved
     return org
 
@@ -103,8 +101,7 @@ async def get_my_organization(
     """The caller's active organization (resolved from membership)."""
     resolved = await service.resolve_membership(current_user_id)
     if resolved is None:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN,
-                            detail=NotAnOrgMemberError().message)
+        raise NotAnOrgMemberError()
     org, membership = resolved
     payload = OrganizationResponse.model_validate(org).model_dump()
     return MyOrganizationResponse(**payload, my_role=membership.role)
@@ -166,7 +163,7 @@ async def link_carrier(
     org: Organization = Depends(get_current_org),
     service: OrganizationService = Depends(get_org_service),
 ) -> OrgCarrierResponse:
-    """Link an existing carrier to the fleet (fleet/both orgs only)."""
+    """Link an existing carrier to the fleet (fleet orgs only)."""
     await service.link_carrier(org, data.carrier_id)
     return await _carrier_row(service, org, data.carrier_id)
 
@@ -177,7 +174,7 @@ async def unlink_carrier(
     org: Organization = Depends(get_current_org),
     service: OrganizationService = Depends(get_org_service),
 ) -> OrgCarrierResponse:
-    """Unlink a carrier (status=inactive, keeps the user). Fleet/both orgs only."""
+    """Unlink a carrier (status=inactive, keeps the user). Fleet orgs only."""
     await service.unlink_carrier(org, carrier_id)
     return await _carrier_row(service, org, carrier_id)
 
@@ -186,7 +183,7 @@ async def _carrier_row(service: OrganizationService, org: Organization, carrier_
     for row in await service.list_fleet(org):
         if row["carrier_id"] == carrier_id:
             return OrgCarrierResponse(**row)
-    raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Carrier link not found")
+    raise NotFoundError("Carrier link", code="CARRIER_LINK_NOT_FOUND")
 
 
 # -- merchant: shipments ----------------------------------------------------
@@ -212,7 +209,7 @@ async def create_my_shipment(
     org: Organization = Depends(get_current_org),
     service: OrganizationService = Depends(get_org_service),
 ) -> OrgShipmentResponse:
-    """Create a shipment as a merchant org (merchant/both orgs only)."""
+    """Create a shipment as a merchant org (merchant orgs only)."""
     shipment = await service.create_shipment(
         org, owner_user_id=current_user_id, **data.model_dump()
     )

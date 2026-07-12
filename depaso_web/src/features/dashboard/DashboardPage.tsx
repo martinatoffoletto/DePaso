@@ -25,8 +25,8 @@ function DashboardInner({ org }: { org: MyOrganization }) {
     queryFn: async () => (await api.get<OrgDashboard>("/organizations/me/dashboard")).data,
   });
 
-  const isFleet = org.kind === "fleet" || org.kind === "both";
-  const isMerchant = org.kind === "merchant" || org.kind === "both";
+  const isFleet = org.kind === "fleet";
+  const isMerchant = org.kind === "merchant";
 
   return (
     <div>

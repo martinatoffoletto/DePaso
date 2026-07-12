@@ -76,12 +76,10 @@ class OrganizationKind(str, Enum):
 
     fleet    -> owns a carrier fleet, manages carrier linking/unlinking.
     merchant -> uses DePaso for its own logistics, creates/schedules shipments.
-    both     -> operates as fleet and merchant.
     """
 
     FLEET = "fleet"
     MERCHANT = "merchant"
-    BOTH = "both"
 
 
 class OrganizationMemberRole(str, Enum):

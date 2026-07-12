@@ -9,7 +9,7 @@ from datetime import datetime
 from pydantic import BaseModel, ConfigDict, Field
 
 CUIT_PATTERN = r"^\d{2}-?\d{8}-?\d$"
-KIND_PATTERN = r"^(fleet|merchant|both)$"
+KIND_PATTERN = r"^(fleet|merchant)$"
 
 
 # -- organizations ----------------------------------------------------------
@@ -89,6 +89,10 @@ class OrgShipmentCreate(BaseModel):
     weight_kg: float = Field(..., gt=0)
     photo_url: str | None = None
     description: str | None = None
+    # Contacto en destino: sin esto el carrier no tenía a quién llamar al
+    # entregar un envío creado por una pyme.
+    recipient_name: str | None = Field(None, max_length=120)
+    recipient_phone: str | None = Field(None, max_length=30)
 
 
 class OrgShipmentResponse(BaseModel):

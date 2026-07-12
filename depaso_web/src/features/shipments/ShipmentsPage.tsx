@@ -36,7 +36,7 @@ import type { MyOrganization, OrgShipment, ShipmentStatus } from "@/types";
 type StatusFilter = ShipmentStatus | "all";
 
 function ShipmentsInner({ org }: { org: MyOrganization }) {
-  const isMerchant = org.kind === "merchant" || org.kind === "both";
+  const isMerchant = org.kind === "merchant";
   const [filter, setFilter] = useState<StatusFilter>("all");
 
   const { data, isLoading, isError, error, refetch } = useQuery({

@@ -3,6 +3,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Loader2, Plus } from "lucide-react";
 import { api, apiErrorMessage } from "@/lib/api";
 import { useToast } from "@/components/ui/toast";
+import { AddressAutocomplete } from "@/components/AddressAutocomplete";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -21,11 +22,21 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import type { AddressSuggestion } from "@/lib/addressSearch";
 import type { OrgShipment, OrgShipmentCreate } from "@/types";
 
 type PackageSize = OrgShipmentCreate["package_size"];
 type Modality = OrgShipmentCreate["modality"];
 type AssignmentMode = OrgShipmentCreate["assignment_mode"];
+
+// Espejo de shared/cargo.py (MAX_WEIGHT_KG / XL_MIN_WEIGHT_KG): mismos topes
+// que valida el backend, para avisar antes del 400.
+const WEIGHT_LIMITS: Record<PackageSize, { min: number; max: number; hint: string }> = {
+  s: { min: 0.1, max: 3, hint: "hasta 3 kg" },
+  m: { min: 0.1, max: 10, hint: "hasta 10 kg" },
+  l: { min: 0.1, max: 30, hint: "hasta 30 kg" },
+  xl: { min: 30, max: 2000, hint: "desde 30 kg" },
+};
 
 const SIZE_OPTIONS: { value: PackageSize; label: string }[] = [
   { value: "s", label: "Chico" },
@@ -38,24 +49,24 @@ interface FormState {
   package_size: PackageSize;
   modality: Modality;
   assignment_mode: AssignmentMode;
-  origin_lat: string;
-  origin_lon: string;
-  destination_lat: string;
-  destination_lon: string;
+  origin: AddressSuggestion | null;
+  destination: AddressSuggestion | null;
   weight_kg: string;
   description: string;
+  recipient_name: string;
+  recipient_phone: string;
 }
 
 const INITIAL: FormState = {
   package_size: "m",
   modality: "collaborative",
   assignment_mode: "on_demand",
-  origin_lat: "",
-  origin_lon: "",
-  destination_lat: "",
-  destination_lon: "",
+  origin: null,
+  destination: null,
   weight_kg: "",
   description: "",
+  recipient_name: "",
+  recipient_phone: "",
 };
 
 export function CreateShipmentDialog() {
@@ -67,6 +78,7 @@ export function CreateShipmentDialog() {
   // Regla de dominio: las mudanzas (XL) son siempre dedicadas.
   const forcedDedicated = form.package_size === "xl";
   const modality: Modality = forcedDedicated ? "dedicated" : form.modality;
+  const weightLimit = WEIGHT_LIMITS[form.package_size];
 
   function set<K extends keyof FormState>(key: K, value: FormState[K]) {
     setForm((f) => ({ ...f, [key]: value }));
@@ -74,16 +86,21 @@ export function CreateShipmentDialog() {
 
   const mutation = useMutation({
     mutationFn: async () => {
+      if (!form.origin || !form.destination) {
+        throw new Error("Elegí una dirección de las sugerencias.");
+      }
       const payload: OrgShipmentCreate = {
         package_size: form.package_size,
         modality,
         assignment_mode: form.assignment_mode,
-        origin_lat: Number(form.origin_lat),
-        origin_lon: Number(form.origin_lon),
-        destination_lat: Number(form.destination_lat),
-        destination_lon: Number(form.destination_lon),
+        origin_lat: form.origin.lat,
+        origin_lon: form.origin.lon,
+        destination_lat: form.destination.lat,
+        destination_lon: form.destination.lon,
         weight_kg: Number(form.weight_kg),
         description: form.description.trim() || null,
+        recipient_name: form.recipient_name.trim() || null,
+        recipient_phone: form.recipient_phone.trim() || null,
       };
       return (await api.post<OrgShipment>("/organizations/me/shipments", payload)).data;
     },
@@ -108,8 +125,8 @@ export function CreateShipmentDialog() {
         <DialogHeader>
           <DialogTitle>Nuevo envío</DialogTitle>
           <DialogDescription>
-            Programá un envío para tu organización. Las coordenadas son de retiro
-            y entrega.
+            Programá un envío para tu organización. Buscá las direcciones de
+            retiro y entrega.
           </DialogDescription>
         </DialogHeader>
 
@@ -117,6 +134,10 @@ export function CreateShipmentDialog() {
           className="space-y-4"
           onSubmit={(e) => {
             e.preventDefault();
+            if (!form.origin || !form.destination) {
+              toast.error("Elegí las direcciones desde las sugerencias.");
+              return;
+            }
             mutation.mutate();
           }}
         >
@@ -133,7 +154,7 @@ export function CreateShipmentDialog() {
                 <SelectContent>
                   {SIZE_OPTIONS.map((o) => (
                     <SelectItem key={o.value} value={o.value}>
-                      {o.label}
+                      {o.label} — {WEIGHT_LIMITS[o.value].hint}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -144,12 +165,17 @@ export function CreateShipmentDialog() {
               <Input
                 id="weight"
                 type="number"
-                min="0.1"
+                min={weightLimit.min}
+                max={weightLimit.max}
                 step="0.1"
                 value={form.weight_kg}
                 onChange={(e) => set("weight_kg", e.target.value)}
                 required
               />
+              <p className="text-xs text-ink-mute">
+                {SIZE_OPTIONS.find((o) => o.value === form.package_size)?.label}:{" "}
+                {weightLimit.hint}
+              </p>
             </div>
           </div>
 
@@ -190,65 +216,49 @@ export function CreateShipmentDialog() {
             </div>
           </div>
 
-          <fieldset className="space-y-2 rounded-lg border border-line p-3">
-            <legend className="px-1 text-xs font-medium text-ink-mute">Retiro</legend>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <Label htmlFor="olat">Latitud</Label>
-                <Input
-                  id="olat"
-                  type="number"
-                  step="any"
-                  placeholder="-34.6037"
-                  value={form.origin_lat}
-                  onChange={(e) => set("origin_lat", e.target.value)}
-                  required
-                />
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="olon">Longitud</Label>
-                <Input
-                  id="olon"
-                  type="number"
-                  step="any"
-                  placeholder="-58.3816"
-                  value={form.origin_lon}
-                  onChange={(e) => set("origin_lon", e.target.value)}
-                  required
-                />
-              </div>
-            </div>
-          </fieldset>
+          <div className="space-y-1.5">
+            <Label htmlFor="origin">Dirección de retiro</Label>
+            <AddressAutocomplete
+              id="origin"
+              placeholder="Av. Corrientes 1234"
+              value={form.origin}
+              onChange={(v) => set("origin", v)}
+            />
+          </div>
 
-          <fieldset className="space-y-2 rounded-lg border border-line p-3">
-            <legend className="px-1 text-xs font-medium text-ink-mute">Entrega</legend>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <Label htmlFor="dlat">Latitud</Label>
-                <Input
-                  id="dlat"
-                  type="number"
-                  step="any"
-                  placeholder="-34.5885"
-                  value={form.destination_lat}
-                  onChange={(e) => set("destination_lat", e.target.value)}
-                  required
-                />
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="dlon">Longitud</Label>
-                <Input
-                  id="dlon"
-                  type="number"
-                  step="any"
-                  placeholder="-58.3974"
-                  value={form.destination_lon}
-                  onChange={(e) => set("destination_lon", e.target.value)}
-                  required
-                />
-              </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="destination">Dirección de entrega</Label>
+            <AddressAutocomplete
+              id="destination"
+              placeholder="Cabildo 2500"
+              value={form.destination}
+              onChange={(v) => set("destination", v)}
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label htmlFor="rname">Quién recibe</Label>
+              <Input
+                id="rname"
+                placeholder="Nombre y apellido"
+                maxLength={120}
+                value={form.recipient_name}
+                onChange={(e) => set("recipient_name", e.target.value)}
+              />
             </div>
-          </fieldset>
+            <div className="space-y-1.5">
+              <Label htmlFor="rphone">Teléfono de contacto</Label>
+              <Input
+                id="rphone"
+                type="tel"
+                placeholder="+54 9 11 ..."
+                maxLength={30}
+                value={form.recipient_phone}
+                onChange={(e) => set("recipient_phone", e.target.value)}
+              />
+            </div>
+          </div>
 
           <div className="space-y-1.5">
             <Label htmlFor="desc">Descripción (opcional)</Label>

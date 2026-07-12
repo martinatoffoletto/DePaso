@@ -150,7 +150,7 @@ export interface AdminActivity {
    Organizations (pymes B2B) — espejo de organizations/schemas.py
 --------------------------------------------------------------------------- */
 
-export type OrgKind = "fleet" | "merchant" | "both";
+export type OrgKind = "fleet" | "merchant";
 export type OrgRole = "owner" | "manager";
 
 // organizations/schemas.py :: OrganizationResponse / MyOrganizationResponse
@@ -225,6 +225,8 @@ export interface OrgShipmentCreate {
   weight_kg: number;
   photo_url?: string | null;
   description?: string | null;
+  recipient_name?: string | null;
+  recipient_phone?: string | null;
 }
 
 // organizations/schemas.py :: OrgDashboardResponse

@@ -19,7 +19,6 @@ import type { MyOrganization, OrgKind } from "@/types";
 const KIND_OPTIONS: { value: OrgKind; label: string; hint: string }[] = [
   { value: "merchant", label: "Comercio", hint: "Usás DePaso para tus envíos" },
   { value: "fleet", label: "Flota", hint: "Tenés transportistas propios" },
-  { value: "both", label: "Ambos", hint: "Flota propia y envíos" },
 ];
 
 /** Onboarding: crea una organización y el usuario queda como owner. */

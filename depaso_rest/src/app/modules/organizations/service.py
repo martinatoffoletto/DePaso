@@ -1,7 +1,7 @@
 """
 Organizations module service — B2B pyme business logic.
 
-Two organization types (a single org may be `both`):
+Two organization types (mutuamente excluyentes):
   - fleet:    manages linking/unlinking of its carriers (never deletes them).
   - merchant: creates/schedules shipments reusing shipments.service (no logic
               duplication) — every shipment is stamped with organization_id.
@@ -35,8 +35,8 @@ ACTIVE_STATUSES = {
     ShipmentStatus.IN_TRANSIT,
 }
 
-_FLEET_KINDS = {OrganizationKind.FLEET, OrganizationKind.BOTH}
-_MERCHANT_KINDS = {OrganizationKind.MERCHANT, OrganizationKind.BOTH}
+_FLEET_KINDS = {OrganizationKind.FLEET}
+_MERCHANT_KINDS = {OrganizationKind.MERCHANT}
 
 
 class OrganizationService:
@@ -164,6 +164,10 @@ class OrganizationService:
         active_carrier_ids = await self.org_repo.active_carrier_ids(org.id)
         earned_shipments = await self.shipment_repo.list_delivered_by_carriers(active_carrier_ids)
 
+        # Un envío cancelado se reintegra: contarlo como "dinero puesto"
+        # inflaba el gasto con plata que volvió.
+        spent_shipments = [s for s in shipments if s.status != ShipmentStatus.CANCELLED]
+
         return {
             "organization_id": org.id,
             "kind": org.kind,
@@ -172,7 +176,7 @@ class OrganizationService:
             "shipments_active": sum(1 for s in shipments if s.status in ACTIVE_STATUSES),
             "shipments_pending": sum(1 for s in shipments if s.status == ShipmentStatus.PENDING),
             "shipments_delivered": sum(1 for s in shipments if s.status == ShipmentStatus.DELIVERED),
-            "total_spent": round(sum(s.estimated_price or 0.0 for s in shipments), 2),
+            "total_spent": round(sum(s.estimated_price or 0.0 for s in spent_shipments), 2),
             # Earned by the fleet is net of the platform commission (payout).
             "total_earned": round(sum(pricing.carrier_payout(s.estimated_price or 0.0) for s in earned_shipments), 2),
             "total_co2_saved_kg": round(
@@ -189,7 +193,9 @@ class OrganizationService:
         Spent is keyed by shipment creation month; earned by delivery month
         (updated_at of the delivered shipment).
         """
-        spent_shipments = await self.shipment_repo.list_all_by_organization(org.id)
+        all_shipments = await self.shipment_repo.list_all_by_organization(org.id)
+        # Cancelado = reintegrado: no es dinero puesto.
+        spent_shipments = [s for s in all_shipments if s.status != ShipmentStatus.CANCELLED]
         active_carrier_ids = await self.org_repo.active_carrier_ids(org.id)
         earned_shipments = await self.shipment_repo.list_delivered_by_carriers(active_carrier_ids)
 

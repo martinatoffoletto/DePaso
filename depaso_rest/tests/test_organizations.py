@@ -96,3 +96,54 @@ def test_duplicate_cuit_conflicts(client: TestClient, db):
     assert _make_org(client, ha, "30-73333333-3").status_code == 201
     hb = _register(client, "dup_b@example.com")
     assert _make_org(client, hb, "30-73333333-3").status_code == 409
+
+
+def test_org_kind_both_removed(client: TestClient, db):
+    """El tipo 'both' se eliminó: una organización es flota O comercio."""
+    h = _register(client, "bothkind@example.com")
+    res = _make_org(client, h, "30-71234567-8", kind="both")
+    assert res.status_code == 422, res.text
+
+
+def test_cancelled_shipments_not_counted_as_spent(client: TestClient, db):
+    """Un envío cancelado se reintegra: no es 'dinero puesto' (dashboard y finanzas)."""
+    h = _register(client, "spender@example.com")
+    _make_org(client, h, "30-71234567-8", kind="merchant")
+
+    kept = client.post("/api/v1/organizations/me/shipments", json=SHIP, headers=h)
+    assert kept.status_code == 201, kept.text
+    cancelled = client.post("/api/v1/organizations/me/shipments", json=SHIP, headers=h)
+    assert cancelled.status_code == 201, cancelled.text
+    res = client.post(f"/api/v1/shipments/{cancelled.json()['id']}/cancel", headers=h)
+    assert res.status_code == 200, res.text
+
+    dash = client.get("/api/v1/organizations/me/dashboard", headers=h).json()
+    assert dash["shipments_total"] == 2
+    assert dash["total_spent"] == kept.json()["estimated_price"]
+
+    fin = client.get("/api/v1/organizations/me/finance", headers=h).json()
+    assert fin["spent"]["total"] == kept.json()["estimated_price"]
+
+
+def test_org_shipment_carries_recipient_contact(client: TestClient, db):
+    """El carrier necesita a quién llamar en destino: la pyme puede cargarlo."""
+    h = _register(client, "recipient_org@example.com")
+    _make_org(client, h, "30-71234567-8", kind="merchant")
+    res = client.post("/api/v1/organizations/me/shipments", json={
+        **SHIP, "recipient_name": "Depósito Central", "recipient_phone": "11-4444-5555",
+    }, headers=h)
+    assert res.status_code == 201, res.text
+    sid = res.json()["id"]
+    detail = client.get(f"/api/v1/shipments/{sid}", headers=h).json()
+    assert detail["recipient_name"] == "Depósito Central"
+    assert detail["recipient_phone"] == "11-4444-5555"
+
+
+def test_no_org_membership_uses_error_envelope(client: TestClient, db):
+    """El 403 'sin organización' sale por el handler global con code (el
+    front lo usa para mostrar el onboarding de crear organización)."""
+    h = _register(client, "orgless@example.com")
+    res = client.get("/api/v1/organizations/me", headers=h)
+    assert res.status_code == 403, res.text
+    body = res.json()
+    assert body["code"] == "NOT_ORG_MEMBER"

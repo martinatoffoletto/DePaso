@@ -62,6 +62,8 @@ eggs/
 .eggs/
 lib/
 lib64/
+# lib/ (build de Python) se comía depaso_web/src/lib — código fuente real
+!depaso_web/src/lib/
 parts/
 sdist/
 var/

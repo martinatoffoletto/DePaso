@@ -53,8 +53,8 @@ function formatMonthLabel(ym: string): string {
 }
 
 function FinanceInner({ org }: { org: MyOrganization }) {
-  const isFleet = org.kind === "fleet" || org.kind === "both";
-  const isMerchant = org.kind === "merchant" || org.kind === "both";
+  const isFleet = org.kind === "fleet";
+  const isMerchant = org.kind === "merchant";
 
   const { data, isLoading, isError, error, refetch } = useQuery({
     queryKey: ["org", "finance"],
@@ -62,8 +62,6 @@ function FinanceInner({ org }: { org: MyOrganization }) {
   });
 
   const rows = useMemo(() => (data ? mergeSeries(data) : []), [data]);
-  const balance =
-    data != null ? data.earned.total - data.spent.total : null;
 
   return (
     <div>
@@ -94,16 +92,6 @@ function FinanceInner({ org }: { org: MyOrganization }) {
                 hint="acumulado por la flota"
                 icon={TrendingUp}
                 tone="emerald"
-                loading={isLoading}
-              />
-            )}
-            {org.kind === "both" && (
-              <StatCard
-                label="Balance"
-                value={formatMoney(balance)}
-                hint={balance != null && balance >= 0 ? "a favor" : "en contra"}
-                icon={Wallet}
-                tone={balance != null && balance >= 0 ? "emerald" : "amber"}
                 loading={isLoading}
               />
             )}
