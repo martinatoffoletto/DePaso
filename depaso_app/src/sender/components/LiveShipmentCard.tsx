@@ -26,7 +26,7 @@ export function LiveShipmentCard({ shipment, onPress }: { shipment: Shipment; on
         <View className="flex-row items-center justify-between mb-[10px]">
           <View className="flex-row items-center gap-[6px] bg-forest px-[9px] py-[5px] rounded-lg">
             <View className="w-2 h-2 rounded-full bg-lime" />
-            <Text className="text-[9.5px] tracking-[1.2px] font-bold text-lime uppercase">EN CURSO</Text>
+            <Text className="text-[9.5px] tracking-[1.2px] font-bold text-lime uppercase" style={{ color: "#A3E635" }}>EN CURSO</Text>
           </View>
           <View className="flex-row items-center gap-2">
             <View className="flex-row items-center gap-[5px] bg-cardSoft border border-border px-2 py-[5px] rounded-lg">

@@ -44,15 +44,15 @@ export function OnboardingOverlay() {
     <Modal visible transparent animationType="fade" onRequestClose={finish}>
       <View className="flex-1 bg-forest px-6" style={{ paddingTop: insets.top + 40, paddingBottom: insets.bottom + 24 }}>
         <TouchableOpacity className="self-end" onPress={finish} hitSlop={12}>
-          <Text className="text-[13px] text-[#F4EFE3]/70 font-semibold">Saltar</Text>
+          <Text className="text-[13px] text-[#F4EFE3]/70 font-semibold" style={{ color: "rgba(244,239,227,0.70)" }}>Saltar</Text>
         </TouchableOpacity>
 
         <View className="flex-1 justify-center items-center gap-5">
           <View className="w-20 h-20 rounded-3xl bg-lime/15 border border-lime/30 items-center justify-center">
             <MaterialCommunityIcons name={current.icon} size={40} color={T.lime} />
           </View>
-          <Text className="text-[26px] font-extrabold text-[#F4EFE3] text-center tracking-[-0.6px]">{current.title}</Text>
-          <Text className="text-[15px] text-[#F4EFE3]/75 text-center leading-[22px] px-2">{current.body}</Text>
+          <Text className="text-[26px] font-extrabold text-[#F4EFE3] text-center tracking-[-0.6px]" style={{ color: "#F4EFE3" }}>{current.title}</Text>
+          <Text className="text-[15px] text-[#F4EFE3]/75 text-center leading-[22px] px-2" style={{ color: "rgba(244,239,227,0.75)" }}>{current.body}</Text>
         </View>
 
         {/* Dots */}

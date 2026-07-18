@@ -76,7 +76,7 @@ export function ActiveJobPanel({ shipment, advancing, onAdvance, onCancel }: {
               activeOpacity={0.85}
             >
               <MaterialCommunityIcons name="phone" size={12} color="#F4EFE3" />
-              <Text className="text-[11px] text-[#F4EFE3] font-semibold">Llamar</Text>
+              <Text className="text-[11px] text-[#F4EFE3] font-semibold" style={{ color: "#F4EFE3" }}>Llamar</Text>
             </TouchableOpacity>
           )}
         </View>
@@ -93,7 +93,7 @@ export function ActiveJobPanel({ shipment, advancing, onAdvance, onCancel }: {
             ? <ActivityIndicator color="#F4EFE3" size="small" />
             : <>
                 <MaterialCommunityIcons name={action.icon} size={16} color="#F4EFE3" />
-                <Text className="text-[#F4EFE3] font-bold text-[13.5px]">{action.label}</Text>
+                <Text className="text-[#F4EFE3] font-bold text-[13.5px]" style={{ color: "#F4EFE3" }}>{action.label}</Text>
               </>}
         </TouchableOpacity>
       )}

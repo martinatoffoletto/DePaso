@@ -77,8 +77,8 @@ export default function CarrierShipmentsScreen() {
       {/* ── Forest hero with stats ── */}
       <View className="bg-forest px-5 pt-3 pb-[18px]">
         <View className="mb-4">
-          <Text className="text-[9.5px] tracking-[2.5px] text-[#F4EFE3]/80 uppercase font-bold">MIS VIAJES</Text>
-          <Text className="text-[26px] font-extrabold text-[#F4EFE3] tracking-[-0.8px] mt-[3px]">Historial</Text>
+          <Text className="text-[9.5px] tracking-[2.5px] text-[#F4EFE3]/80 uppercase font-bold" style={{ color: "rgba(244,239,227,0.80)" }}>MIS VIAJES</Text>
+          <Text className="text-[26px] font-extrabold text-[#F4EFE3] tracking-[-0.8px] mt-[3px]" style={{ color: "#F4EFE3" }}>Historial</Text>
         </View>
 
         {summary && (
@@ -91,8 +91,8 @@ export default function CarrierShipmentsScreen() {
             ].map((it, i) => (
               <View key={i} className="flex-1 bg-[#F4EFE3]/[0.08] rounded-[14px] p-[10px] items-center gap-1 border border-[#F4EFE3]/10">
                 <MaterialCommunityIcons name={it.icon} size={14} color="rgba(244,239,227,0.8)" />
-                <Text className="text-sm font-extrabold text-[#F4EFE3] tracking-[-0.4px]">{it.value}</Text>
-                <Text className="text-[8.5px] tracking-[0.5px] text-[#F4EFE3]/75 uppercase text-center">{it.label}</Text>
+                <Text className="text-sm font-extrabold text-[#F4EFE3] tracking-[-0.4px]" style={{ color: "#F4EFE3" }}>{it.value}</Text>
+                <Text className="text-[8.5px] tracking-[0.5px] text-[#F4EFE3]/75 uppercase text-center" style={{ color: "rgba(244,239,227,0.75)" }}>{it.label}</Text>
               </View>
             ))}
           </View>

@@ -86,7 +86,7 @@ export function ContactModal({ visible, onClose }: { visible: boolean; onClose: 
                   <Text className="text-sm font-semibold text-inkSoft">Cancelar</Text>
                 </TouchableOpacity>
                 <TouchableOpacity className="flex-1 flex-row justify-center items-center bg-forest rounded-xl py-[13px]" onPress={save} activeOpacity={0.8}>
-                  <Text className="text-sm font-bold text-[#F4EFE3]">Guardar</Text>
+                  <Text className="text-sm font-bold text-[#F4EFE3]" style={{ color: "#F4EFE3" }}>Guardar</Text>
                 </TouchableOpacity>
               </View>
             </View>

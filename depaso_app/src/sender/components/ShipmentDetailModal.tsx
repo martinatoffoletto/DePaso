@@ -356,7 +356,7 @@ export function ShipmentDetailModal({ shipment, onClose, onCancel, onPaid }: { s
                 ? <ActivityIndicator size="small" color={T.lime} />
                 : <>
                     <MaterialCommunityIcons name="credit-card-check-outline" size={18} color="#F4EFE3" />
-                    <Text className="text-sm font-semibold text-[#F4EFE3]">Pagar (simulado)</Text>
+                    <Text className="text-sm font-semibold text-[#F4EFE3]" style={{ color: "#F4EFE3" }}>Pagar (simulado)</Text>
                   </>
               }
             </TouchableOpacity>

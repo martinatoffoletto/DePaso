@@ -73,7 +73,7 @@ export function EditProfileModal({ visible, onClose }: { visible: boolean; onClo
             disabled={saving}
             activeOpacity={0.88}
           >
-            {saving ? <ActivityIndicator color="#F4EFE3" /> : <Text className="text-[#F4EFE3] font-bold text-[16px]">Guardar cambios</Text>}
+            {saving ? <ActivityIndicator color="#F4EFE3" /> : <Text className="text-[#F4EFE3] font-bold text-[16px]" style={{ color: "#F4EFE3" }}>Guardar cambios</Text>}
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>

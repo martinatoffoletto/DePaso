@@ -43,7 +43,7 @@ export function Toast() {
         style={{ backgroundColor: s.bg, shadowColor: "#000", shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.25, shadowRadius: 16, elevation: 8 }}
       >
         <MaterialCommunityIcons name={s.icon} size={18} color="#fff" />
-        <Text className="flex-1 text-[13px] text-white font-semibold">{message}</Text>
+        <Text className="flex-1 text-[13px] text-white font-semibold" style={{ color: "#FFFFFF" }}>{message}</Text>
       </TouchableOpacity>
     </Animated.View>
   );

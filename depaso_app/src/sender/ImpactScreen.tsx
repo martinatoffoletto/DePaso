@@ -69,27 +69,27 @@ export default function ImpactScreen() {
       <View className="m-4 mt-[14px] rounded-3xl bg-forest p-[22px] overflow-hidden">
         <View className="flex-row items-center gap-[5px] self-start bg-lime/15 border border-lime/30 px-2 py-[3px] rounded-md">
           <MaterialCommunityIcons name="leaf" size={12} color={T.lime} />
-          <Text className="text-[9px] tracking-[1.2px] text-lime font-bold">CO₂ EVITADO CON TUS ENVÍOS</Text>
+          <Text className="text-[9px] tracking-[1.2px] text-lime font-bold" style={{ color: "#A3E635" }}>CO₂ EVITADO CON TUS ENVÍOS</Text>
         </View>
-        <Text className="text-5xl font-extrabold text-[#F4EFE3] tracking-[-1.5px] mt-3">
-          {kg.toFixed(2)}<Text className="text-xl font-medium text-[#F4EFE3]/70"> kg</Text>
+        <Text className="text-5xl font-extrabold text-[#F4EFE3] tracking-[-1.5px] mt-3" style={{ color: "#F4EFE3" }}>
+          {kg.toFixed(2)}<Text className="text-xl font-medium text-[#F4EFE3]/70" style={{ color: "rgba(244,239,227,0.70)" }}> kg</Text>
         </Text>
-        <Text className="text-[12.5px] leading-[18px] text-[#F4EFE3]/70 mt-[6px]">
+        <Text className="text-[12.5px] leading-[18px] text-[#F4EFE3]/70 mt-[6px]" style={{ color: "rgba(244,239,227,0.70)" }}>
           Cada envío colaborativo aprovecha un viaje que ya iba a hacerse,
           en lugar de generar un viaje dedicado nuevo.
         </Text>
         <View className="flex-row mt-5">
           <View className="flex-1 border-r border-[#F4EFE3]/[0.12] pr-[10px] mr-[14px]">
-            <Text className="text-xl font-bold text-[#F4EFE3] tracking-[-0.5px]">{impact?.shipments_delivered ?? 0}</Text>
-            <Text className="text-[9px] tracking-[1.3px] text-[#F4EFE3]/80 mt-[2px]">ENTREGADOS</Text>
+            <Text className="text-xl font-bold text-[#F4EFE3] tracking-[-0.5px]" style={{ color: "#F4EFE3" }}>{impact?.shipments_delivered ?? 0}</Text>
+            <Text className="text-[9px] tracking-[1.3px] text-[#F4EFE3]/80 mt-[2px]" style={{ color: "rgba(244,239,227,0.80)" }}>ENTREGADOS</Text>
           </View>
           <View className="flex-1 border-r border-[#F4EFE3]/[0.12] pr-[10px] mr-[14px]">
-            <Text className="text-xl font-bold text-[#F4EFE3] tracking-[-0.5px]">{impact?.shipments_collaborative ?? 0}</Text>
-            <Text className="text-[9px] tracking-[1.3px] text-[#F4EFE3]/80 mt-[2px]">COLABORATIVOS</Text>
+            <Text className="text-xl font-bold text-[#F4EFE3] tracking-[-0.5px]" style={{ color: "#F4EFE3" }}>{impact?.shipments_collaborative ?? 0}</Text>
+            <Text className="text-[9px] tracking-[1.3px] text-[#F4EFE3]/80 mt-[2px]" style={{ color: "rgba(244,239,227,0.80)" }}>COLABORATIVOS</Text>
           </View>
           <View className="flex-1">
-            <Text className="text-xl font-bold text-lime tracking-[-0.5px]">{(collaborativeShare * 100).toFixed(0)}%</Text>
-            <Text className="text-[9px] tracking-[1.3px] text-[#F4EFE3]/80 mt-[2px]">ECO</Text>
+            <Text className="text-xl font-bold text-lime tracking-[-0.5px]" style={{ color: "#A3E635" }}>{(collaborativeShare * 100).toFixed(0)}%</Text>
+            <Text className="text-[9px] tracking-[1.3px] text-[#F4EFE3]/80 mt-[2px]" style={{ color: "rgba(244,239,227,0.80)" }}>ECO</Text>
           </View>
         </View>
       </View>

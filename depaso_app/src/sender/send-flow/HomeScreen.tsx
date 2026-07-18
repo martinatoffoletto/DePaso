@@ -7,7 +7,7 @@ import * as ImagePicker from "expo-image-picker";
 import { useAuthStore } from "@/src/shared/session/authStore";
 import { co2Service } from "@/src/shared/api/co2";
 import type { ClientImpact } from "@/src/shared/types";
-import { ForestHeroCard, HeroStatsRow, HeroStat } from "@/src/shared/ui/ForestHeroCard";
+import { ForestHeroCard, HeroStatsRow, HeroStat, HeroStatUnit } from "@/src/shared/ui/ForestHeroCard";
 import { ScanCorners } from "@/src/sender/components/ScanCorners";
 import { T } from "@/constants/tokens";
 
@@ -98,10 +98,10 @@ export function HomeScreen({ onStart }: HomeScreenProps) {
           <HeroStat value={impact != null ? String(impact.shipments_delivered) : "—"} label="ENVÍOS" divider />
           <HeroStat
             value={impact != null
-              ? <>{impact.total_co2_saved_kg.toFixed(1)}<Text className="text-xs font-normal text-[#F4EFE3]">kg</Text></>
+              ? <>{impact.total_co2_saved_kg.toFixed(1)}<HeroStatUnit>kg</HeroStatUnit></>
               : "—"}
             label="CO₂ AHORRADO"
-            valueClassName="text-lime"
+            valueColor={T.lime}
             divider
           />
           <HeroStat value={user ? user.rating.toFixed(1) : "—"} label="REPUTACIÓN" />

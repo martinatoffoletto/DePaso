@@ -192,7 +192,7 @@ export function RouteOfferScreen({ origin, destination, originCoords, destinatio
                 <MaterialCommunityIcons name="wifi-off" size={15} color={T.red} />
                 <Text className="flex-1 text-[12px] text-red font-medium">No pudimos calcular el precio.</Text>
                 <TouchableOpacity onPress={() => setRetryTick(t => t + 1)} className="bg-red rounded-lg px-3 py-[6px]" activeOpacity={0.85}>
-                  <Text className="text-[11px] text-white font-bold">Reintentar</Text>
+                  <Text className="text-[11px] text-white font-bold" style={{ color: "#FFFFFF" }}>Reintentar</Text>
                 </TouchableOpacity>
               </View>
             )}
@@ -293,7 +293,7 @@ export function RouteOfferScreen({ origin, destination, originCoords, destinatio
           onPress={() => onNext(mode, quote)}
           activeOpacity={0.88}
         >
-          <Text className="text-[#F4EFE3] font-semibold text-[15px]">Continuar · Resumen</Text>
+          <Text className="text-[#F4EFE3] font-semibold text-[15px]" style={{ color: "#F4EFE3" }}>Continuar · Resumen</Text>
           <MaterialCommunityIcons name="arrow-right" size={18} color="#F4EFE3" />
         </TouchableOpacity>
       </View>

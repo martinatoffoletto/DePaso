@@ -83,7 +83,7 @@ export function PastShipmentCard({ item, onPress, onRate }: { item: Shipment; on
         {isDelivered && (
           <TouchableOpacity className="flex-row items-center gap-[5px] bg-forest px-[10px] py-[6px] rounded-lg" activeOpacity={0.85} onPress={onRate}>
             <MaterialCommunityIcons name="star-outline" size={11} color={T.lime} />
-            <Text className="text-[11.5px] font-semibold text-[#F4EFE3]">Calificar</Text>
+            <Text className="text-[11.5px] font-semibold text-[#F4EFE3]" style={{ color: "#F4EFE3" }}>Calificar</Text>
           </TouchableOpacity>
         )}
         {isCancelled && (

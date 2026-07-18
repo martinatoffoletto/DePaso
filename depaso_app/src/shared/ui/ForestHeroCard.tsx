@@ -1,9 +1,12 @@
-import { View } from "react-native";
-import { Text } from "react-native-paper";
+import { View, Text } from "react-native";
 
 /**
  * Card verde "hero" con las franjas diagonales decorativas (la "ruta").
  * La usan el home del sender y el perfil; el contenido lo pone cada pantalla.
+ *
+ * Importante: acá se usa Text de react-native (no react-native-paper) con
+ * colores por style — el Text de paper aplica el color oscuro de su tema y
+ * pisa los colores por className, dejando el texto ilegible sobre verde.
  */
 export function ForestHeroCard({
   stripes = "bottom",
@@ -53,28 +56,43 @@ export function HeroStat({
   value,
   label,
   divider = false,
-  valueClassName = "text-[#F4EFE3]",
+  valueColor = "#F4EFE3",
   trailing,
 }: {
   value: React.ReactNode;
   label: string;
   divider?: boolean;
-  /** Color del valor (ej. text-lime para CO₂). */
-  valueClassName?: string;
+  /** Color del valor (ej. T.lime para CO₂). */
+  valueColor?: string;
   /** Elemento a la derecha del valor (ej. estrellita de reputación). */
   trailing?: React.ReactNode;
 }) {
+  const valueText = (
+    <Text className="text-[22px] font-bold tracking-[-0.5px]" style={{ color: valueColor }}>
+      {value}
+    </Text>
+  );
   return (
-    <View className={`flex-1 ${divider ? "border-r border-[#F4EFE3]/[0.12] pr-[10px] mr-[14px]" : ""}`}>
+    <View
+      className={`flex-1 ${divider ? "pr-[10px] mr-[14px]" : ""}`}
+      style={divider ? { borderRightWidth: 1, borderRightColor: "rgba(244,239,227,0.12)" } : undefined}
+    >
       {trailing ? (
         <View className="flex-row items-center gap-1">
-          <Text className={`text-[22px] font-bold tracking-[-0.5px] ${valueClassName}`}>{value}</Text>
+          {valueText}
           {trailing}
         </View>
       ) : (
-        <Text className={`text-[22px] font-bold tracking-[-0.5px] ${valueClassName}`}>{value}</Text>
+        valueText
       )}
-      <Text className="text-[9px] tracking-[1.5px] text-[#F4EFE3]/80 uppercase mt-[2px]">{label}</Text>
+      <Text className="text-[9px] tracking-[1.5px] uppercase mt-[2px]" style={{ color: "rgba(244,239,227,0.8)" }}>
+        {label}
+      </Text>
     </View>
   );
+}
+
+/** Sufijo de unidad dentro del valor de un HeroStat (ej. "kg"). */
+export function HeroStatUnit({ children }: { children: React.ReactNode }) {
+  return <Text className="text-xs font-normal" style={{ color: "#F4EFE3" }}>{children}</Text>;
 }

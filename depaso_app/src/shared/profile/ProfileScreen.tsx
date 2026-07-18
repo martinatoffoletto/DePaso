@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { View, TouchableOpacity, ScrollView, Alert } from "react-native";
+import { View, TouchableOpacity, ScrollView, Alert, Text as RNText } from "react-native";
 import { Text } from "react-native-paper";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
@@ -12,7 +12,7 @@ import { co2Service } from "@/src/shared/api/co2";
 import { carriersService } from "@/src/shared/api/carriers";
 import { UserType } from "@/src/shared/types";
 import PublishTripScreen from "@/src/carrier/PublishTripScreen";
-import { ForestHeroCard, HeroStatsRow, HeroStat } from "@/src/shared/ui/ForestHeroCard";
+import { ForestHeroCard, HeroStatsRow, HeroStat, HeroStatUnit } from "@/src/shared/ui/ForestHeroCard";
 import { ProfileRow, ProfileSection } from "./components/ProfileRow";
 import { AddressModal } from "./components/AddressModal";
 import { ContactModal } from "./components/ContactModal";
@@ -101,26 +101,26 @@ export default function ProfileScreen() {
               className="w-16 h-16 rounded-[20px] bg-lime items-center justify-center"
               style={{ shadowColor: "#000", shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.3, shadowRadius: 16, elevation: 4 }}
             >
-              <Text className="text-[26px] font-extrabold text-forest tracking-[-0.5px]">{initials}</Text>
+              <RNText className="text-[26px] font-extrabold tracking-[-0.5px]" style={{ color: T.forest }}>{initials}</RNText>
             </View>
             <View className="flex-1">
-              <Text className="text-[22px] font-bold text-white tracking-[-0.6px] leading-6">{fullName}</Text>
-              <Text className="text-[12.5px] text-[#F4EFE3]/70 mt-1">{email}</Text>
+              <RNText className="text-[22px] font-bold tracking-[-0.6px] leading-6" style={{ color: "#FFFFFF" }}>{fullName}</RNText>
+              <RNText className="text-[12.5px] mt-1" style={{ color: "rgba(244,239,227,0.7)" }}>{email}</RNText>
               <View className="flex-row items-center gap-[6px] mt-[6px]">
                 <View className="flex-row items-center gap-[3px] bg-lime/15 border border-lime/30 px-[7px] py-[2px] rounded-md">
                   <MaterialCommunityIcons name="leaf" size={10} color={T.lime} />
-                  <Text className="text-[9px] tracking-[1px] text-lime font-bold uppercase">ECO · NIVEL {ecoLevel}</Text>
+                  <RNText className="text-[9px] tracking-[1px] font-bold uppercase" style={{ color: T.lime }}>ECO · NIVEL {ecoLevel}</RNText>
                 </View>
-                {memberSince && <Text className="text-[9px] tracking-[1px] text-[#F4EFE3]/75 uppercase">DESDE {memberSince}</Text>}
+                {memberSince && <RNText className="text-[9px] tracking-[1px] uppercase" style={{ color: "rgba(244,239,227,0.75)" }}>DESDE {memberSince}</RNText>}
               </View>
             </View>
           </View>
           <HeroStatsRow className="mt-[22px]">
             <HeroStat value={stats.shipments} label="ENVÍOS" divider />
             <HeroStat
-              value={<>{stats.co2}<Text className="text-xs font-normal text-[#F4EFE3]">kg</Text></>}
+              value={<>{stats.co2}<HeroStatUnit>kg</HeroStatUnit></>}
               label="CO₂ AHORRADO"
-              valueClassName="text-lime"
+              valueColor={T.lime}
               divider
             />
             <HeroStat

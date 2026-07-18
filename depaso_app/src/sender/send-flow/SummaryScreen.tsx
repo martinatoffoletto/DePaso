@@ -289,7 +289,7 @@ export function SummaryScreen({
             ? <ActivityIndicator color="#fff" />
             : <>
                 <MaterialCommunityIcons name="check-circle-outline" size={22} color="#fff" />
-                <Text className="text-[#F4EFE3] font-bold text-[17px]">Confirmar envío</Text>
+                <Text className="text-[#F4EFE3] font-bold text-[17px]" style={{ color: "#F4EFE3" }}>Confirmar envío</Text>
               </>
           }
         </TouchableOpacity>
@@ -346,7 +346,7 @@ export function SummaryScreen({
                 ? <ActivityIndicator color="#fff" />
                 : <>
                     <MaterialCommunityIcons name="credit-card-check-outline" size={20} color="#fff" />
-                    <Text className="text-[#F4EFE3] font-bold text-[16px]">Pagar (simulado)</Text>
+                    <Text className="text-[#F4EFE3] font-bold text-[16px]" style={{ color: "#F4EFE3" }}>Pagar (simulado)</Text>
                   </>
               }
             </TouchableOpacity>

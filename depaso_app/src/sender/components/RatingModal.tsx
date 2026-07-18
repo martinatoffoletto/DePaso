@@ -50,7 +50,7 @@ export function RatingModal({ shipment, onClose, onRated }: { shipment: Shipment
           >
             {sending
               ? <ActivityIndicator color={T.lime} />
-              : <Text className="text-[#F4EFE3] font-semibold text-[15px]">Enviar calificación</Text>}
+              : <Text className="text-[#F4EFE3] font-semibold text-[15px]" style={{ color: "#F4EFE3" }}>Enviar calificación</Text>}
           </TouchableOpacity>
           <TouchableOpacity onPress={onClose} className="items-center py-1">
             <Text className="text-inkMute text-[13px]">Ahora no</Text>

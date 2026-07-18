@@ -14,7 +14,7 @@ export function OfflineBanner() {
     <View className="bg-red" style={{ paddingTop: insets.top }}>
       <View className="flex-row items-center justify-center gap-2 py-[6px] px-4">
         <MaterialCommunityIcons name="wifi-off" size={13} color="#fff" />
-        <Text className="text-[11px] text-white font-semibold tracking-[0.3px]">
+        <Text className="text-[11px] text-white font-semibold tracking-[0.3px]" style={{ color: "#FFFFFF" }}>
           Sin conexión — reintentando…
         </Text>
       </View>

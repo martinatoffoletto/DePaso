@@ -78,7 +78,7 @@ export function ChangePasswordModal({ visible, onClose }: { visible: boolean; on
             disabled={saving}
             activeOpacity={0.88}
           >
-            {saving ? <ActivityIndicator color="#F4EFE3" /> : <Text className="text-[#F4EFE3] font-bold text-[16px]">Actualizar</Text>}
+            {saving ? <ActivityIndicator color="#F4EFE3" /> : <Text className="text-[#F4EFE3] font-bold text-[16px]" style={{ color: "#F4EFE3" }}>Actualizar</Text>}
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>

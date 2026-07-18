@@ -237,7 +237,7 @@ export function DimensioningModal({ photoUri, onClose, onResult }: Props) {
             activeOpacity={0.88}
           >
             <MaterialCommunityIcons name="check-circle-outline" size={20} color="#fff" />
-            <Text className="text-[#F4EFE3] font-bold text-[16px]">Usar esta estimación</Text>
+            <Text className="text-[#F4EFE3] font-bold text-[16px]" style={{ color: "#F4EFE3" }}>Usar esta estimación</Text>
           </TouchableOpacity>
         </View>
       </View>
