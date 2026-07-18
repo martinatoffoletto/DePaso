@@ -9,7 +9,7 @@
 
 | Pieza | Tecnología |
 |---|---|
-| **Backend** (`depaso_rest`) | Python 3.12 + FastAPI + Pydantic v2 + SQLAlchemy 2 + Alembic · PostgreSQL (prod) / SQLite (dev y tests) · JWT access+refresh con argon2 · slowapi · structlog |
+| **Backend** (`depaso_rest`) | Python 3.12 + FastAPI + Pydantic v2 + SQLAlchemy 2 · PostgreSQL (prod) / SQLite (dev y tests) · JWT access+refresh con argon2 · slowapi · structlog |
 | **App móvil** (`depaso_app`) | Expo SDK 54 + expo-router 6 + React Native 0.81 + React 19 · NativeWind 4 (tokens cream/forest/lime) · zustand + TanStack Query v5 · Reanimated 4 |
 | **Panel web** (`depaso_web`) | Vite + React 19 + TypeScript + Tailwind 4 + shadcn/ui · TanStack Query v5 + react-router-dom + axios · Recharts |
 | **IA/ML** | TensorFlow/Keras · MobileNetV2 transfer learning, dual input (imagen 224×224 + flag objeto de referencia) · entrenamiento en Google Colab |
@@ -130,7 +130,7 @@ El código del pipeline ya existe y está corregido. Lo único que falta es **da
 **Sí conviene mantener Docker**: es lo que hace la app portable y es lo que Render consume. `docker-compose.yml` sigue siendo el entorno dev local con Postgres.
 
 ### Pasos concretos del deploy (cuando A/C/E estén cerrados)
-1. Supabase: crear proyecto → copiar `DATABASE_URL` → `alembic upgrade head` contra esa DB → correr seed.
+1. Supabase: crear proyecto → copiar `DATABASE_URL` → el esquema se crea solo al arrancar la API (`create_all()`) → correr seed.
 2. Render: New → Blueprint → apuntar al repo (`render.yaml`). Env: `DATABASE_URL`, `JWT_SECRET_KEY` (se autogenera), `VISION_MODEL_PATH`. Verificar `GET /api/v1/health` → 200.
 3. Vercel: importar el repo, root directory `depaso_web`, build `npm run build`, env `VITE_API_URL` apuntando a Render.
 4. EAS: `eas login` → `eas build --profile preview --platform android` → APK para la defensa.

@@ -6,7 +6,7 @@ consumed by depaso_web. Keep field names/shapes in sync when they change.
 """
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
 CUIT_PATTERN = r"^\d{2}-?\d{8}-?\d$"
 KIND_PATTERN = r"^(fleet|merchant)$"
@@ -50,9 +50,10 @@ class MyOrganizationResponse(OrganizationResponse):
 # -- fleet: carriers --------------------------------------------------------
 
 class LinkCarrierRequest(BaseModel):
-    """Link an existing carrier to the fleet organization."""
+    """Link an existing carrier to the fleet organization, found by the email
+    they're registered with — the org never browses/lists other carriers."""
 
-    carrier_id: int
+    email: EmailStr
 
 
 class OrgCarrierResponse(BaseModel):

@@ -1,9 +1,7 @@
-import { useEffect, useState } from "react";
 import { View } from "react-native";
 import { Text } from "react-native-paper";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { PackageCategory, Shipment, ShipmentStatus } from "@/src/shared/types";
-import { reverseGeocode } from "@/src/shared/utils/geocoding";
 import { T } from "@/constants/tokens";
 
 /**
@@ -23,16 +21,7 @@ const STATUS_ORDER = [
 ];
 const STEP_LABELS = ["Asignado", "Retiro", "En viaje", "Entrega"];
 
-/** Reverse-geocodes coords to a human address, with the coords as a placeholder. */
-export function useAddress(lat: number, lon: number): string {
-  const [addr, setAddr] = useState(`${lat.toFixed(3)}, ${lon.toFixed(3)}`);
-  useEffect(() => {
-    let alive = true;
-    reverseGeocode(lat, lon).then(r => { if (alive) setAddr(r); });
-    return () => { alive = false; };
-  }, [lat, lon]);
-  return addr;
-}
+export { useAddress } from "@/src/shared/hooks/useAddress";
 
 export function timelineSteps(status: ShipmentStatus) {
   const idx = STATUS_ORDER.indexOf(status);
@@ -143,3 +132,11 @@ export function StatusTimeline({ steps, dotBase }: { steps: ReturnType<typeof ti
     </View>
   );
 }
+
+/** Estados que cuentan como "en curso" (comparten screen y detail modal). */
+export const ACTIVE_STATUSES = [
+  ShipmentStatus.PENDING,
+  ShipmentStatus.ASSIGNED,
+  ShipmentStatus.PICKUP_ARRIVED,
+  ShipmentStatus.IN_TRANSIT,
+];

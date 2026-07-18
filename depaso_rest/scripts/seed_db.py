@@ -17,9 +17,19 @@ from sqlalchemy.orm import sessionmaker
 from src.app.core.config import settings
 from src.app.core.security import get_password_hash
 from src.app.shared.base_model import Base
+from src.app.shared.enums import (
+    OrganizationCarrierStatus,
+    OrganizationKind,
+    OrganizationMemberRole,
+)
 from src.app.modules.users.models import User
 from src.app.modules.carriers.models import Carrier
 from src.app.modules.shipments.models import Shipment
+from src.app.modules.organizations.models import (
+    Organization,
+    OrganizationCarrier,
+    OrganizationMember,
+)
 
 
 def _seed_shipments(db, client_user, carriers):
@@ -117,6 +127,147 @@ def _seed_shipments(db, client_user, carriers):
     print(f"✅ {len(shipments)} envíos de historial creados para cliente@depaso.com")
 
 
+def _seed_organizations(db):
+    """Tres perfiles de organización para probar el panel web: pyme (merchant
+    genérica), fletero (fleet con carriers propios) y local/comercio (merchant)."""
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
+
+    pyme_user = User(
+        email="pyme@depaso.com",
+        password_hash=get_password_hash("password123"),
+        first_name="Rocio",
+        last_name="Aguirre",
+        phone_number="+541155550201",
+        user_type="client",
+        is_active=True,
+        rating=5.0,
+    )
+    fletero_user = User(
+        email="fletero@depaso.com",
+        password_hash=get_password_hash("password123"),
+        first_name="Nestor",
+        last_name="Ibanez",
+        phone_number="+541155550202",
+        user_type="client",
+        is_active=True,
+        rating=5.0,
+    )
+    local_user = User(
+        email="local@depaso.com",
+        password_hash=get_password_hash("password123"),
+        first_name="Marta",
+        last_name="Suarez",
+        phone_number="+541155550203",
+        user_type="client",
+        is_active=True,
+        rating=5.0,
+    )
+    db.add_all([pyme_user, fletero_user, local_user])
+    db.commit()
+    for u in (pyme_user, fletero_user, local_user):
+        db.refresh(u)
+
+    # Choferes propios de la flota del fletero (para que el panel de flota
+    # tenga carriers reales para linkear, no los independientes del resto del seed)
+    fleet_driver_1 = User(
+        email="fletero.chofer1@depaso.com",
+        password_hash=get_password_hash("password123"),
+        first_name="Ruben",
+        last_name="Paez",
+        phone_number="+541155550210",
+        user_type="carrier",
+        is_active=True,
+        rating=4.6,
+    )
+    fleet_driver_2 = User(
+        email="fletero.chofer2@depaso.com",
+        password_hash=get_password_hash("password123"),
+        first_name="Walter",
+        last_name="Bravo",
+        phone_number="+541155550211",
+        user_type="carrier",
+        is_active=True,
+        rating=4.5,
+    )
+    db.add_all([fleet_driver_1, fleet_driver_2])
+    db.commit()
+    for u in (fleet_driver_1, fleet_driver_2):
+        db.refresh(u)
+
+    fleet_carrier_1 = Carrier(
+        user_id=fleet_driver_1.id,
+        company_name="Fletes Rapidos - Camion 1",
+        vehicle_type="truck",
+        license_plate="H234WXY",
+        capacity_kg=1200.0,
+        capacity_volume_m3=10.0,
+        reputation=4.6,
+        is_active=True,
+        is_verified=True,
+        is_available=True,
+        current_lat=-34.6551,  # Avellaneda
+        current_lon=-58.3650,
+    )
+    fleet_carrier_2 = Carrier(
+        user_id=fleet_driver_2.id,
+        company_name="Fletes Rapidos - Camion 2",
+        vehicle_type="van",
+        license_plate="J567ZAB",
+        capacity_kg=600.0,
+        capacity_volume_m3=4.0,
+        reputation=4.5,
+        is_active=True,
+        is_verified=True,
+        is_available=True,
+        current_lat=-34.6252,  # San Telmo
+        current_lon=-58.3721,
+    )
+    db.add_all([fleet_carrier_1, fleet_carrier_2])
+    db.commit()
+    for c in (fleet_carrier_1, fleet_carrier_2):
+        db.refresh(c)
+
+    pyme_org = Organization(
+        name="Pyme Test SRL",
+        cuit="30-71234567-8",
+        kind=OrganizationKind.MERCHANT,
+        owner_user_id=pyme_user.id,
+    )
+    fletero_org = Organization(
+        name="Fletes Rapidos SRL",
+        cuit="30-71234568-6",
+        kind=OrganizationKind.FLEET,
+        owner_user_id=fletero_user.id,
+    )
+    local_org = Organization(
+        name="Almacen Don Jose",
+        cuit="30-71234569-4",
+        kind=OrganizationKind.MERCHANT,
+        owner_user_id=local_user.id,
+    )
+    db.add_all([pyme_org, fletero_org, local_org])
+    db.commit()
+    for o in (pyme_org, fletero_org, local_org):
+        db.refresh(o)
+
+    db.add_all([
+        OrganizationMember(org_id=pyme_org.id, user_id=pyme_user.id,
+                            role=OrganizationMemberRole.OWNER, joined_at=now),
+        OrganizationMember(org_id=fletero_org.id, user_id=fletero_user.id,
+                            role=OrganizationMemberRole.OWNER, joined_at=now),
+        OrganizationMember(org_id=local_org.id, user_id=local_user.id,
+                            role=OrganizationMemberRole.OWNER, joined_at=now),
+    ])
+    db.add_all([
+        OrganizationCarrier(org_id=fletero_org.id, carrier_id=fleet_carrier_1.id,
+                             status=OrganizationCarrierStatus.ACTIVE, linked_at=now),
+        OrganizationCarrier(org_id=fletero_org.id, carrier_id=fleet_carrier_2.id,
+                             status=OrganizationCarrierStatus.ACTIVE, linked_at=now),
+    ])
+    db.commit()
+    print("✅ 3 organizaciones creadas (pyme, fletero, local) + 2 carriers de flota")
+
+
 def seed():
     engine = create_engine(settings.database_url)
     Base.metadata.create_all(bind=engine)
@@ -127,6 +278,12 @@ def seed():
     try:
         has_users = db.query(User).count() > 0
         has_shipments = db.query(Shipment).count() > 0
+        has_orgs = db.query(Organization).count() > 0
+
+        if not has_orgs:
+            _seed_organizations(db)
+        else:
+            print("ℹ️  Organizaciones ya existentes, salteando.")
 
         if has_users and has_shipments:
             print("La base ya tiene datos completos. Salteando seed.")
@@ -142,6 +299,16 @@ def seed():
             _seed_shipments(db, client_user, carriers)
             return
         users = [
+            User(
+                email="admin@depaso.com",
+                password_hash=get_password_hash("password123"),
+                first_name="Admin",
+                last_name="DePaso",
+                phone_number="+541155550000",
+                user_type="admin",
+                is_active=True,
+                rating=5.0,
+            ),
             User(
                 email="cliente@depaso.com",
                 password_hash=get_password_hash("password123"),
@@ -233,7 +400,7 @@ def seed():
         # Coordenadas reales de distintos barrios/municipios de AMBA
         carriers = [
             Carrier(
-                user_id=users[1].id,  # Lucia
+                user_id=users[2].id,  # Lucia
                 company_name="Lucia Fernandez",
                 vehicle_type="motorcycle",
                 license_plate="A123BCD",
@@ -247,7 +414,7 @@ def seed():
                 current_lon=-58.4297,
             ),
             Carrier(
-                user_id=users[2].id,  # Marcos
+                user_id=users[3].id,  # Marcos
                 company_name="Marcos Envios",
                 vehicle_type="car",
                 license_plate="B456EFG",
@@ -261,7 +428,7 @@ def seed():
                 current_lon=-58.4375,
             ),
             Carrier(
-                user_id=users[3].id,  # Sofia
+                user_id=users[4].id,  # Sofia
                 company_name="Sofia Logistica",
                 vehicle_type="van",
                 license_plate="C789HIJ",
@@ -275,7 +442,7 @@ def seed():
                 current_lon=-58.4187,
             ),
             Carrier(
-                user_id=users[4].id,  # Diego
+                user_id=users[5].id,  # Diego
                 company_name="Diego Bike Delivery",
                 vehicle_type="bike",
                 license_plate="D012KLM",
@@ -289,7 +456,7 @@ def seed():
                 current_lon=-58.4438,
             ),
             Carrier(
-                user_id=users[5].id,  # Carlos
+                user_id=users[6].id,  # Carlos
                 company_name="Carlos Medina Motos",
                 vehicle_type="motorcycle",
                 license_plate="E345NOP",
@@ -303,7 +470,7 @@ def seed():
                 current_lon=-58.4910,
             ),
             Carrier(
-                user_id=users[6].id,  # Ana
+                user_id=users[7].id,  # Ana
                 company_name="Ana Gimenez Envios",
                 vehicle_type="car",
                 license_plate="F678QRS",
@@ -317,7 +484,7 @@ def seed():
                 current_lon=-58.4631,
             ),
             Carrier(
-                user_id=users[7].id,  # Pablo
+                user_id=users[8].id,  # Pablo
                 company_name="Pablo Romero Flete",
                 vehicle_type="truck",
                 license_plate="G901TUV",
@@ -335,13 +502,17 @@ def seed():
         db.commit()
         print(f"✅ {len(carriers)} carriers creados (verificados, disponibles, con ubicación)")
 
-        _seed_shipments(db, users[0], carriers)
+        _seed_shipments(db, users[1], carriers)
 
         print()
         print("=" * 50)
         print("Seed completado. Credenciales de prueba:")
+        print("  Admin:    admin@depaso.com   / password123")
         print("  Cliente:  cliente@depaso.com / password123")
         print("  Carrier:  lucia@depaso.com   / password123")
+        print("  Pyme:     pyme@depaso.com    / password123 (org merchant)")
+        print("  Fletero:  fletero@depaso.com / password123 (org fleet, 2 carriers)")
+        print("  Local:    local@depaso.com   / password123 (org merchant)")
         print("=" * 50)
 
     except Exception as e:

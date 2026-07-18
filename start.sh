@@ -1,13 +1,14 @@
 #!/bin/bash
 # start.sh — Levanta todo el stack de DePaso en local
 # Uso: ./start.sh
-# Abre la DB en Docker, seedea, y lanza backend + frontend en tabs separados.
+# Abre la DB en Docker, seedea, y lanza backend + app + web en tabs separados.
 
 set -e
 
 ROOT_DIR="$(cd "$(dirname "$0")" && pwd)"
 BACKEND_DIR="$ROOT_DIR/depaso_rest"
 FRONTEND_DIR="$ROOT_DIR/depaso_app"
+WEB_DIR="$ROOT_DIR/depaso_web"
 
 # ── Colores ────────────────────────────────────────────────────────────────
 RED='\033[0;31m'
@@ -55,13 +56,12 @@ if [ ! -d "$VENV" ]; then
   err "Abortando."
 fi
 
-log "Aplicando migraciones de base de datos..."
-cd "$BACKEND_DIR"
-# python -m: los shims de .venv/bin (alembic, pip) tienen shebangs rotos
-# desde que el repo se movió fuera de iCloud Drive.
-"$VENV/bin/python" -m alembic upgrade head
-
+# Sin migraciones (MVP): el esquema lo crea create_all() — lo hacen tanto
+# el seed como el backend al arrancar.
 log "Ejecutando seed de base de datos..."
+cd "$BACKEND_DIR"
+# python -m: los shims de .venv/bin tienen shebangs rotos
+# desde que el repo se movió fuera de iCloud Drive.
 "$VENV/bin/python" scripts/seed_db.py
 
 # ── 4. Backend en nueva ventana de Terminal ───────────────────────────────
@@ -69,18 +69,27 @@ log "Abriendo backend en nueva ventana..."
 osascript <<EOF
 tell application "Terminal"
   activate
-  do script "cd '$BACKEND_DIR' && source .venv/bin/activate && python -m uvicorn src.app.main:app --reload --host 0.0.0.0 --port 8000"
+  do script "cd '$BACKEND_DIR' && .venv/bin/python -m uvicorn src.app.main:app --reload --host 0.0.0.0 --port 8000"
 end tell
 EOF
 
 sleep 2  # Dale un segundo para que arranque
 
-# ── 5. Frontend en nueva ventana de Terminal ──────────────────────────────
+# ── 5. Frontend (Expo) en nueva ventana de Terminal ───────────────────────
 log "Abriendo frontend en nueva ventana..."
 osascript <<EOF
 tell application "Terminal"
   activate
   do script "cd '$FRONTEND_DIR' && npm run start"
+end tell
+EOF
+
+# ── 6. Panel web (Vite) en nueva ventana de Terminal ──────────────────────
+log "Abriendo panel web en nueva ventana..."
+osascript <<EOF
+tell application "Terminal"
+  activate
+  do script "cd '$WEB_DIR' && npm run dev"
 end tell
 EOF
 
@@ -93,8 +102,12 @@ echo ""
 echo "  DB:       postgresql://depaso:***@localhost:5432/depaso_dev"
 echo "  Backend:  http://localhost:8000/api/v1/docs"
 echo "  Frontend: Expo (presioná 'i' para iOS, 'a' para Android)"
+echo "  Web:      http://localhost:5173"
 echo ""
 echo "  Credenciales de prueba:"
-echo "    cliente@depaso.com / password123"
-echo "    lucia@depaso.com   / password123"
+echo "    Cliente:   cliente@depaso.com  / password123"
+echo "    Carrier:   lucia@depaso.com    / password123"
+echo "    Pyme:      pyme@depaso.com     / password123  (panel web, org merchant)"
+echo "    Fletero:   fletero@depaso.com  / password123  (panel web, org fleet)"
+echo "    Local:     local@depaso.com    / password123  (panel web, org merchant)"
 echo ""

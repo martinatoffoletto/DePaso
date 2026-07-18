@@ -1,7 +1,7 @@
 import { useState } from "react";
 import {
   View, ScrollView, TouchableOpacity,
-  TextInput, ActivityIndicator, Text,
+  ActivityIndicator, Text,
   KeyboardAvoidingView, Platform,
 } from "react-native";
 import { useRouter } from "expo-router";
@@ -11,46 +11,9 @@ import { useAuthStore } from "@/src/shared/session/authStore";
 import { carriersService } from "@/src/shared/api/carriers";
 import { TransportType, UserType } from "@/src/shared/types";
 import { VEHICLES, vehicleNeedsPlate } from "@/src/shared/utils/vehicles";
+import { Field, FieldLabel } from "@/src/shared/ui/Field";
+import { PasswordStrengthBar } from "@/src/shared/ui/PasswordStrengthBar";
 import { T } from "@/constants/tokens";
-
-function pwdStrength(pwd: string): number {
-  if (!pwd) return 0;
-  if (pwd.length < 5) return 1;
-  if (pwd.length < 8) return 2;
-  if (pwd.length < 12) return 3;
-  return 4;
-}
-
-const STRENGTH_LABELS = ["", "Débil", "Regular", "Buena", "Fuerte"];
-const STRENGTH_COLORS = [T.border, T.red, T.amber, T.emerald, T.emerald];
-
-function Label({ text }: { text: string }) {
-  return (
-    <Text style={{ fontSize: 9.5, letterSpacing: 1.5, color: T.inkMute, textTransform: "uppercase", fontWeight: "700", marginBottom: 8 }}>
-      {text}
-    </Text>
-  );
-}
-
-function Field({ icon, placeholder, value, onChangeText, secureTextEntry, keyboardType, autoCapitalize, error, right }: any) {
-  return (
-    <View style={{ flexDirection: "row", alignItems: "center", gap: 12, backgroundColor: T.card, borderRadius: 16, paddingHorizontal: 14, height: 52, borderWidth: 1.2, borderColor: error ? T.red : value ? T.forest : T.border }}>
-      {icon && <MaterialCommunityIcons name={icon} size={18} color={error ? T.red : T.inkMute} />}
-      <TextInput
-        style={{ flex: 1, fontSize: 15, color: T.ink, fontWeight: "500" }}
-        placeholder={placeholder}
-        placeholderTextColor={T.inkFaint}
-        value={value}
-        onChangeText={onChangeText}
-        secureTextEntry={secureTextEntry}
-        keyboardType={keyboardType ?? "default"}
-        autoCapitalize={autoCapitalize ?? "sentences"}
-        autoCorrect={false}
-      />
-      {right}
-    </View>
-  );
-}
 
 export default function RegisterScreen() {
   const router = useRouter();
@@ -62,7 +25,6 @@ export default function RegisterScreen() {
     password: "", confirmPassword: "", phone_number: "",
     user_type: UserType.CLIENT as UserType,
   });
-  const [showPwd, setShowPwd]   = useState(false);
   const [errors, setErrors]     = useState<Record<string, string>>({});
   const [serverError, setServerError] = useState<string | null>(null);
   const [accepted, setAccepted] = useState(false);
@@ -71,7 +33,6 @@ export default function RegisterScreen() {
 
   const isCarrier = form.user_type === UserType.CARRIER;
   const needsPlate = vehicleNeedsPlate(vehicleType);
-  const strength = pwdStrength(form.password);
 
   const update = (field: string, value: string) => {
     setForm(p => ({ ...p, [field]: value }));
@@ -96,33 +57,32 @@ export default function RegisterScreen() {
   const handleRegister = async () => {
     if (!validate()) return;
     setServerError(null);
+    const vehicle = VEHICLES.find(v => v.type === vehicleType)!;
     try {
-      await register({
-        first_name: form.first_name.trim(),
-        last_name:  form.last_name.trim(),
-        email:      form.email.trim().toLowerCase(),
-        password:   form.password,
-        phone_number: form.phone_number.trim() || undefined,
-        user_type:  form.user_type,
-      });
-      if (isCarrier) {
-        const me = useAuthStore.getState().user;
-        const vehicle = VEHICLES.find(v => v.type === vehicleType)!;
-        if (me) {
-          try {
-            await carriersService.createProfile({
-              company_name: `${form.first_name.trim()} ${form.last_name.trim()}`,
-              vehicle_type: vehicleType,
-              license_plate: needsPlate ? licensePlate.trim().toUpperCase() : null,
-              capacity_kg: vehicle.capacityKg,
-            });
-          } catch {
-            // La cuenta ya se creó y la navegación al home es inmediata:
-            // si esto falla (ej. patente duplicada), el home de cadete
-            // detecta el perfil faltante y ofrece completarlo ahí.
-          }
-        }
-      }
+      await register(
+        {
+          first_name: form.first_name.trim(),
+          last_name:  form.last_name.trim(),
+          email:      form.email.trim().toLowerCase(),
+          password:   form.password,
+          phone_number: form.phone_number.trim() || undefined,
+          user_type:  form.user_type,
+        },
+        // Se crea el perfil de carrier ANTES de que el store marque la
+        // sesión como autenticada: si falla (ej. patente duplicada), el
+        // usuario ve el error acá mismo en vez de terminar en el home con
+        // un perfil a medio crear.
+        isCarrier
+          ? async () => {
+              await carriersService.createProfile({
+                company_name: `${form.first_name.trim()} ${form.last_name.trim()}`,
+                vehicle_type: vehicleType,
+                license_plate: needsPlate ? licensePlate.trim().toUpperCase() : null,
+                capacity_kg: vehicle.capacityKg,
+              });
+            }
+          : undefined,
+      );
     } catch (error: any) {
       setServerError(error?.response?.data?.detail ?? "Error al crear la cuenta");
     }
@@ -167,7 +127,7 @@ export default function RegisterScreen() {
         )}
 
         {/* ── Role selector ── */}
-        <Label text="¿Cómo vas a usar DePaso?" />
+        <FieldLabel text="¿Cómo vas a usar DePaso?" />
         <View style={{ flexDirection: "row", gap: 10, marginBottom: 22 }}>
           {([
             { type: UserType.CLIENT,  icon: "cube-outline" as const,  title: "Envío paquetes", sub: "Clientes y empresas" },
@@ -203,7 +163,7 @@ export default function RegisterScreen() {
         {/* ── Carrier: vehicle + plate ── */}
         {isCarrier && (
           <View style={{ marginBottom: 22 }}>
-            <Label text="Tu vehículo" />
+            <FieldLabel text="Tu vehículo" />
             <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 14 }}>
               {VEHICLES.map(v => {
                 const active = vehicleType === v.type;
@@ -221,9 +181,9 @@ export default function RegisterScreen() {
               })}
             </View>
             {needsPlate && (
-              <>
-                <Label text="Patente" />
+              <View style={{ marginBottom: 10 }}>
                 <Field
+                  label="Patente"
                   icon="card-text-outline"
                   placeholder="AB123CD"
                   value={licensePlate}
@@ -231,9 +191,7 @@ export default function RegisterScreen() {
                   autoCapitalize="characters"
                   error={errors.license_plate}
                 />
-                {errors.license_plate ? <Text style={{ fontSize: 11, color: T.red, marginTop: 4, paddingLeft: 4 }}>{errors.license_plate}</Text> : null}
-                <View style={{ height: 10 }} />
-              </>
+              </View>
             )}
             <View style={{ flexDirection: "row", alignItems: "flex-start", gap: 10, backgroundColor: T.mint, borderRadius: 12, borderWidth: 1, borderColor: T.border, padding: 12, marginTop: 4 }}>
               <MaterialCommunityIcons name="shield-check-outline" size={16} color={T.forest} style={{ marginTop: 1 }} />
@@ -247,40 +205,31 @@ export default function RegisterScreen() {
         {/* ── Name ── */}
         <View style={{ flexDirection: "row", gap: 10, marginBottom: 14 }}>
           <View style={{ flex: 1 }}>
-            <Label text="Nombre" />
-            <Field placeholder="Valentina" value={form.first_name} onChangeText={(t: string) => update("first_name", t)} error={errors.first_name} />
-            {errors.first_name ? <Text style={{ fontSize: 11, color: T.red, marginTop: 4, paddingLeft: 4 }}>{errors.first_name}</Text> : null}
+            <Field label="Nombre" placeholder="Valentina" value={form.first_name} onChangeText={(t: string) => update("first_name", t)} error={errors.first_name} />
           </View>
           <View style={{ flex: 1 }}>
-            <Label text="Apellido" />
-            <Field placeholder="Rossi" value={form.last_name} onChangeText={(t: string) => update("last_name", t)} error={errors.last_name} />
-            {errors.last_name ? <Text style={{ fontSize: 11, color: T.red, marginTop: 4, paddingLeft: 4 }}>{errors.last_name}</Text> : null}
+            <Field label="Apellido" placeholder="Rossi" value={form.last_name} onChangeText={(t: string) => update("last_name", t)} error={errors.last_name} />
           </View>
         </View>
 
         {/* ── Email ── */}
-        <Label text="Email" />
-        <View style={{ flexDirection: "row", alignItems: "center", gap: 12, backgroundColor: T.card, borderRadius: 16, paddingHorizontal: 14, height: 52, borderWidth: 1.2, borderColor: errors.email ? T.red : form.email ? T.forest : T.border, marginBottom: 4 }}>
-          <MaterialCommunityIcons name="email-outline" size={18} color={errors.email ? T.red : T.inkMute} />
-          <TextInput
-            style={{ flex: 1, fontSize: 15, color: T.ink, fontWeight: "500" }}
-            placeholder="tu@email.com"
-            placeholderTextColor={T.inkFaint}
-            autoCapitalize="none"
-            keyboardType="email-address"
-            autoCorrect={false}
-            value={form.email}
-            onChangeText={t => update("email", t)}
-          />
-          {form.email.includes("@") && !errors.email && (
-            <MaterialCommunityIcons name="check-circle-outline" size={18} color={T.emerald} />
-          )}
-        </View>
-        {errors.email ? <Text style={{ fontSize: 11, color: T.red, marginBottom: 8, paddingLeft: 4 }}>{errors.email}</Text> : null}
+        <Field
+          label="Email"
+          icon="email-outline"
+          placeholder="tu@email.com"
+          autoCapitalize="none"
+          keyboardType="email-address"
+          value={form.email}
+          onChangeText={(t: string) => update("email", t)}
+          error={errors.email}
+          right={form.email.includes("@") && !errors.email
+            ? <MaterialCommunityIcons name="check-circle-outline" size={18} color={T.emerald} />
+            : undefined}
+        />
 
         {/* ── Phone ── */}
         <View style={{ height: 16 }} />
-        <Label text="Celular (opcional)" />
+        <FieldLabel text="Celular (opcional)" />
         <View style={{ flexDirection: "row", gap: 8, marginBottom: 4 }}>
           <View style={{ flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: T.card, borderRadius: 16, paddingHorizontal: 12, height: 52, borderWidth: 1.2, borderColor: T.border }}>
             <View style={{ width: 22, height: 14, borderRadius: 3, overflow: "hidden", flexDirection: "column" }}>
@@ -290,67 +239,44 @@ export default function RegisterScreen() {
             </View>
             <Text style={{ fontSize: 14, fontWeight: "600", color: T.ink }}>+54</Text>
           </View>
-          <View style={{ flex: 1, flexDirection: "row", alignItems: "center", backgroundColor: T.card, borderRadius: 16, paddingHorizontal: 14, height: 52, borderWidth: 1.2, borderColor: form.phone_number ? T.forest : T.border }}>
-            <TextInput
-              style={{ flex: 1, fontSize: 15, color: T.ink, fontWeight: "500" }}
+          <View style={{ flex: 1 }}>
+            <Field
               placeholder="11 5821-9043"
-              placeholderTextColor={T.inkFaint}
               keyboardType="phone-pad"
               value={form.phone_number}
-              onChangeText={t => update("phone_number", t)}
+              onChangeText={(t: string) => update("phone_number", t)}
             />
           </View>
         </View>
 
         {/* ── Password ── */}
         <View style={{ height: 16 }} />
-        <Label text="Contraseña" />
-        <View style={{ flexDirection: "row", alignItems: "center", gap: 12, backgroundColor: T.card, borderRadius: 16, paddingHorizontal: 14, height: 52, borderWidth: 1.2, borderColor: errors.password ? T.red : form.password ? T.forest : T.border, marginBottom: 4 }}>
-          <MaterialCommunityIcons name="lock-outline" size={18} color={errors.password ? T.red : T.inkMute} />
-          <TextInput
-            style={{ flex: 1, fontSize: 15, color: T.ink, fontWeight: "500" }}
-            placeholder="Mínimo 8 caracteres"
-            placeholderTextColor={T.inkFaint}
-            secureTextEntry={!showPwd}
-            value={form.password}
-            onChangeText={t => update("password", t)}
-          />
-          <TouchableOpacity onPress={() => setShowPwd(v => !v)} hitSlop={10}>
-            <MaterialCommunityIcons name={showPwd ? "eye-off-outline" : "eye-outline"} size={18} color={T.inkMute} />
-          </TouchableOpacity>
-        </View>
-        {errors.password ? <Text style={{ fontSize: 11, color: T.red, marginBottom: 6, paddingLeft: 4 }}>{errors.password}</Text> : null}
-        {form.password.length > 0 && (
-          <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 2, paddingLeft: 2 }}>
-            <View style={{ flexDirection: "row", gap: 4 }}>
-              {[1, 2, 3, 4].map(i => (
-                <View key={i} style={{ width: 28, height: 4, borderRadius: 3, backgroundColor: i <= strength ? STRENGTH_COLORS[strength] : T.border }} />
-              ))}
-            </View>
-            <Text style={{ fontSize: 10, letterSpacing: 1, fontWeight: "700", color: STRENGTH_COLORS[strength], textTransform: "uppercase" }}>
-              {STRENGTH_LABELS[strength]}
-            </Text>
-          </View>
-        )}
+        <Field
+          label="Contraseña"
+          icon="lock-outline"
+          placeholder="Mínimo 8 caracteres"
+          secureToggle
+          value={form.password}
+          onChangeText={(t: string) => update("password", t)}
+          error={errors.password}
+        />
+        <View style={{ height: 6 }} />
+        <PasswordStrengthBar password={form.password} />
 
         {/* ── Confirm password ── */}
         <View style={{ height: 14 }} />
-        <Label text="Repetí la contraseña" />
-        <View style={{ flexDirection: "row", alignItems: "center", gap: 12, backgroundColor: T.card, borderRadius: 16, paddingHorizontal: 14, height: 52, borderWidth: 1.2, borderColor: errors.confirmPassword ? T.red : form.confirmPassword ? T.forest : T.border, marginBottom: 4 }}>
-          <MaterialCommunityIcons name="lock-check-outline" size={18} color={errors.confirmPassword ? T.red : T.inkMute} />
-          <TextInput
-            style={{ flex: 1, fontSize: 15, color: T.ink, fontWeight: "500" }}
-            placeholder="Repetí tu contraseña"
-            placeholderTextColor={T.inkFaint}
-            secureTextEntry={!showPwd}
-            value={form.confirmPassword}
-            onChangeText={t => update("confirmPassword", t)}
-          />
-          {form.confirmPassword && form.password === form.confirmPassword && (
-            <MaterialCommunityIcons name="check-circle-outline" size={18} color={T.emerald} />
-          )}
-        </View>
-        {errors.confirmPassword ? <Text style={{ fontSize: 11, color: T.red, marginBottom: 6, paddingLeft: 4 }}>{errors.confirmPassword}</Text> : null}
+        <Field
+          label="Repetí la contraseña"
+          icon="lock-check-outline"
+          placeholder="Repetí tu contraseña"
+          secureToggle
+          value={form.confirmPassword}
+          onChangeText={(t: string) => update("confirmPassword", t)}
+          error={errors.confirmPassword}
+          right={form.confirmPassword && form.password === form.confirmPassword
+            ? <MaterialCommunityIcons name="check-circle-outline" size={18} color={T.emerald} />
+            : undefined}
+        />
 
         {/* ── Terms ── */}
         <TouchableOpacity

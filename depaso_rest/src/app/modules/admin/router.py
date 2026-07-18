@@ -5,13 +5,15 @@ Admin access: users with user_type == "admin". For the prototype demo an
 admin is created by the seed script. All logic lives in AdminService — the
 router only handles auth and HTTP mapping.
 """
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.app.core.database import get_db
 from src.app.core.dependencies import AdminUserId
 from src.app.modules.admin.schemas import (
     ActivityResponse,
+    AdminCreateOrganizationRequest,
+    AdminCreateOrganizationResponse,
     ClassificationActivityItem,
     DashboardResponse,
     ModerationRequest,
@@ -87,4 +89,25 @@ async def recent_activity(
             ShipmentEventActivityItem.model_validate(e, from_attributes=True)
             for e in data["events"]
         ],
+    )
+
+
+@router.post(
+    "/organizations", response_model=AdminCreateOrganizationResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+async def create_organization_account(
+    data: AdminCreateOrganizationRequest,
+    _admin: AdminUserId,
+    service: AdminService = Depends(get_admin_service),
+):
+    """Alta manual de una cuenta B2B (pyme/fletero): crea el usuario dueño y
+    su organización de una sola vez (RF-ADM)."""
+    user, org = await service.create_org_account(
+        name=data.name, cuit=data.cuit, kind=data.kind,
+        email=data.email, password=data.password,
+    )
+    return AdminCreateOrganizationResponse(
+        organization_id=org.id, name=org.name, cuit=org.cuit, kind=org.kind,
+        owner_user_id=user.id, owner_email=user.email,
     )

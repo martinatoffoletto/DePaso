@@ -6,30 +6,17 @@ import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { T } from "@/constants/tokens";
+import { StepDots } from "@/src/sender/components/StepDots";
+import { SummaryRow } from "@/src/sender/components/SummaryRow";
 import type { Coords } from "./FlowNavigator";
 import { shipmentsService } from "@/src/shared/api/shipments";
 import { co2EquivalenceLabel } from "@/src/sender/co2";
 import { PACKAGE_LABEL } from "@/src/shared/utils/packageCategory";
 import { DeliveryMode, AssignmentMode, PackageCategory, Quote } from "@/src/shared/types";
 
-type IconName = React.ComponentProps<typeof MaterialCommunityIcons>["name"];
 
 const SIZE_LABEL = PACKAGE_LABEL;
 
-function StepDots({ current, total }: { current: number; total: number }) {
-  return (
-    <View className="flex-row gap-[6px] items-center">
-      {Array.from({ length: total }).map((_, i) => (
-        <View
-          key={i}
-          className="h-[6px] rounded"
-          style={{ width: i === current - 1 ? 18 : 6, backgroundColor: i < current ? T.forest : T.border }}
-        />
-      ))}
-      <Text className="text-[10px] tracking-[1.5px] text-inkMute ml-1">{String(current).padStart(2, "0")}/{String(total).padStart(2, "0")}</Text>
-    </View>
-  );
-}
 
 type SummaryScreenProps = {
   origin: string;
@@ -50,15 +37,6 @@ type SummaryScreenProps = {
   onConfirm: () => void;
 };
 
-function Row({ icon, label, value }: { icon: IconName; label: string; value: string }) {
-  return (
-    <View className="flex-row items-start gap-[10px] py-[10px]">
-      <MaterialCommunityIcons name={icon} size={17} color={T.inkMute} />
-      <Text className="text-[13px] text-inkMute w-20">{label}</Text>
-      <Text className="flex-1 text-sm text-ink font-medium text-right" numberOfLines={2}>{value}</Text>
-    </View>
-  );
-}
 
 export function SummaryScreen({
   origin, destination, originCoords, destinationCoords,
@@ -224,24 +202,24 @@ export function SummaryScreen({
             </>
           )}
 
-          <Row icon="package-variant-closed" label="Paquete" value={`${SIZE_LABEL[categoryId] ?? categoryId} · ${weightKg} kg`} />
+          <SummaryRow icon="package-variant-closed" label="Paquete" value={`${SIZE_LABEL[categoryId] ?? categoryId} · ${weightKg} kg`} />
 
           {!!description && (
             <>
               <View className="h-px bg-borderSoft" />
-              <Row icon="text-box-outline" label="Descripción" value={description} />
+              <SummaryRow icon="text-box-outline" label="Descripción" value={description} />
             </>
           )}
 
           {declaredValue != null && declaredValue > 0 && (
             <>
               <View className="h-px bg-borderSoft" />
-              <Row icon="cash-multiple" label="Valor decl." value={`$${declaredValue.toLocaleString("es-AR")} ARS`} />
+              <SummaryRow icon="cash-multiple" label="Valor decl." value={`$${declaredValue.toLocaleString("es-AR")} ARS`} />
             </>
           )}
 
           <View className="h-px bg-borderSoft" />
-          <Row
+          <SummaryRow
             icon={isCollaborative ? "account-group-outline" : "lightning-bolt"}
             label="Modalidad"
             value={isCollaborative ? "Colaborativa" : "Dedicada"}
@@ -272,7 +250,7 @@ export function SummaryScreen({
             </View>
           </View>
           <View className="h-px bg-borderSoft" />
-          <Row icon="cash" label="Precio est." value={price != null ? `$${price.toLocaleString("es-AR")} ARS` : "A confirmar"} />
+          <SummaryRow icon="cash" label="Precio est." value={price != null ? `$${price.toLocaleString("es-AR")} ARS` : "A confirmar"} />
         </View>
 
         {/* CO₂ hero card */}

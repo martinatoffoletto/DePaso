@@ -1,8 +1,5 @@
 import { useEffect, useState } from "react";
-import {
-  View, TouchableOpacity, ScrollView,
-  Modal, TextInput as RNTextInput, Alert,
-} from "react-native";
+import { View, TouchableOpacity, ScrollView, Alert } from "react-native";
 import { Text } from "react-native-paper";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
@@ -15,296 +12,14 @@ import { co2Service } from "@/src/shared/api/co2";
 import { carriersService } from "@/src/shared/api/carriers";
 import { UserType } from "@/src/shared/types";
 import PublishTripScreen from "@/src/carrier/PublishTripScreen";
+import { ForestHeroCard, HeroStatsRow, HeroStat } from "@/src/shared/ui/ForestHeroCard";
+import { ProfileRow, ProfileSection } from "./components/ProfileRow";
+import { AddressModal } from "./components/AddressModal";
+import { ContactModal } from "./components/ContactModal";
 import { EditProfileModal } from "./EditProfileModal";
 import { ChangePasswordModal } from "./ChangePasswordModal";
 import { CarrierReviewsModal } from "./CarrierReviewsModal";
 import { T } from "@/constants/tokens";
-
-type IconName = React.ComponentProps<typeof MaterialCommunityIcons>["name"];
-
-// ── Small helpers ─────────────────────────────────────────────────────────────
-
-function Toggle({ on }: { on: boolean }) {
-  return (
-    <View className={`w-[38px] h-[22px] rounded-full px-[2px] justify-center ${on ? "bg-forest items-end" : "bg-border items-start"}`}>
-      <View className="w-[18px] h-[18px] rounded-full bg-[#F4EFE3]" />
-    </View>
-  );
-}
-
-type Trailing = "chevron" | "toggle-on" | "toggle-off" | string;
-function ProfileRow({ icon, label, value, trailing = "chevron", accent = false, danger = false, onPress }: {
-  icon: IconName; label: string; value?: string;
-  trailing?: Trailing; accent?: boolean; danger?: boolean; onPress?: () => void;
-}) {
-  const isChevron  = trailing === "chevron";
-  const isToggleOn = trailing === "toggle-on";
-  const isToggleOff = trailing === "toggle-off";
-  const isText = !isChevron && !isToggleOn && !isToggleOff;
-  return (
-    <TouchableOpacity className="flex-row items-center gap-[14px] px-4 py-[14px]" activeOpacity={onPress ? 0.7 : 1} onPress={onPress}>
-      <View className={`w-9 h-9 rounded-[10px] items-center justify-center shrink-0 ${accent ? "bg-mint" : "bg-cardSoft border border-borderSoft"}`}>
-        <MaterialCommunityIcons name={icon} size={18} color={danger ? T.red : accent ? T.forest : T.inkSoft} />
-      </View>
-      <View className="flex-1 min-w-0">
-        <Text className={`text-sm font-medium ${danger ? "text-red" : "text-ink"}`}>{label}</Text>
-        {value && <Text className="text-[11.5px] text-inkMute mt-px" numberOfLines={1}>{value}</Text>}
-      </View>
-      {isChevron    && <MaterialCommunityIcons name="chevron-right" size={18} color={T.inkFaint} />}
-      {isToggleOn   && <Toggle on={true} />}
-      {isToggleOff  && <Toggle on={false} />}
-      {isText       && <Text className="text-[10px] tracking-[1px] text-inkMute uppercase font-semibold">{trailing}</Text>}
-    </TouchableOpacity>
-  );
-}
-
-function ProfileSection({ title, rows }: { title: string; rows: React.ReactNode[] }) {
-  return (
-    <View className="mt-[18px]">
-      <Text className="text-[10px] font-bold tracking-[2px] text-inkMute uppercase mx-5 mb-2">{title}</Text>
-      <View className="mx-4 bg-card rounded-[18px] border border-border overflow-hidden">
-        {rows.map((row, i) => (
-          <View key={i}>
-            {i > 0 && <View className="h-px bg-borderSoft ml-[66px]" />}
-            {row}
-          </View>
-        ))}
-      </View>
-    </View>
-  );
-}
-
-// ── Address modal ─────────────────────────────────────────────────────────────
-
-function AddressModal({ visible, onClose }: { visible: boolean; onClose: () => void }) {
-  const insets = useSafeAreaInsets();
-  const { addresses, addAddress, removeAddress } = useAddressBookStore();
-  const [adding, setAdding] = useState(false);
-  const [label, setLabel]   = useState("");
-  const [addr, setAddr]     = useState("");
-
-  function save() {
-    if (!label.trim() || !addr.trim()) {
-      Alert.alert("Completá los campos", "Necesitamos el nombre y la dirección.");
-      return;
-    }
-    addAddress({ label: label.trim().toUpperCase(), address: addr.trim(), icon: "map-marker-outline" });
-    setLabel(""); setAddr(""); setAdding(false);
-  }
-
-  function cancel() { setLabel(""); setAddr(""); setAdding(false); }
-
-  return (
-    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
-      <View className="flex-1 bg-bg" style={{ paddingTop: insets.top }}>
-        {/* Header */}
-        <View className="flex-row items-center justify-between px-5 py-[14px] border-b border-borderSoft">
-          <TouchableOpacity onPress={onClose} hitSlop={10}>
-            <MaterialCommunityIcons name="arrow-left" size={22} color={T.ink} />
-          </TouchableOpacity>
-          <Text className="text-[17px] font-bold text-ink tracking-[-0.4px]">Mis direcciones</Text>
-          {!adding
-            ? <TouchableOpacity onPress={() => setAdding(true)} hitSlop={10}>
-                <MaterialCommunityIcons name="plus" size={24} color={T.forest} />
-              </TouchableOpacity>
-            : <View className="w-6" />
-          }
-        </View>
-
-        <ScrollView contentContainerStyle={{ padding: 16, gap: 10, paddingBottom: insets.bottom + 32 }}>
-          {/* Add form */}
-          {adding && (
-            <View className="bg-card rounded-[18px] border border-forest p-4 gap-3">
-              <Text className="text-[10px] tracking-[2px] text-forest font-bold uppercase">NUEVA DIRECCIÓN</Text>
-              <View className="gap-1">
-                <Text className="text-[9px] tracking-[1.5px] text-inkMute uppercase font-semibold">NOMBRE (ej: CASA, TRABAJO)</Text>
-                <RNTextInput
-                  className="text-[15px] text-ink border-b border-borderSoft py-[6px] font-medium"
-                  value={label}
-                  onChangeText={setLabel}
-                  placeholder="CASA"
-                  placeholderTextColor={T.inkFaint}
-                  autoCapitalize="characters"
-                  autoFocus
-                />
-              </View>
-              <View className="gap-1">
-                <Text className="text-[9px] tracking-[1.5px] text-inkMute uppercase font-semibold">DIRECCIÓN COMPLETA</Text>
-                <RNTextInput
-                  className="text-[15px] text-ink border-b border-borderSoft py-[6px] font-medium"
-                  value={addr}
-                  onChangeText={setAddr}
-                  placeholder="Av. Corrientes 1234, CABA"
-                  placeholderTextColor={T.inkFaint}
-                />
-              </View>
-              <View className="flex-row gap-2 mt-1">
-                <TouchableOpacity className="flex-1 flex-row justify-center items-center bg-cardSoft border border-border rounded-xl py-[13px]" onPress={cancel} activeOpacity={0.8}>
-                  <Text className="text-sm font-semibold text-inkSoft">Cancelar</Text>
-                </TouchableOpacity>
-                <TouchableOpacity className="flex-1 flex-row justify-center items-center bg-forest rounded-xl py-[13px]" onPress={save} activeOpacity={0.8}>
-                  <Text className="text-sm font-bold text-[#F4EFE3]">Guardar</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          )}
-
-          {/* List */}
-          {addresses.length === 0 && !adding ? (
-            <View className="items-center gap-3 py-12">
-              <MaterialCommunityIcons name="map-marker-off-outline" size={48} color={T.border} />
-              <Text className="text-sm text-inkMute font-medium">Sin direcciones guardadas</Text>
-            </View>
-          ) : (
-            addresses.map((a) => (
-              <View key={a.id} className="flex-row items-center gap-3 bg-card rounded-[14px] border border-border p-[14px]">
-                <View className="w-[38px] h-[38px] rounded-[10px] bg-mint items-center justify-center shrink-0">
-                  <MaterialCommunityIcons name={a.icon as IconName} size={18} color={T.forest} />
-                </View>
-                <View className="flex-1">
-                  <Text className="text-[13px] font-bold text-ink tracking-[-0.2px]">{a.label}</Text>
-                  <Text className="text-xs text-inkMute mt-[2px]" numberOfLines={1}>{a.address}</Text>
-                </View>
-                <TouchableOpacity
-                  onPress={() => Alert.alert("Eliminar", `¿Eliminar "${a.label}"?`, [
-                    { text: "Cancelar", style: "cancel" },
-                    { text: "Eliminar", style: "destructive", onPress: () => removeAddress(a.id) },
-                  ])}
-                  hitSlop={10}
-                >
-                  <MaterialCommunityIcons name="trash-can-outline" size={18} color={T.inkMute} />
-                </TouchableOpacity>
-              </View>
-            ))
-          )}
-        </ScrollView>
-      </View>
-    </Modal>
-  );
-}
-
-// ── Contact modal ─────────────────────────────────────────────────────────────
-
-function ContactModal({ visible, onClose }: { visible: boolean; onClose: () => void }) {
-  const insets = useSafeAreaInsets();
-  const { contacts, addContact, removeContact } = useAddressBookStore();
-  const [adding, setAdding]   = useState(false);
-  const [label, setLabel]     = useState("");
-  const [name, setName]       = useState("");
-  const [phone, setPhone]     = useState("");
-
-  function save() {
-    if (!label.trim() || !name.trim()) {
-      Alert.alert("Completá los campos", "Nombre y apodo son requeridos.");
-      return;
-    }
-    addContact({ label: label.trim().toUpperCase(), name: name.trim(), phone: phone.trim() });
-    setLabel(""); setName(""); setPhone(""); setAdding(false);
-  }
-
-  function cancel() { setLabel(""); setName(""); setPhone(""); setAdding(false); }
-
-  return (
-    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
-      <View className="flex-1 bg-bg" style={{ paddingTop: insets.top }}>
-        {/* Header */}
-        <View className="flex-row items-center justify-between px-5 py-[14px] border-b border-borderSoft">
-          <TouchableOpacity onPress={onClose} hitSlop={10}>
-            <MaterialCommunityIcons name="arrow-left" size={22} color={T.ink} />
-          </TouchableOpacity>
-          <Text className="text-[17px] font-bold text-ink tracking-[-0.4px]">Mis personas</Text>
-          {!adding
-            ? <TouchableOpacity onPress={() => setAdding(true)} hitSlop={10}>
-                <MaterialCommunityIcons name="plus" size={24} color={T.forest} />
-              </TouchableOpacity>
-            : <View className="w-6" />
-          }
-        </View>
-
-        <ScrollView contentContainerStyle={{ padding: 16, gap: 10, paddingBottom: insets.bottom + 32 }}>
-          {/* Add form */}
-          {adding && (
-            <View className="bg-card rounded-[18px] border border-forest p-4 gap-3">
-              <Text className="text-[10px] tracking-[2px] text-forest font-bold uppercase">NUEVA PERSONA</Text>
-              <View className="gap-1">
-                <Text className="text-[9px] tracking-[1.5px] text-inkMute uppercase font-semibold">APODO (ej: MAMÁ, TRABAJO)</Text>
-                <RNTextInput
-                  className="text-[15px] text-ink border-b border-borderSoft py-[6px] font-medium"
-                  value={label}
-                  onChangeText={setLabel}
-                  placeholder="MAMÁ"
-                  placeholderTextColor={T.inkFaint}
-                  autoCapitalize="characters"
-                  autoFocus
-                />
-              </View>
-              <View className="gap-1">
-                <Text className="text-[9px] tracking-[1.5px] text-inkMute uppercase font-semibold">NOMBRE COMPLETO</Text>
-                <RNTextInput
-                  className="text-[15px] text-ink border-b border-borderSoft py-[6px] font-medium"
-                  value={name}
-                  onChangeText={setName}
-                  placeholder="María García"
-                  placeholderTextColor={T.inkFaint}
-                />
-              </View>
-              <View className="gap-1">
-                <Text className="text-[9px] tracking-[1.5px] text-inkMute uppercase font-semibold">TELÉFONO</Text>
-                <RNTextInput
-                  className="text-[15px] text-ink border-b border-borderSoft py-[6px] font-medium"
-                  value={phone}
-                  onChangeText={setPhone}
-                  placeholder="11 4521-8830"
-                  placeholderTextColor={T.inkFaint}
-                  keyboardType="phone-pad"
-                />
-              </View>
-              <View className="flex-row gap-2 mt-1">
-                <TouchableOpacity className="flex-1 flex-row justify-center items-center bg-cardSoft border border-border rounded-xl py-[13px]" onPress={cancel} activeOpacity={0.8}>
-                  <Text className="text-sm font-semibold text-inkSoft">Cancelar</Text>
-                </TouchableOpacity>
-                <TouchableOpacity className="flex-1 flex-row justify-center items-center bg-forest rounded-xl py-[13px]" onPress={save} activeOpacity={0.8}>
-                  <Text className="text-sm font-bold text-[#F4EFE3]">Guardar</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          )}
-
-          {/* List */}
-          {contacts.length === 0 && !adding ? (
-            <View className="items-center gap-3 py-12">
-              <MaterialCommunityIcons name="account-off-outline" size={48} color={T.border} />
-              <Text className="text-sm text-inkMute font-medium">Sin personas guardadas</Text>
-            </View>
-          ) : (
-            contacts.map((c) => (
-              <View key={c.id} className="flex-row items-center gap-3 bg-card rounded-[14px] border border-border p-[14px]">
-                <View className="w-[38px] h-[38px] rounded-[10px] bg-cardSoft items-center justify-center shrink-0">
-                  <MaterialCommunityIcons name="account-outline" size={18} color={T.forest} />
-                </View>
-                <View className="flex-1">
-                  <Text className="text-[13px] font-bold text-ink tracking-[-0.2px]">{c.label} · <Text className="font-normal text-ink">{c.name}</Text></Text>
-                  {!!c.phone && <Text className="text-xs text-inkMute mt-[2px]">{c.phone}</Text>}
-                </View>
-                <TouchableOpacity
-                  onPress={() => Alert.alert("Eliminar", `¿Eliminar "${c.label}"?`, [
-                    { text: "Cancelar", style: "cancel" },
-                    { text: "Eliminar", style: "destructive", onPress: () => removeContact(c.id) },
-                  ])}
-                  hitSlop={10}
-                >
-                  <MaterialCommunityIcons name="trash-can-outline" size={18} color={T.inkMute} />
-                </TouchableOpacity>
-              </View>
-            ))
-          )}
-        </ScrollView>
-      </View>
-    </Modal>
-  );
-}
-
-// ── Main screen ───────────────────────────────────────────────────────────────
 
 export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
@@ -380,9 +95,7 @@ export default function ProfileScreen() {
         </View>
 
         {/* ── Forest hero card ── */}
-        <View className="m-4 mt-[14px] rounded-3xl bg-forest p-5 pb-[18px] overflow-hidden">
-          <View className="absolute bottom-7 -left-5 -right-5 h-5 rounded-[10px] bg-white/5 -rotate-3" />
-          <View className="absolute bottom-2 -left-5 -right-5 h-5 rounded-[10px] bg-white/[0.04] -rotate-3" />
+        <ForestHeroCard stripes="bottom" className="m-4 mt-[14px] rounded-3xl p-5 pb-[18px]">
           <View className="flex-row items-center gap-[14px] relative">
             <View
               className="w-16 h-16 rounded-[20px] bg-lime items-center justify-center"
@@ -391,7 +104,7 @@ export default function ProfileScreen() {
               <Text className="text-[26px] font-extrabold text-forest tracking-[-0.5px]">{initials}</Text>
             </View>
             <View className="flex-1">
-              <Text className="text-[22px] font-bold text-[#F4EFE3] tracking-[-0.6px] leading-6">{fullName}</Text>
+              <Text className="text-[22px] font-bold text-white tracking-[-0.6px] leading-6">{fullName}</Text>
               <Text className="text-[12.5px] text-[#F4EFE3]/70 mt-1">{email}</Text>
               <View className="flex-row items-center gap-[6px] mt-[6px]">
                 <View className="flex-row items-center gap-[3px] bg-lime/15 border border-lime/30 px-[7px] py-[2px] rounded-md">
@@ -402,24 +115,21 @@ export default function ProfileScreen() {
               </View>
             </View>
           </View>
-          <View className="flex-row mt-[22px]">
-            <View className="flex-1 border-r border-[#F4EFE3]/[0.12] pr-[10px] mr-[14px]">
-              <Text className="text-[22px] font-bold text-[#F4EFE3] tracking-[-0.5px]">{stats.shipments}</Text>
-              <Text className="text-[9px] tracking-[1.5px] text-[#F4EFE3]/80 uppercase mt-[2px]">ENVÍOS</Text>
-            </View>
-            <View className="flex-1 border-r border-[#F4EFE3]/[0.12] pr-[10px] mr-[14px]">
-              <Text className="text-[22px] font-bold text-lime tracking-[-0.5px]">{stats.co2}<Text className="text-xs font-normal text-[#F4EFE3]">kg</Text></Text>
-              <Text className="text-[9px] tracking-[1.5px] text-[#F4EFE3]/80 uppercase mt-[2px]">CO₂ AHORRADO</Text>
-            </View>
-            <View className="flex-1">
-              <View className="flex-row items-center gap-1">
-                <Text className="text-[22px] font-bold text-[#F4EFE3] tracking-[-0.5px]">{reputation.toFixed(1)}</Text>
-                <MaterialCommunityIcons name="star" size={14} color={T.lime} />
-              </View>
-              <Text className="text-[9px] tracking-[1.5px] text-[#F4EFE3]/80 uppercase mt-[2px]">REPUTACIÓN</Text>
-            </View>
-          </View>
-        </View>
+          <HeroStatsRow className="mt-[22px]">
+            <HeroStat value={stats.shipments} label="ENVÍOS" divider />
+            <HeroStat
+              value={<>{stats.co2}<Text className="text-xs font-normal text-[#F4EFE3]">kg</Text></>}
+              label="CO₂ AHORRADO"
+              valueClassName="text-lime"
+              divider
+            />
+            <HeroStat
+              value={reputation.toFixed(1)}
+              label="REPUTACIÓN"
+              trailing={<MaterialCommunityIcons name="star" size={14} color={T.lime} />}
+            />
+          </HeroStatsRow>
+        </ForestHeroCard>
 
         {/* ── Eco progress card — derivado del CO2 real ahorrado ── */}
         <View className="mx-4 mt-3 bg-cardSoft border border-border rounded-2xl p-[14px]">

@@ -23,6 +23,20 @@ def _make_org(client, headers, cuit, kind="merchant", name="ACME"):
                        json={"name": name, "cuit": cuit, "kind": kind}, headers=headers)
 
 
+def _carrier_profile(client: TestClient, email: str) -> dict:
+    """Registra un usuario y le crea perfil de carrier; devuelve sus headers."""
+    headers = _register(client, email)
+    res = client.post("/api/v1/carriers/me", json={
+        "company_name": "Flete Individual",
+        "vehicle_type": "car",
+        "license_plate": "AA123BB",
+        "capacity_kg": 50.0,
+        "capacity_volume_m3": 1.0,
+    }, headers=headers)
+    assert res.status_code == 201, res.text
+    return headers
+
+
 SHIP = {
     "package_size": "m", "modality": "collaborative", "assignment_mode": "on_demand",
     "origin_lat": -34.60, "origin_lon": -58.38,
@@ -62,7 +76,7 @@ def test_merchant_org_cannot_manage_fleet(client: TestClient, db):
     h = _register(client, "merch2@example.com")
     _make_org(client, h, "30-71234567-8", kind="merchant")
     res = client.post("/api/v1/organizations/me/carriers",
-                      json={"carrier_id": 1}, headers=h)
+                      json={"email": "someone@example.com"}, headers=h)
     assert res.status_code == 403
 
 
@@ -137,6 +151,39 @@ def test_org_shipment_carries_recipient_contact(client: TestClient, db):
     detail = client.get(f"/api/v1/shipments/{sid}", headers=h).json()
     assert detail["recipient_name"] == "Depósito Central"
     assert detail["recipient_phone"] == "11-4444-5555"
+
+
+def test_fleet_links_carrier_by_email(client: TestClient, db):
+    """La flota no lista transportistas ajenos: vincula por el email registrado."""
+    _carrier_profile(client, "chofer_link@example.com")
+    h = _register(client, "fletero_link@example.com")
+    _make_org(client, h, "30-71234567-8", kind="fleet")
+
+    res = client.post("/api/v1/organizations/me/carriers",
+                      json={"email": "chofer_link@example.com"}, headers=h)
+    assert res.status_code == 201, res.text
+    assert res.json()["status"] == "active"
+
+    fleet = client.get("/api/v1/organizations/me/carriers", headers=h).json()
+    assert len(fleet) == 1
+    assert fleet[0]["company_name"] == "Flete Individual"
+
+
+def test_fleet_link_unknown_email_fails(client: TestClient, db):
+    h = _register(client, "fletero_unknown@example.com")
+    _make_org(client, h, "30-71234567-8", kind="fleet")
+    res = client.post("/api/v1/organizations/me/carriers",
+                      json={"email": "nadie@example.com"}, headers=h)
+    assert res.status_code == 400, res.text
+
+
+def test_fleet_link_email_without_carrier_profile_fails(client: TestClient, db):
+    _register(client, "solo_client@example.com")  # sin perfil de carrier
+    h = _register(client, "fletero_noprofile@example.com")
+    _make_org(client, h, "30-71234567-8", kind="fleet")
+    res = client.post("/api/v1/organizations/me/carriers",
+                      json={"email": "solo_client@example.com"}, headers=h)
+    assert res.status_code == 400, res.text
 
 
 def test_no_org_membership_uses_error_envelope(client: TestClient, db):

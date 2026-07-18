@@ -3,36 +3,62 @@ import {
   LayoutDashboard,
   LogOut,
   Package,
-  ShieldCheck,
   Truck,
+  UserPlus,
   Wallet,
   type LucideIcon,
 } from "lucide-react";
 import { useAuth } from "@/stores/auth";
+import { useMyOrg } from "@/features/org/useOrg";
 import { cn } from "@/lib/utils";
 
 interface NavItem {
   to: string;
   label: string;
   icon: LucideIcon;
-  adminOnly?: boolean;
 }
-
-const NAV: NavItem[] = [
-  { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { to: "/flota", label: "Flota", icon: Truck },
-  { to: "/envios", label: "Envíos", icon: Package },
-  { to: "/finanzas", label: "Finanzas", icon: Wallet },
-  { to: "/admin", label: "Admin", icon: ShieldCheck, adminOnly: true },
-];
 
 function initials(first: string, last: string): string {
   return `${first[0] ?? ""}${last[0] ?? ""}`.toUpperCase();
 }
 
+/**
+ * Nav por rol: admin ve Dashboard (monitoreo) + Altas; una org fleet ve
+ * Dashboard + Flota + Finanzas; una org merchant ve Dashboard + Envíos +
+ * Finanzas. Sin organización todavía (onboarding) sólo se ve Dashboard.
+ */
+function useNavItems(): NavItem[] {
+  const { user } = useAuth();
+  const isAdmin = user?.user_type === "admin";
+  const { data: org } = useMyOrg({ enabled: !isAdmin });
+
+  if (isAdmin) {
+    return [
+      { to: "/admin", label: "Dashboard", icon: LayoutDashboard },
+      { to: "/transportistas", label: "Transportistas", icon: Truck },
+      { to: "/altas", label: "Altas", icon: UserPlus },
+    ];
+  }
+  if (org?.kind === "fleet") {
+    return [
+      { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+      { to: "/flota", label: "Flota", icon: Truck },
+      { to: "/finanzas", label: "Finanzas", icon: Wallet },
+    ];
+  }
+  if (org?.kind === "merchant") {
+    return [
+      { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+      { to: "/envios", label: "Envíos", icon: Package },
+      { to: "/finanzas", label: "Finanzas", icon: Wallet },
+    ];
+  }
+  return [{ to: "/dashboard", label: "Dashboard", icon: LayoutDashboard }];
+}
+
 export function AppShell() {
   const { user, logout } = useAuth();
-  const items = NAV.filter((i) => !i.adminOnly || user?.user_type === "admin");
+  const items = useNavItems();
 
   return (
     <div className="flex min-h-screen bg-cream">

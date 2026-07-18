@@ -67,8 +67,8 @@ POST /shipments  { ..., recipient_name, recipient_phone }
 ```
 
 **Regla mental (backend):** ¿es una URL/código HTTP? → router. ¿es una regla del negocio? →
-service. ¿es una query? → repository. ¿es una columna nueva? → models (+ migración en
-`alembic/versions/`).
+service. ¿es una query? → repository. ¿es una columna nueva? → models (el esquema se crea con
+`create_all()` al arrancar).
 
 > Nota: el módulo `admin` es especial — es de *reportería* (lee de varias tablas a la vez), así
 > que su `service.py` consulta directo la sesión en vez de un solo repository. Sigue teniendo su

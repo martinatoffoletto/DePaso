@@ -226,7 +226,7 @@ justificar por qué las otras serían sobre-ingeniería a esta escala (principio
 | Control de versiones | Git + GitHub (`martinatoffoletto/DePaso`) |
 | Build reproducible / portable | `Dockerfile` multi-stage + `docker-compose.yml` |
 | Infra declarativa (lo que aplica) | `render.yaml` (blueprint), `eas.json` (builds), `vercel` config |
-| Esquema de DB versionado | Migraciones Alembic (`001` → `002` → `003`) |
+| Esquema de DB reproducible | Modelos ORM como única fuente de verdad (`create_all()` al arrancar) |
 | Config por entorno, no hardcodeada | `.env` / variables de entorno + **guard de producción** (rechaza JWT/CORS inseguros) |
 | Secretos fuera del repo | `.env` en `.gitignore`; `JWT_SECRET` se autogenera en Render |
 | Tests automatizados | 100 tests pytest (backend), tsc + eslint (app y web) |

@@ -7,6 +7,8 @@ import * as ImagePicker from "expo-image-picker";
 import { useAuthStore } from "@/src/shared/session/authStore";
 import { co2Service } from "@/src/shared/api/co2";
 import type { ClientImpact } from "@/src/shared/types";
+import { ForestHeroCard, HeroStatsRow, HeroStat } from "@/src/shared/ui/ForestHeroCard";
+import { ScanCorners } from "@/src/sender/components/ScanCorners";
 import { T } from "@/constants/tokens";
 
 type IconName = React.ComponentProps<typeof MaterialCommunityIcons>["name"];
@@ -75,16 +77,7 @@ export function HomeScreen({ onStart }: HomeScreenProps) {
       showsVerticalScrollIndicator={false}
     >
       {/* ── Forest header card ── */}
-      <View className="bg-forest rounded-[22px] p-[22px] overflow-hidden">
-        <View
-          className="absolute h-4 rounded-lg bg-white/5"
-          style={{ top: 40, left: -20, right: -20, transform: [{ rotate: "-6deg" }] }}
-        />
-        <View
-          className="absolute h-4 rounded-lg"
-          style={{ top: 62, left: -20, right: -20, backgroundColor: "rgba(255,255,255,0.04)", transform: [{ rotate: "-6deg" }] }}
-        />
-
+      <ForestHeroCard stripes="top" className="rounded-[22px] p-[22px]">
         <View className="flex-row justify-between items-start">
           <View>
             <Text className="text-[10px] tracking-[2.5px] uppercase mb-[6px]" style={{ color: "rgba(244,239,227,0.8)" }}>
@@ -101,28 +94,19 @@ export function HomeScreen({ onStart }: HomeScreenProps) {
           </View>
         </View>
 
-        <View className="flex-row mt-[18px]">
-          <View className="flex-1 pr-[10px] mr-[14px]" style={{ borderRightWidth: 1, borderRightColor: "rgba(244,239,227,0.12)" }}>
-            <Text className="text-[22px] font-bold text-[#F4EFE3] tracking-[-0.5px]">
-              {impact != null ? String(impact.shipments_delivered) : "—"}
-            </Text>
-            <Text className="text-[9px] tracking-[1.5px] uppercase mt-0.5" style={{ color: "rgba(244,239,227,0.8)" }}>ENVÍOS</Text>
-          </View>
-          <View className="flex-1 pr-[10px] mr-[14px]" style={{ borderRightWidth: 1, borderRightColor: "rgba(244,239,227,0.12)" }}>
-            <Text className="text-[22px] font-bold text-lime tracking-[-0.5px]">
-              {impact != null ? impact.total_co2_saved_kg.toFixed(1) : "—"}
-              {impact != null ? <Text className="text-xs font-normal text-[#F4EFE3]">kg</Text> : null}
-            </Text>
-            <Text className="text-[9px] tracking-[1.5px] uppercase mt-0.5" style={{ color: "rgba(244,239,227,0.8)" }}>CO₂ AHORRADO</Text>
-          </View>
-          <View className="flex-1">
-            <Text className="text-[22px] font-bold text-[#F4EFE3] tracking-[-0.5px]">
-              {user ? user.rating.toFixed(1) : "—"}
-            </Text>
-            <Text className="text-[9px] tracking-[1.5px] uppercase mt-0.5" style={{ color: "rgba(244,239,227,0.8)" }}>REPUTACIÓN</Text>
-          </View>
-        </View>
-      </View>
+        <HeroStatsRow className="mt-[18px]">
+          <HeroStat value={impact != null ? String(impact.shipments_delivered) : "—"} label="ENVÍOS" divider />
+          <HeroStat
+            value={impact != null
+              ? <>{impact.total_co2_saved_kg.toFixed(1)}<Text className="text-xs font-normal text-[#F4EFE3]">kg</Text></>
+              : "—"}
+            label="CO₂ AHORRADO"
+            valueClassName="text-lime"
+            divider
+          />
+          <HeroStat value={user ? user.rating.toFixed(1) : "—"} label="REPUTACIÓN" />
+        </HeroStatsRow>
+      </ForestHeroCard>
 
       {/* ── Package card ── */}
       <View
@@ -177,7 +161,7 @@ export function HomeScreen({ onStart }: HomeScreenProps) {
               activeOpacity={0.88}
             >
               <View className="absolute top-[14px] right-[14px] bottom-[14px] left-[14px]">
-                <ScanCornersLime />
+                <ScanCorners color={T.lime} />
               </View>
               <View className="flex-row items-center gap-[14px] px-5">
                 <View
@@ -256,25 +240,3 @@ export function HomeScreen({ onStart }: HomeScreenProps) {
   );
 }
 
-function ScanCornersLime() {
-  const corners: { top?: number; bottom?: number; left?: number; right?: number }[] = [
-    { top: 0, left: 0 }, { top: 0, right: 0 }, { bottom: 0, left: 0 }, { bottom: 0, right: 0 },
-  ];
-  return (
-    <>
-      {corners.map((pos, i) => (
-        <View key={i} style={[{
-          position: "absolute", width: 20, height: 20, borderColor: T.lime,
-          borderTopWidth:    pos.top    !== undefined ? 2.5 : 0,
-          borderBottomWidth: pos.bottom !== undefined ? 2.5 : 0,
-          borderLeftWidth:   pos.left   !== undefined ? 2.5 : 0,
-          borderRightWidth:  pos.right  !== undefined ? 2.5 : 0,
-          borderTopLeftRadius:    i === 0 ? 6 : 0,
-          borderTopRightRadius:   i === 1 ? 6 : 0,
-          borderBottomLeftRadius: i === 2 ? 6 : 0,
-          borderBottomRightRadius: i === 3 ? 6 : 0,
-        }, pos]} />
-      ))}
-    </>
-  );
-}

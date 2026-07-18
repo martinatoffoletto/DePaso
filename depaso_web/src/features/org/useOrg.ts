@@ -8,7 +8,7 @@ import type { MyOrganization } from "@/types";
  * El backend devuelve 403 cuando el usuario no es miembro de ninguna org:
  * eso NO es un error a reintentar, es el estado "todavía no tenés organización".
  */
-export function useMyOrg() {
+export function useMyOrg(options?: { enabled?: boolean }) {
   return useQuery<MyOrganization | null>({
     queryKey: ["org", "me"],
     queryFn: async () => {
@@ -24,5 +24,6 @@ export function useMyOrg() {
     },
     staleTime: 60_000,
     retry: false,
+    enabled: options?.enabled ?? true,
   });
 }

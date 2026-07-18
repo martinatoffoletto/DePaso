@@ -24,9 +24,7 @@ if ! python -c "import fastapi" 2>/dev/null; then
     pip install -r requirements.txt
 fi
 
-# Run database migrations
-echo "🔄 Running database migrations..."
-alembic upgrade head || echo "⚠️  Migration failed, continuing anyway..."
+# Sin migraciones (MVP): el esquema lo crea create_all() en el seed y al arrancar la app.
 
 # Seed database (optional)
 echo "🌱 Seeding database with sample data..."

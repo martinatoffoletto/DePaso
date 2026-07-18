@@ -5,6 +5,7 @@ import { Text } from "react-native-paper";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { T } from "@/constants/tokens";
+import { StepDots } from "@/src/sender/components/StepDots";
 import { shipmentsService } from "@/src/shared/api/shipments";
 import type { Quote } from "@/src/shared/types";
 import type { Coords } from "./FlowNavigator";
@@ -23,16 +24,6 @@ const BA_DEFAULT: Coords = { latitude: -34.6037, longitude: -58.3816 };
 // Soft shadow shared by the floating map controls.
 const FLOAT_SHADOW = { shadowColor: "#000", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.15, shadowRadius: 12, elevation: 3 };
 
-function StepDots({ current, total }: { current: number; total: number }) {
-  return (
-    <View className="flex-row gap-[6px] items-center">
-      {Array.from({ length: total }).map((_, i) => (
-        <View key={i} className="h-[6px] rounded" style={{ width: i === current - 1 ? 18 : 6, backgroundColor: i < current ? T.forest : T.border }} />
-      ))}
-      <Text className="text-[10px] tracking-[1.5px] text-inkMute ml-1">{String(current).padStart(2, "0")}/{String(total).padStart(2, "0")}</Text>
-    </View>
-  );
-}
 
 type Props = {
   origin: string;

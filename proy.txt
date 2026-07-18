@@ -284,7 +284,7 @@ RNF-PRV-04: Cumplimiento con Ley 25.326 de Protección de Datos Personales (Arge
 
 RNF-MNT-01: Código backend organizado en módulos independientes con 4 capas (router, service, repository, schemas) para facilitar testing y refactors.
 RNF-MNT-02: Cobertura mínima de tests: 60% en módulos core (auth, shipments, matching).
-RNF-MNT-03: Migraciones de base de datos versionadas con Alembic.
+RNF-MNT-03: Esquema de base de datos definido en los modelos ORM y creado automáticamente al iniciar la aplicación (create_all), adecuado al alcance del MVP.
 RNF-MNT-04: Documentación de API auto-generada via Swagger/OpenAPI.
 RNF-MNT-05: Logs estructurados (JSON) con niveles INFO, WARNING, ERROR.
 

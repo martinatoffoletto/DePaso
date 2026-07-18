@@ -9,11 +9,16 @@ from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.app.core.config import settings
+from src.app.modules.auth.service import AuthService
 from src.app.modules.carriers.models import Carrier
+from src.app.modules.organizations.exceptions import OrganizationAlreadyExistsError
+from src.app.modules.organizations.models import Organization
+from src.app.modules.organizations.repository import OrganizationRepository
 from src.app.modules.shipments.models import Shipment, ShipmentEvent
 from src.app.modules.users.models import User
+from src.app.modules.users.repository import UserRepository
 from src.app.modules.vision.models import Classification
-from src.app.shared.enums import ShipmentStatus
+from src.app.shared.enums import OrganizationMemberRole, ShipmentStatus
 from src.app.shared.exceptions import NotFoundError, ValidationError
 
 ACTIVE_STATUSES = (
@@ -124,3 +129,22 @@ class AdminService:
             )
         ).scalars().all()
         return {"classifications": list(classifications), "events": list(events)}
+
+    async def create_org_account(
+        self, name: str, cuit: str, kind: str, email: str, password: str,
+    ) -> tuple[User, Organization]:
+        """Alta manual (RF-ADM): crea el usuario dueño y su organización B2B.
+        Reemplaza el alta self-service para cuentas que el admin da de alta
+        directamente (pyme/fletero), sin pasar por /auth/register."""
+        org_repo = OrganizationRepository(self.db)
+        if await org_repo.get_by_cuit(cuit):
+            raise OrganizationAlreadyExistsError()
+
+        auth_service = AuthService(UserRepository(self.db))
+        user = await auth_service.register(
+            email=email, password=password, first_name=name, last_name="",
+            user_type="client",
+        )
+        org = await org_repo.create(name=name, cuit=cuit, kind=kind, owner_user_id=user.id)
+        await org_repo.add_member(org.id, user.id, OrganizationMemberRole.OWNER)
+        return user, org

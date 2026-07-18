@@ -30,7 +30,6 @@ DePaso is a platform that connects clients needing shipments with carriers provi
 | **PostgreSQL**  | Latest  | Database            |
 | **PostGIS**     | -       | Geospatial queries  |
 | **Pydantic**    | 2.5.0   | Data validation     |
-| **Alembic**     | 1.13.1  | Database migrations |
 | **TensorFlow**  | 2.14.0  | ML/vision module    |
 | **python-jose** | 3.3.0   | JWT tokens          |
 | **passlib**     | 1.7.4   | Password hashing    |
@@ -66,11 +65,6 @@ depaso_rest/
 │       ├── co2/               # CO2 calculation
 │       ├── tracking/          # Shipment tracking
 │       └── freight/           # Mudanza-specific logic
-├── alembic/                    # Database migrations
-│   ├── env.py                 # Migration environment
-│   ├── script.py.mako         # Migration template
-│   ├── versions/              # Migration scripts
-│   └── alembic.ini            # Alembic config
 ├── tests/
 │   ├── conftest.py            # Pytest fixtures
 │   ├── test_auth.py           # Auth tests
@@ -187,10 +181,9 @@ IPCC_EMISSION_FACTOR_DEFAULT=250.0
 
 ### 5. Database Setup
 
-```bash
-# Run migrations
-alembic upgrade head
+The schema is created automatically on startup (`create_all()`).
 
+```bash
 # Seed with sample data (optional)
 python scripts/seed_db.py
 ```
@@ -396,33 +389,11 @@ pre-commit run --all-files
 - Dedicated carrier requirements
 - Specialized pricing
 
-## Database Migrations
+## Database Schema
 
-### Create New Migration
-
-```bash
-alembic revision --autogenerate -m "Add shipments table"
-```
-
-### Apply Migrations
-
-```bash
-# Apply all pending
-alembic upgrade head
-
-# Apply specific revision
-alembic upgrade 1234567abcde
-
-# Rollback last migration
-alembic downgrade -1
-```
-
-### View Migration History
-
-```bash
-alembic current
-alembic history
-```
+No migration tool in the MVP: the ORM models are the single source of truth and
+`Base.metadata.create_all()` creates the schema when the app starts (also done by the seed
+script). To add a column, edit the model and recreate the dev database.
 
 ## Deployment
 

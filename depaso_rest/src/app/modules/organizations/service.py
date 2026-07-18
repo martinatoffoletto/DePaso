@@ -23,6 +23,7 @@ from src.app.modules.shipments import pricing
 from src.app.modules.shipments.models import Shipment
 from src.app.modules.shipments.repository import ShipmentRepository
 from src.app.modules.shipments.service import ShipmentService
+from src.app.modules.users.repository import UserRepository
 from src.app.shared.enums import (
     OrganizationKind,
     OrganizationMemberRole,
@@ -48,11 +49,13 @@ class OrganizationService:
         carrier_repo: CarrierRepository,
         shipment_repo: ShipmentRepository,
         shipment_service: ShipmentService,
+        user_repo: UserRepository,
     ) -> None:
         self.org_repo = org_repo
         self.carrier_repo = carrier_repo
         self.shipment_repo = shipment_repo
         self.shipment_service = shipment_service
+        self.user_repo = user_repo
 
     # -- organization lifecycle ------------------------------------------------
 
@@ -102,12 +105,17 @@ class OrganizationService:
 
     # -- fleet: carrier management ---------------------------------------------
 
-    async def link_carrier(self, org: Organization, carrier_id: int):
+    async def link_carrier_by_email(self, org: Organization, email: str):
+        """Vincula un carrier a la flota por el email con el que está
+        registrado — la org no navega/lista transportistas ajenos."""
         await self._require_kind(org, _FLEET_KINDS, "manage fleet carriers")
-        carrier = await self.carrier_repo.get_by_id(carrier_id)
+        user = await self.user_repo.get_by_email(email)
+        if user is None:
+            raise CarrierNotLinkableError("No existe un usuario registrado con ese email.")
+        carrier = await self.carrier_repo.get_by_user_id(user.id)
         if carrier is None:
-            raise CarrierNotLinkableError("Carrier not found.")
-        return await self.org_repo.link_carrier(org.id, carrier_id)
+            raise CarrierNotLinkableError("Ese usuario no tiene un perfil de transportista.")
+        return await self.org_repo.link_carrier(org.id, carrier.id)
 
     async def unlink_carrier(self, org: Organization, carrier_id: int):
         await self._require_kind(org, _FLEET_KINDS, "manage fleet carriers")

@@ -1,7 +1,6 @@
 """
 Shared SQLAlchemy declarative base and base model mixin.
 All ORM models must inherit from this single Base to share the same metadata.
-Having one Base ensures Alembic can auto-detect all tables.
 """
 from datetime import datetime, timezone
 
@@ -15,8 +14,7 @@ def _utcnow() -> datetime:
 
 
 # Single shared Base for the entire application.
-# Previously each module declared its own Base, which broke FK relationships
-# and Alembic migrations.
+# Previously each module declared its own Base, which broke FK relationships.
 class Base(DeclarativeBase):
     __allow_unmapped__ = True
 

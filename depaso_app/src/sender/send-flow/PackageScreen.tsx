@@ -11,6 +11,8 @@ import { visionService } from "@/src/sender/vision";
 import { DimensioningModal } from "./DimensioningModal";
 import type { DimensionEstimate } from "@/src/sender/dimensioning";
 import { T } from "@/constants/tokens";
+import { StepDots } from "@/src/sender/components/StepDots";
+import { ScanCorners } from "@/src/sender/components/ScanCorners";
 
 type IconName = React.ComponentProps<typeof MaterialCommunityIcons>["name"];
 
@@ -31,45 +33,7 @@ const CATEGORY_AI_LABEL: Record<string, string> = {
   l: "una carga grande o voluminosa", xl: "una mudanza o flete",
 };
 
-function StepDots({ current, total }: { current: number; total: number }) {
-  return (
-    <View className="flex-row gap-[6px] items-center">
-      {Array.from({ length: total }).map((_, i) => (
-        <View
-          key={i}
-          className="h-[6px] rounded-[4px]"
-          style={{ width: i === current - 1 ? 18 : 6, backgroundColor: i < current ? T.forest : T.border }}
-        />
-      ))}
-      <Text className="text-[10px] tracking-[1.5px] text-inkMute ml-1">
-        {String(current).padStart(2, "0")}/{String(total).padStart(2, "0")}
-      </Text>
-    </View>
-  );
-}
 
-function ScanCorners() {
-  const corners: { top?: number; bottom?: number; left?: number; right?: number }[] = [
-    { top: 0, left: 0 }, { top: 0, right: 0 }, { bottom: 0, left: 0 }, { bottom: 0, right: 0 },
-  ];
-  return (
-    <>
-      {corners.map((pos, i) => (
-        <View key={i} style={[{
-          position: "absolute", width: 20, height: 20, borderColor: T.emerald,
-          borderTopWidth:    pos.top    !== undefined ? 2.5 : 0,
-          borderBottomWidth: pos.bottom !== undefined ? 2.5 : 0,
-          borderLeftWidth:   pos.left   !== undefined ? 2.5 : 0,
-          borderRightWidth:  pos.right  !== undefined ? 2.5 : 0,
-          borderTopLeftRadius:    i === 0 ? 6 : 0,
-          borderTopRightRadius:   i === 1 ? 6 : 0,
-          borderBottomLeftRadius: i === 2 ? 6 : 0,
-          borderBottomRightRadius: i === 3 ? 6 : 0,
-        }, pos]} />
-      ))}
-    </>
-  );
-}
 
 export type PackagePayload = {
   categoryId: string;

@@ -7,6 +7,7 @@ import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as Location from "expo-location";
 import { T } from "@/constants/tokens";
+import { StepDots } from "@/src/sender/components/StepDots";
 import { reverseGeocode } from "@/src/shared/utils/geocoding";
 import { searchAddresses, formatAddress, Suggestion } from "@/src/shared/utils/addressSearch";
 import { useAuthStore } from "@/src/shared/session/authStore";
@@ -17,22 +18,6 @@ type IconName = React.ComponentProps<typeof MaterialCommunityIcons>["name"];
 
 // Geocoding compartido (Photon / Komoot — OSM): src/shared/utils/addressSearch.ts
 
-function StepDots({ current, total }: { current: number; total: number }) {
-  return (
-    <View className="flex-row gap-[6px] items-center">
-      {Array.from({ length: total }).map((_, i) => (
-        <View
-          key={i}
-          className="h-[6px] rounded-[4px]"
-          style={{ width: i === current - 1 ? 18 : 6, backgroundColor: i < current ? T.forest : T.border }}
-        />
-      ))}
-      <Text className="text-[10px] tracking-[1.5px] text-inkMute ml-1">
-        {String(current).padStart(2, "0")}/{String(total).padStart(2, "0")}
-      </Text>
-    </View>
-  );
-}
 
 export type AddressPayload = {
   origin: string;

@@ -120,22 +120,29 @@ app/
     admin.tsx      # solo admins
 src/                 # regla: lo que usa UN rol va en su carpeta; lo que usan 2+ va en shared/
   shared/
-    ui/            # Button, Card, FormInput, Toast (+toastStore), Skeleton, AddressField...
+    ui/            # Button, Card, Field (+FieldLabel), Toast (+toastStore), Skeleton, AddressField, ForestHeroCard, PasswordStrengthBar, WaypointMark...
     errors/        # AppErrorBoundary, OfflineBanner, connectionStore
     session/       # authStore, settingsStore, auth.ts (service)
     api/           # client.ts (axios), shipments.ts, carriers.ts, notifications.ts, co2.ts
-    profile/       # ProfileScreen + modales, addressBookStore (todos los roles)
+    profile/       # ProfileScreen, addressBookStore + components/ (ProfileRow, AddressModal, ContactModal)
     onboarding/    # OnboardingOverlay
-    hooks/         # useShipmentNotifications
+    hooks/         # useShipmentNotifications, useAddress
     utils/         # geocoding, addressSearch, packageCategory
     types.ts       # tipos compartidos y enums TS
   sender/          # send-flow/, ShipmentsScreen, ImpactScreen, vision.ts, dimensioning, co2
+    components/    # LiveShipmentCard, PastShipmentCard, ShipmentDetailModal, RatingModal, StepDots, ScanCorners, SummaryRow, EquivalenceCard, shipmentsUi
   carrier/         # RiderHomeScreen, CarrierShipmentsScreen, PublishTripScreen, riderStore, useGpsPublisher
+    components/    # ActiveJobPanel, OfferRow, TripRow, HistoryRow, HourSelect, MiniCalendar, RouteAddress, riderUi
   admin/           # AdminScreen, api.ts
 constants/
   tokens.ts        # Design tokens → importar como `T` (ej: T.forest, T.bg)
 ```
 Imports siempre con alias `@/src/...` (único path alias en tsconfig).
+
+**Regla pantallas vs componentes**: los archivos `*Screen.tsx` son páginas — solo estado, carga
+de datos y layout. Todo componente presentacional (cards, rows, modales, paneles) vive en la
+subcarpeta `components/` de su área (o en `shared/ui/` si lo usan 2+ roles). No definir
+componentes inline dentro de un archivo de pantalla.
 
 ### Roles y tabs
 | Rol | Tab "Pedidos/Enviar" | Tab "Mis Viajes/Envíos" | Tab especial |

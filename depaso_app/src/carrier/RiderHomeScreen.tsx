@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { View, ScrollView, TouchableOpacity, ActivityIndicator, Alert, RefreshControl, Linking, Text, TextInput as RNTextInput } from "react-native";
+import { View, ScrollView, TouchableOpacity, ActivityIndicator, Alert, RefreshControl, Text } from "react-native";
 import MapView, { Marker, Polyline, Region } from "react-native-maps";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -11,17 +11,16 @@ import { useRiderStore } from "@/src/carrier/riderStore";
 import { toast } from "@/src/shared/ui/toastStore";
 import { carriersService, routesService } from "@/src/shared/api/carriers";
 import { shipmentsService } from "@/src/shared/api/shipments";
-import { Carrier, CarrierRoute, CarrierSummary, FeedItem, Shipment, ShipmentStatus, TransportType } from "@/src/shared/types";
+import { Carrier, CarrierRoute, CarrierSummary, FeedItem, Shipment, ShipmentStatus } from "@/src/shared/types";
 import { carrierPayout } from "@/src/shared/utils/payout";
-import { VEHICLES, vehicleNeedsPlate } from "@/src/shared/utils/vehicles";
-import { reverseGeocode } from "@/src/shared/utils/geocoding";
 import { T } from "@/constants/tokens";
 import { IncomingOfferModal } from "./IncomingOfferModal";
 import PublishTripScreen from "./PublishTripScreen";
 import { useGpsPublisher } from "./useGpsPublisher";
-import { PACKAGE_LABEL_SHORT } from "@/src/shared/utils/packageCategory";
-
-const SIZE_LABEL = PACKAGE_LABEL_SHORT;
+import { ActiveJobPanel } from "./components/ActiveJobPanel";
+import { OfferRow } from "./components/OfferRow";
+import { TripRow } from "./components/TripRow";
+import { money } from "./components/riderUi";
 
 const ACTIVE_STATUSES: ShipmentStatus[] = [
   ShipmentStatus.ASSIGNED,
@@ -29,140 +28,8 @@ const ACTIVE_STATUSES: ShipmentStatus[] = [
   ShipmentStatus.IN_TRANSIT,
 ];
 
-type IconName = React.ComponentProps<typeof MaterialCommunityIcons>["name"];
-
-/** Operational milestones — managed from the map, not from the history tab. */
-const NEXT_ACTION: Partial<Record<ShipmentStatus, { next: ShipmentStatus; label: string; icon: IconName }>> = {
-  [ShipmentStatus.ASSIGNED]:       { next: ShipmentStatus.PICKUP_ARRIVED, label: "Llegué al origen",  icon: "map-marker-check-outline" },
-  [ShipmentStatus.PICKUP_ARRIVED]: { next: ShipmentStatus.IN_TRANSIT,     label: "Retiré el paquete", icon: "package-up" },
-  [ShipmentStatus.IN_TRANSIT]:     { next: ShipmentStatus.DELIVERED,      label: "Entregué el paquete", icon: "check-decagram-outline" },
-};
-
-const STATUS_LABEL: Partial<Record<ShipmentStatus, { text: string; color: string; bg: string }>> = {
-  [ShipmentStatus.ASSIGNED]:       { text: "IR AL RETIRO", color: T.amberDeep,   bg: T.amberBg },
-  [ShipmentStatus.PICKUP_ARRIVED]: { text: "EN RETIRO",    color: T.emeraldDeep, bg: T.mint },
-  [ShipmentStatus.IN_TRANSIT]:     { text: "EN CAMINO",    color: T.forest,      bg: T.mint },
-};
-
 const BA_REGION: Region = { latitude: -34.6037, longitude: -58.4173, latitudeDelta: 0.06, longitudeDelta: 0.06 };
 const SPACE_WINDOW_HOURS = 4;
-
-function money(n: number): string {
-  return `$${Math.round(n).toLocaleString("es-AR")}`;
-}
-
-function useAddress(lat: number, lon: number): string {
-  const [addr, setAddr] = useState(`${lat.toFixed(3)}, ${lon.toFixed(3)}`);
-  useEffect(() => {
-    let alive = true;
-    reverseGeocode(lat, lon).then((r) => { if (alive) setAddr(r); });
-    return () => { alive = false; };
-  }, [lat, lon]);
-  return addr;
-}
-
-/** El registro crea la cuenta y DESPUÉS el perfil de cadete; si ese segundo
- * paso falló (ej. patente duplicada, sin red), el usuario quedaba en una UI
- * de cadete vacía y sin salida. Este formulario completa el perfil acá. */
-function CompleteCarrierProfile({ userName, onDone }: { userName: string; onDone: () => void }) {
-  const insets = useSafeAreaInsets();
-  const [vehicleType, setVehicleType] = useState<TransportType>(TransportType.MOTORCYCLE);
-  const [plate, setPlate] = useState("");
-  const [saving, setSaving] = useState(false);
-  const needsPlate = vehicleNeedsPlate(vehicleType);
-
-  async function submit() {
-    if (needsPlate && !plate.trim()) {
-      Alert.alert("Falta la patente", "Ingresá la patente de tu vehículo.");
-      return;
-    }
-    setSaving(true);
-    try {
-      const vehicle = VEHICLES.find((v) => v.type === vehicleType)!;
-      await carriersService.createProfile({
-        company_name: userName,
-        vehicle_type: vehicleType,
-        license_plate: needsPlate ? plate.trim().toUpperCase() : null,
-        capacity_kg: vehicle.capacityKg,
-      });
-      onDone();
-    } catch (err: unknown) {
-      const detail = (err as { response?: { data?: { detail?: unknown } } })?.response?.data?.detail;
-      Alert.alert("No se pudo crear el perfil",
-        typeof detail === "string" ? detail : "Intentá de nuevo.");
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  return (
-    <ScrollView
-      className="flex-1 bg-bg"
-      contentContainerStyle={{ paddingTop: insets.top + 24, paddingHorizontal: 24, paddingBottom: insets.bottom + 32, gap: 16 }}
-      keyboardShouldPersistTaps="handled"
-    >
-      <View className="items-center gap-[10px]">
-        <View className="w-[72px] h-[72px] rounded-[22px] bg-cardSoft items-center justify-center border border-border">
-          <MaterialCommunityIcons name="truck-outline" size={34} color={T.forest} />
-        </View>
-        <Text className="text-base text-ink font-bold tracking-[-0.3px] text-center">Completá tu perfil de cadete</Text>
-        <Text className="text-[13px] text-inkMute text-center leading-[19px]">
-          Tu cuenta se creó pero falta registrar tu vehículo para poder trabajar.
-        </Text>
-      </View>
-
-      <View>
-        <Text className="text-[9.5px] tracking-[1.5px] text-inkMute uppercase font-bold mb-2">Tu vehículo</Text>
-        <View className="flex-row flex-wrap gap-2">
-          {VEHICLES.map((v) => {
-            const active = vehicleType === v.type;
-            return (
-              <TouchableOpacity
-                key={v.type}
-                className={`flex-row items-center gap-[6px] rounded-xl px-3 py-[9px] border-[1.2px] ${active ? "bg-forest border-forest" : "bg-card border-border"}`}
-                onPress={() => setVehicleType(v.type)}
-                activeOpacity={0.8}
-              >
-                <MaterialCommunityIcons name={v.icon as IconName} size={14} color={active ? T.lime : T.inkSoft} />
-                <Text className={`text-[12.5px] font-semibold ${active ? "text-[#F4EFE3]" : "text-inkSoft"}`}>{v.label}</Text>
-              </TouchableOpacity>
-            );
-          })}
-        </View>
-      </View>
-
-      {needsPlate && (
-        <View>
-          <Text className="text-[9.5px] tracking-[1.5px] text-inkMute uppercase font-bold mb-2">Patente</Text>
-          <View className="flex-row items-center gap-3 bg-card rounded-2xl border-[1.2px] border-border px-[14px] h-[52px]">
-            <MaterialCommunityIcons name="card-text-outline" size={18} color={T.inkMute} />
-            <RNTextInput
-              className="flex-1 text-[15px] text-ink font-medium"
-              placeholder="AB123CD"
-              placeholderTextColor={T.inkFaint}
-              value={plate}
-              onChangeText={setPlate}
-              autoCapitalize="characters"
-              autoCorrect={false}
-            />
-          </View>
-        </View>
-      )}
-
-      <TouchableOpacity
-        className="bg-forest rounded-2xl h-[54px] items-center justify-center"
-        style={{ opacity: saving ? 0.7 : 1 }}
-        onPress={submit}
-        disabled={saving}
-        activeOpacity={0.88}
-      >
-        {saving
-          ? <ActivityIndicator color="#F4EFE3" />
-          : <Text className="text-[#F4EFE3] font-bold text-[15px]">Crear perfil de cadete</Text>}
-      </TouchableOpacity>
-    </ScrollView>
-  );
-}
 
 function shiftLabel(startedAt: number | null, now: number): string {
   if (!startedAt) return "recién arrancás";
@@ -170,164 +37,6 @@ function shiftLabel(startedAt: number | null, now: number): string {
   const h = Math.floor(mins / 60);
   const m = mins % 60;
   return h > 0 ? `${h}h ${m}min activo` : `${m}min activo`;
-}
-
-/** Active delivery card in the map's bottom sheet — milestones live here. */
-function ActiveJobPanel({ shipment, advancing, onAdvance, onCancel }: {
-  shipment: Shipment;
-  advancing: boolean;
-  onAdvance: (next: ShipmentStatus) => void;
-  onCancel: () => void;
-}) {
-  const origAddr = useAddress(shipment.origin_lat, shipment.origin_lon);
-  const destAddr = useAddress(shipment.destination_lat, shipment.destination_lon);
-  const action = NEXT_ACTION[shipment.status];
-  const statusInfo = STATUS_LABEL[shipment.status];
-
-  return (
-    <View className="bg-card border-[1.2px] border-forest rounded-[18px] p-[14px]">
-      <View className="flex-row items-center justify-between mb-[10px]">
-        <View className="flex-row items-center gap-2">
-          <Text className="text-[10px] tracking-[1.5px] text-inkMute font-bold">DP-{String(shipment.id).padStart(4, "0")}</Text>
-          {statusInfo && (
-            <View className="rounded-md px-[7px] py-[3px]" style={{ backgroundColor: statusInfo.bg }}>
-              <Text className="text-[9px] tracking-[1px] font-bold uppercase" style={{ color: statusInfo.color }}>
-                {statusInfo.text}
-              </Text>
-            </View>
-          )}
-        </View>
-        {shipment.estimated_price != null && (
-          <Text className="text-[16px] font-extrabold text-ink tracking-[-0.4px]">{money(carrierPayout(shipment.estimated_price))}</Text>
-        )}
-      </View>
-
-      <View className="gap-[6px] mb-[10px]">
-        <View className="flex-row items-center gap-[10px]">
-          <View className="w-[9px] h-[9px] rounded-full border-2 border-forest bg-card" />
-          <Text className="flex-1 text-[13px] text-ink font-medium" numberOfLines={1}>{origAddr}</Text>
-        </View>
-        <View className="flex-row items-center gap-[10px]">
-          <View className="w-[9px] h-[9px] rounded-[3px] bg-emerald rotate-45" />
-          <Text className="flex-1 text-[13px] text-ink font-medium" numberOfLines={1}>{destAddr}</Text>
-        </View>
-      </View>
-
-      {(shipment.recipient_name || shipment.recipient_phone) && (
-        <View className="flex-row items-center gap-[10px] bg-cardSoft border border-borderSoft rounded-xl px-3 py-2 mb-[10px]">
-          <MaterialCommunityIcons name="account-outline" size={15} color={T.inkSoft} />
-          <Text className="flex-1 text-[12.5px] text-ink font-semibold" numberOfLines={1}>
-            {shipment.recipient_name || "Destinatario"}
-          </Text>
-          {shipment.recipient_phone && (
-            <TouchableOpacity
-              className="flex-row items-center gap-[5px] bg-forest rounded-lg px-[10px] py-[6px]"
-              onPress={() => Linking.openURL(`tel:${shipment.recipient_phone}`)}
-              activeOpacity={0.85}
-            >
-              <MaterialCommunityIcons name="phone" size={12} color="#F4EFE3" />
-              <Text className="text-[11px] text-[#F4EFE3] font-semibold">Llamar</Text>
-            </TouchableOpacity>
-          )}
-        </View>
-      )}
-
-      {action && (
-        <TouchableOpacity
-          className="bg-forest rounded-[13px] h-[46px] flex-row items-center justify-center gap-2"
-          onPress={() => onAdvance(action.next)}
-          disabled={advancing}
-          activeOpacity={0.88}
-        >
-          {advancing
-            ? <ActivityIndicator color="#F4EFE3" size="small" />
-            : <>
-                <MaterialCommunityIcons name={action.icon} size={16} color="#F4EFE3" />
-                <Text className="text-[#F4EFE3] font-bold text-[13.5px]">{action.label}</Text>
-              </>}
-        </TouchableOpacity>
-      )}
-
-      {shipment.status === ShipmentStatus.ASSIGNED && (
-        <TouchableOpacity className="items-center pt-[10px]" onPress={onCancel} activeOpacity={0.8}>
-          <Text className="text-[11.5px] text-red font-medium">No puedo llevarlo · penaliza reputación</Text>
-        </TouchableOpacity>
-      )}
-    </View>
-  );
-}
-
-/** Small offer row in the online "Pedidos cerca tuyo" list. */
-function OfferRow({ item, onPress }: { item: FeedItem; onPress: () => void }) {
-  const origAddr = useAddress(item.origin_lat, item.origin_lon);
-  const destAddr = useAddress(item.destination_lat, item.destination_lon);
-  return (
-    <TouchableOpacity
-      className="bg-card border border-border rounded-[14px] px-3 py-[10px] flex-row items-center gap-[10px]"
-      onPress={onPress}
-      activeOpacity={0.85}
-    >
-      <View className="w-[38px] h-[38px] rounded-[10px] bg-cardSoft border border-borderSoft items-center justify-center">
-        {item.distance_to_pickup_km != null ? (
-          <>
-            <Text className="text-[13px] font-bold text-ink">{item.distance_to_pickup_km.toFixed(1)}</Text>
-            <Text className="text-[7px] tracking-[0.5px] text-inkMute mt-px">KM</Text>
-          </>
-        ) : (
-          <MaterialCommunityIcons name="package-variant" size={18} color={T.forest} />
-        )}
-      </View>
-      <View className="flex-1">
-        <View className="flex-row items-center gap-[6px]">
-          <Text className="text-[13px] text-ink font-semibold">{SIZE_LABEL[item.package_size]}</Text>
-          <Text className="text-[8px] tracking-[1px] text-inkMute bg-bg px-[5px] py-px rounded font-bold uppercase">
-            {item.weight_kg} kg
-          </Text>
-        </View>
-        <Text className="text-[11px] text-inkMute mt-px" numberOfLines={1}>{origAddr} → {destAddr}</Text>
-      </View>
-      <View className="items-end">
-        <Text className="text-[15px] font-bold text-ink tracking-[-0.4px]">
-          {item.estimated_price != null ? money(carrierPayout(item.estimated_price)) : "—"}
-        </Text>
-        <Text className="text-[8.5px] tracking-[1px] text-emeraldDeep font-bold mt-px">VER</Text>
-      </View>
-    </TouchableOpacity>
-  );
-}
-
-/** Published collaborative trip card (offline state). */
-function TripRow({ route }: { route: CarrierRoute }) {
-  const origAddr = useAddress(route.origin_lat, route.origin_lon);
-  const destAddr = useAddress(route.destination_lat ?? route.origin_lat, route.destination_lon ?? route.origin_lon);
-  return (
-    <View className="bg-card border border-border rounded-2xl px-[14px] py-3">
-      <View className="flex-row items-center gap-2 mb-[10px]">
-        <MaterialCommunityIcons
-          name={route.kind === "dedicated_window" ? "calendar-clock" : "map-marker-path"}
-          size={14}
-          color={T.emeraldDeep}
-        />
-        <Text className="text-[11px] tracking-[1px] text-inkMute font-bold uppercase">
-          {route.kind === "dedicated_window" ? "Ventana dedicada" : "Ruta habitual"}
-        </Text>
-      </View>
-      <View className="flex-row items-center">
-        <View className="flex-row items-center gap-[6px] flex-1 min-w-0">
-          <View className="w-[9px] h-[9px] rounded-full border-2 border-forest bg-card" />
-          <Text className="text-[13px] text-ink font-medium flex-1" numberOfLines={1}>{origAddr}</Text>
-        </View>
-        <MaterialCommunityIcons name="dots-horizontal" size={16} color={T.inkFaint} />
-        <View className="flex-row items-center gap-[6px] flex-1 min-w-0 justify-end">
-          <Text className="text-[13px] text-ink font-medium flex-1 text-right" numberOfLines={1}>{destAddr}</Text>
-          <View className="w-[9px] h-[9px] rounded-[2px] bg-emerald rotate-45" />
-        </View>
-      </View>
-      {route.recurrence_days && (
-        <Text className="text-[10px] tracking-[1px] text-inkMute uppercase mt-2">{route.recurrence_days.replace(/,/g, " · ")}</Text>
-      )}
-    </View>
-  );
 }
 
 export default function RiderHomeScreen() {
@@ -351,7 +60,6 @@ export default function RiderHomeScreen() {
   }, [goOnline, goOffline]);
 
   const [carrier, setCarrier] = useState<Carrier | null>(null);
-  const [profileMissing, setProfileMissing] = useState(false);
   const [summary, setSummary] = useState<CarrierSummary | null>(null);
   const [routes, setRoutes] = useState<CarrierRoute[]>([]);
   const [feed, setFeed] = useState<FeedItem[]>([]);
@@ -399,7 +107,6 @@ export default function RiderHomeScreen() {
     try {
       const profile = await carriersService.getMyProfile();
       setCarrier(profile);
-      setProfileMissing(false);
       // Reconciliar disponibilidad: si la app se cerró estando "en línea",
       // el backend quedaba disponible para siempre.
       if (profile.is_available !== online) {
@@ -413,12 +120,8 @@ export default function RiderHomeScreen() {
       setRoutes(mine);
       await loadActive();
       if (profile.is_verified && online) await loadFeed();
-    } catch (err: unknown) {
+    } catch {
       setCarrier(null);
-      // 404 = la cuenta existe pero el perfil de cadete nunca se creó
-      // (falló en el registro): ofrecemos completarlo acá.
-      const status = (err as { response?: { status?: number } })?.response?.status;
-      setProfileMissing(status === 404);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -602,18 +305,31 @@ export default function RiderHomeScreen() {
     );
   }
 
-  // El perfil de cadete no existe (falló al registrarse): completarlo acá.
-  if (profileMissing) {
+  // El perfil se crea junto con el registro (antes de autenticar la sesión),
+  // así que si no cargó fue un error puntual (red, backend) — reintentar alcanza.
+  if (!carrier) {
     return (
-      <CompleteCarrierProfile
-        userName={`${user?.first_name ?? ""} ${user?.last_name ?? ""}`.trim() || "Cadete"}
-        onDone={() => load()}
-      />
+      <View className="flex-1 bg-bg items-center justify-center px-10 gap-[10px]" style={{ paddingTop: insets.top }}>
+        <View className="w-[72px] h-[72px] rounded-[22px] bg-cardSoft items-center justify-center border border-border mb-1">
+          <MaterialCommunityIcons name="alert-circle-outline" size={34} color={T.inkMute} />
+        </View>
+        <Text className="text-base text-ink font-bold tracking-[-0.3px] text-center">No pudimos cargar tu perfil</Text>
+        <Text className="text-[13px] text-inkMute text-center leading-[19px]">
+          Revisá tu conexión e intentá de nuevo.
+        </Text>
+        <TouchableOpacity
+          className="bg-forest rounded-2xl px-6 h-[46px] items-center justify-center mt-2"
+          onPress={() => load()}
+          activeOpacity={0.88}
+        >
+          <Text className="text-[#F4EFE3] font-bold text-[14px]">Reintentar</Text>
+        </TouchableOpacity>
+      </View>
     );
   }
 
   // Verification gate — matches the feed screen behaviour.
-  if (carrier && !carrier.is_verified) {
+  if (!carrier.is_verified) {
     return (
       <View className="flex-1 bg-bg items-center justify-center px-10 gap-[10px]" style={{ paddingTop: insets.top }}>
         <View className="w-[72px] h-[72px] rounded-[22px] bg-cardSoft items-center justify-center border border-border mb-1">

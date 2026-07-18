@@ -11,14 +11,17 @@ interface AuthState {
 
   // Actions
   login: (email: string, password: string) => Promise<void>;
-  register: (data: {
-    first_name: string;
-    last_name: string;
-    email: string;
-    password: string;
-    phone_number?: string;
-    user_type: UserType;
-  }) => Promise<void>;
+  register: (
+    data: {
+      first_name: string;
+      last_name: string;
+      email: string;
+      password: string;
+      phone_number?: string;
+      user_type: UserType;
+    },
+    onBeforeComplete?: () => Promise<void>,
+  ) => Promise<void>;
   logout: () => Promise<void>;
   restoreToken: () => Promise<void>;
   setUser: (user: User) => void;
@@ -52,11 +55,17 @@ export const useAuthStore = create<AuthState>((set) => ({
     }
   },
 
-  register: async (data) => {
+  register: async (data, onBeforeComplete) => {
     set({ isLoading: true });
     try {
       const response = await authService.register(data);
       await tokenStorage.save(response.access_token, response.refresh_token);
+
+      // Corre ANTES de marcar isAuthenticated: el router navega a (main) en
+      // cuanto isAuthenticated pasa a true, así que si esto (ej. crear el
+      // perfil de carrier) falla, nunca llegamos a navegar con un perfil a
+      // medio crear.
+      if (onBeforeComplete) await onBeforeComplete();
 
       // Fetch full user profile after register
       const fullUser = await authService.getCurrentUser();

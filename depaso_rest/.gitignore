@@ -40,8 +40,6 @@ env/
 .coverage
 htmlcov/
 
-# Alembic
-alembic/versions/__pycache__/
 
 # Models and weights
 *.tflite

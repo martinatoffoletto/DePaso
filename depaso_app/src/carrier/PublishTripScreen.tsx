@@ -5,8 +5,11 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useFocusEffect } from "@react-navigation/native";
 import { routesService } from "@/src/shared/api/carriers";
 import { CarrierRoute } from "@/src/shared/types";
-import { reverseGeocode } from "@/src/shared/utils/geocoding";
 import { AddressField, SelectedAddress } from "@/src/shared/ui/AddressField";
+import { FieldLabel } from "@/src/shared/ui/Field";
+import { HourSelect } from "./components/HourSelect";
+import { MiniCalendar } from "./components/MiniCalendar";
+import { RouteAddress } from "./components/RouteAddress";
 import { T } from "@/constants/tokens";
 
 const DAYS = [
@@ -24,11 +27,6 @@ const DURATIONS = [
   { hours: 12, label: "12 h" },
 ];
 
-const MONTHS = [
-  "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
-  "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre",
-];
-
 type RouteKind = "collaborative_route" | "dedicated_window";
 
 /** Next datetime matching one of the recurrence days at the given hour. */
@@ -41,136 +39,6 @@ function nextOccurrence(days: string[], hour: number): Date {
     }
   }
   return new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, hour, 0, 0);
-}
-
-function sameDay(a: Date, b: Date): boolean {
-  return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
-}
-
-function Label({ text }: { text: string }) {
-  return <Text className="text-[9.5px] tracking-[1.5px] text-inkMute uppercase font-bold mb-2">{text}</Text>;
-}
-
-/** Hour dropdown — opens a bottom sheet with 24 options. */
-function HourSelect({ value, onSelect, disabled }: {
-  value: number | null;
-  onSelect: (hour: number) => void;
-  disabled?: boolean;
-}) {
-  const [open, setOpen] = useState(false);
-  const insets = useSafeAreaInsets();
-  return (
-    <>
-      <TouchableOpacity
-        className={`flex-row items-center gap-[10px] bg-card rounded-[14px] border-[1.2px] border-border px-[14px] h-[52px] ${disabled ? "opacity-40" : ""}`}
-        onPress={() => !disabled && setOpen(true)}
-        activeOpacity={0.8}
-        disabled={disabled}
-      >
-        <MaterialCommunityIcons name="clock-outline" size={16} color={T.inkMute} />
-        <Text className={`flex-1 text-[15px] font-medium ${value != null ? "text-ink" : "text-inkFaint"}`}>
-          {value != null ? `${String(value).padStart(2, "0")}:00` : "Elegí la hora"}
-        </Text>
-        <MaterialCommunityIcons name="chevron-down" size={18} color={T.inkMute} />
-      </TouchableOpacity>
-      <Modal visible={open} transparent animationType="slide" onRequestClose={() => setOpen(false)}>
-        <TouchableOpacity className="flex-1 bg-black/40" activeOpacity={1} onPress={() => setOpen(false)}>
-          <View className="absolute left-0 right-0 bottom-0 bg-bg rounded-t-[24px] pt-3" style={{ paddingBottom: insets.bottom + 8, maxHeight: "60%" }}>
-            <View className="w-[38px] h-1 bg-border rounded-[3px] self-center mb-2" />
-            <Text className="text-sm font-bold text-ink text-center mb-2">Hora de inicio</Text>
-            <ScrollView showsVerticalScrollIndicator={false}>
-              {Array.from({ length: 24 }).map((_, h) => (
-                <TouchableOpacity
-                  key={h}
-                  className={`px-6 py-3 flex-row items-center justify-between ${value === h ? "bg-mint" : ""}`}
-                  onPress={() => { onSelect(h); setOpen(false); }}
-                  activeOpacity={0.7}
-                >
-                  <Text className={`text-[15px] font-medium ${value === h ? "text-forest" : "text-ink"}`}>
-                    {String(h).padStart(2, "0")}:00
-                  </Text>
-                  {value === h && <MaterialCommunityIcons name="check" size={16} color={T.forest} />}
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-          </View>
-        </TouchableOpacity>
-      </Modal>
-    </>
-  );
-}
-
-/** Compact month calendar — past days disabled, tap to pick a day. */
-function MiniCalendar({ selected, onSelect }: { selected: Date | null; onSelect: (d: Date) => void }) {
-  const [monthOffset, setMonthOffset] = useState(0);
-  const today = new Date();
-  const base = new Date(today.getFullYear(), today.getMonth() + monthOffset, 1);
-  const daysInMonth = new Date(base.getFullYear(), base.getMonth() + 1, 0).getDate();
-  const leadingBlanks = (base.getDay() + 6) % 7; // Monday-first grid
-
-  const cells: (number | null)[] = [
-    ...Array.from({ length: leadingBlanks }, () => null),
-    ...Array.from({ length: daysInMonth }, (_, i) => i + 1),
-  ];
-
-  return (
-    <View className="bg-card rounded-[14px] border-[1.2px] border-border p-3">
-      <View className="flex-row items-center justify-between mb-2">
-        <TouchableOpacity
-          onPress={() => setMonthOffset((m) => Math.max(0, m - 1))}
-          hitSlop={10}
-          className={monthOffset === 0 ? "opacity-30" : ""}
-          disabled={monthOffset === 0}
-        >
-          <MaterialCommunityIcons name="chevron-left" size={20} color={T.ink} />
-        </TouchableOpacity>
-        <Text className="text-[13px] font-bold text-ink">{MONTHS[base.getMonth()]} {base.getFullYear()}</Text>
-        <TouchableOpacity onPress={() => setMonthOffset((m) => Math.min(2, m + 1))} hitSlop={10}>
-          <MaterialCommunityIcons name="chevron-right" size={20} color={T.ink} />
-        </TouchableOpacity>
-      </View>
-      <View className="flex-row mb-1">
-        {["L", "M", "X", "J", "V", "S", "D"].map((d, i) => (
-          <Text key={i} className="flex-1 text-center text-[10px] tracking-[0.5px] text-inkMute font-bold">{d}</Text>
-        ))}
-      </View>
-      <View className="flex-row flex-wrap">
-        {cells.map((day, i) => {
-          if (day === null) return <View key={`b${i}`} style={{ width: "14.28%" }} className="h-9" />;
-          const date = new Date(base.getFullYear(), base.getMonth(), day);
-          const isPast = date < new Date(today.getFullYear(), today.getMonth(), today.getDate());
-          const isSelected = selected != null && sameDay(date, selected);
-          const isToday = sameDay(date, today);
-          return (
-            <TouchableOpacity
-              key={day}
-              style={{ width: "14.28%" }}
-              className="h-9 items-center justify-center"
-              onPress={() => !isPast && onSelect(date)}
-              disabled={isPast}
-              activeOpacity={0.7}
-            >
-              <View className={`w-8 h-8 rounded-[10px] items-center justify-center ${isSelected ? "bg-forest" : isToday ? "bg-mint" : ""}`}>
-                <Text className={`text-[13px] font-semibold ${isSelected ? "text-[#F4EFE3]" : isPast ? "text-inkFaint" : isToday ? "text-forest" : "text-ink"}`}>
-                  {day}
-                </Text>
-              </View>
-            </TouchableOpacity>
-          );
-        })}
-      </View>
-    </View>
-  );
-}
-
-function RouteAddress({ lat, lon }: { lat: number; lon: number }) {
-  const [addr, setAddr] = useState(`${lat.toFixed(3)}, ${lon.toFixed(3)}`);
-  useFocusEffect(useCallback(() => {
-    let alive = true;
-    reverseGeocode(lat, lon).then((r) => { if (alive) setAddr(r); }).catch(() => {});
-    return () => { alive = false; };
-  }, [lat, lon]));
-  return <Text className="text-[12.5px] text-ink font-medium flex-1" numberOfLines={1}>{addr}</Text>;
 }
 
 export default function PublishTripScreen({ onClose }: { onClose: () => void }) {
@@ -393,7 +261,7 @@ export default function PublishTripScreen({ onClose }: { onClose: () => void }) 
           {!isDedicated && (
             <>
               <View>
-                <Label text="¿Qué días hacés este trayecto?" />
+                <FieldLabel text="¿Qué días hacés este trayecto?" />
                 <View className="flex-row gap-[6px]">
                   {DAYS.map((d) => {
                     const active = days.includes(d.key);
@@ -412,7 +280,7 @@ export default function PublishTripScreen({ onClose }: { onClose: () => void }) 
               </View>
 
               <View>
-                <Label text="Hora de inicio" />
+                <FieldLabel text="Hora de inicio" />
                 <HourSelect value={startHour} onSelect={setStartHour} />
               </View>
             </>
@@ -422,7 +290,7 @@ export default function PublishTripScreen({ onClose }: { onClose: () => void }) 
           {isDedicated && (
             <>
               <View>
-                <Label text="Inicio de ventana" />
+                <FieldLabel text="Inicio de ventana" />
                 <View className="flex-row gap-2 mb-2">
                   <TouchableOpacity
                     className={`flex-1 h-11 rounded-[12px] border-[1.2px] flex-row items-center justify-center gap-[6px] ${startNow ? "bg-forest border-forest" : "bg-card border-border"}`}
@@ -453,7 +321,7 @@ export default function PublishTripScreen({ onClose }: { onClose: () => void }) 
 
           {/* Duration — shared by both kinds */}
           <View>
-            <Label text={isDedicated ? "¿Por cuántas horas?" : "¿Cuántas horas dura tu disponibilidad?"} />
+            <FieldLabel text={isDedicated ? "¿Por cuántas horas?" : "¿Cuántas horas dura tu disponibilidad?"} />
             <View className="flex-row gap-2">
               {DURATIONS.map((d) => {
                 const active = durationH === d.hours;
@@ -494,7 +362,7 @@ export default function PublishTripScreen({ onClose }: { onClose: () => void }) 
           {/* Active routes */}
           {activeRoutes.length > 0 && (
             <View className="gap-2">
-              <Label text="Viajes activos" />
+              <FieldLabel text="Viajes activos" />
               {activeRoutes.map((r) => (
                 <View key={r.id} className="flex-row items-center gap-3 bg-card rounded-[14px] border border-borderSoft p-3">
                   <View className="w-[34px] h-[34px] rounded-[10px] bg-mint items-center justify-center border border-border">

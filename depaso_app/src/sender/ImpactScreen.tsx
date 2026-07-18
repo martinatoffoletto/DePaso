@@ -6,24 +6,9 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { co2Service } from "@/src/shared/api/co2";
 import { ClientImpact } from "@/src/shared/types";
 import { T } from "@/constants/tokens";
+import { EquivalenceCard } from "@/src/sender/components/EquivalenceCard";
 
-type IconName = React.ComponentProps<typeof MaterialCommunityIcons>["name"];
 
-function EquivalenceCard({ icon, value, unit, label }: {
-  icon: IconName; value: string; unit: string; label: string;
-}) {
-  return (
-    <View className="flex-1 bg-card rounded-[18px] border border-border p-4 gap-[6px]">
-      <View className="w-9 h-9 rounded-[10px] bg-mint items-center justify-center">
-        <MaterialCommunityIcons name={icon} size={20} color={T.forest} />
-      </View>
-      <Text className="text-[22px] font-bold text-ink tracking-[-0.5px] mt-1">
-        {value}<Text className="text-[13px] font-medium text-inkMute"> {unit}</Text>
-      </Text>
-      <Text className="text-[11.5px] text-inkMute">{label}</Text>
-    </View>
-  );
-}
 
 export default function ImpactScreen() {
   const insets = useSafeAreaInsets();

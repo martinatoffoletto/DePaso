@@ -33,6 +33,7 @@ from src.app.modules.organizations.service import OrganizationService
 from src.app.modules.routes.repository import RouteRepository
 from src.app.modules.shipments.repository import ShipmentRepository
 from src.app.modules.shipments.service import ShipmentService
+from src.app.modules.users.repository import UserRepository
 
 router = APIRouter(prefix="/organizations", tags=["organizations"])
 
@@ -49,6 +50,7 @@ def get_org_service(db: AsyncSession = Depends(get_db)) -> OrganizationService:
         carrier_repo=CarrierRepository(db),
         shipment_repo=shipment_repo,
         shipment_service=shipment_service,
+        user_repo=UserRepository(db),
     )
 
 
@@ -163,9 +165,9 @@ async def link_carrier(
     org: Organization = Depends(get_current_org),
     service: OrganizationService = Depends(get_org_service),
 ) -> OrgCarrierResponse:
-    """Link an existing carrier to the fleet (fleet orgs only)."""
-    await service.link_carrier(org, data.carrier_id)
-    return await _carrier_row(service, org, data.carrier_id)
+    """Link an existing carrier to the fleet, found by email (fleet orgs only)."""
+    link = await service.link_carrier_by_email(org, data.email)
+    return await _carrier_row(service, org, link.carrier_id)
 
 
 @router.delete("/me/carriers/{carrier_id}", response_model=OrgCarrierResponse)

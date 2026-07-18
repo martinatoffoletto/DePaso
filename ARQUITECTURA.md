@@ -17,7 +17,7 @@
 | **Backend** | Python 3.12 + FastAPI (async) | Mandatorio por propuesta. Async nativo, OpenAPI gratis (RNF-MNT-04), Pydantic v2 integrado (RNF-SEC-04) |
 | **ORM / DB** | SQLAlchemy 2 **async** (asyncpg / aiosqlite) + **PostgreSQL 16** | Migrado a async jul-2026: event loop nunca bloquea en I/O de DB. Pool con `pre_ping` + `recycle` (conexiones muertas de Supabase/Render). Transacción por request (commit único en `get_db`). Races resueltas con UPDATE condicional (compare-and-set) |
 | **DB hosting** | **Supabase** (free tier) | Postgres + PostGIS + Storage con URLs firmadas (RNF-SEC-07) + Auth opcional. Todo en tier gratuito (RNF-COST) |
-| **Esquema DB** | `Base.metadata.create_all()` en el lifespan | Sin migraciones en el MVP (decisión jul-2026: Alembic eliminado para simplificar; se reintroduce si el esquema necesita evolucionar con datos en prod) |
+| **Esquema DB** | `Base.metadata.create_all()` en el lifespan | Sin migraciones en el MVP; se introducen herramientas de migración si el esquema necesita evolucionar con datos en prod |
 | **Auth** | JWT access (30 min) + refresh token (7 días), passlib + **argon2** | RNF-SEC-03. Nota: la spec dice bcrypt, pero argon2 (ya instalado) es superior — documentar la mejora en la tesis |
 | **Rate limiting** | `slowapi` | RNF-SEC-06 (5 intentos/min en login) con una sola dependencia |
 | **Ruteo / distancias** | **OSRM** (demo server público o Docker local) | Necesario para `compat_geo` y `desvio_norm` del matching (5.2) y para CO₂ contrafactual. Gratis |

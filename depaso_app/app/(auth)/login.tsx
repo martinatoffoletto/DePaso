@@ -1,13 +1,14 @@
 import { useState } from "react";
 import {
   View, ScrollView, TouchableOpacity,
-  TextInput, ActivityIndicator, Text,
+  ActivityIndicator, Text,
   KeyboardAvoidingView, Platform,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAuthStore } from "@/src/shared/session/authStore";
+import { Field } from "@/src/shared/ui/Field";
 import { T } from "@/constants/tokens";
 
 export default function LoginScreen() {
@@ -17,7 +18,6 @@ export default function LoginScreen() {
 
   const [email, setEmail]       = useState("");
   const [password, setPassword] = useState("");
-  const [showPwd, setShowPwd]   = useState(false);
   const [errors, setErrors]     = useState<{ email?: string; password?: string }>({});
   const [serverError, setServerError] = useState<string | null>(null);
   const [connError, setConnError]     = useState(false);
@@ -117,23 +117,16 @@ export default function LoginScreen() {
         )}
 
         {/* Email */}
-        <Text style={{ fontSize: 9.5, letterSpacing: 1.5, color: T.inkMute, textTransform: "uppercase", fontWeight: "700", marginBottom: 8 }}>
-          Email
-        </Text>
-        <View style={{ flexDirection: "row", alignItems: "center", gap: 12, backgroundColor: T.card, borderRadius: 16, paddingHorizontal: 16, height: 56, marginBottom: 4, borderWidth: 1.2, borderColor: errors.email ? T.red : email ? T.forest : T.border }}>
-          <MaterialCommunityIcons name="email-outline" size={19} color={errors.email ? T.red : T.inkMute} />
-          <TextInput
-            style={{ flex: 1, fontSize: 15, color: T.ink, fontWeight: "500" }}
-            placeholder="hola@ejemplo.com"
-            placeholderTextColor={T.inkFaint}
-            autoCapitalize="none"
-            keyboardType="email-address"
-            autoCorrect={false}
-            value={email}
-            onChangeText={t => { setEmail(t); if (errors.email) setErrors(e => ({ ...e, email: undefined })); }}
-          />
-        </View>
-        {errors.email && <Text style={{ fontSize: 11, color: T.red, marginBottom: 8, paddingLeft: 4 }}>{errors.email}</Text>}
+        <Field
+          label="Email"
+          icon="email-outline"
+          placeholder="hola@ejemplo.com"
+          autoCapitalize="none"
+          keyboardType="email-address"
+          value={email}
+          onChangeText={t => { setEmail(t); if (errors.email) setErrors(e => ({ ...e, email: undefined })); }}
+          error={errors.email}
+        />
 
         {/* Password */}
         <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginTop: 20, marginBottom: 8 }}>
@@ -144,21 +137,14 @@ export default function LoginScreen() {
             <Text style={{ fontSize: 11, color: T.emeraldDeep, fontWeight: "600" }}>Olvidé mi contraseña</Text>
           </TouchableOpacity>
         </View>
-        <View style={{ flexDirection: "row", alignItems: "center", gap: 12, backgroundColor: T.card, borderRadius: 16, paddingHorizontal: 16, height: 56, marginBottom: 4, borderWidth: 1.2, borderColor: errors.password ? T.red : password ? T.forest : T.border }}>
-          <MaterialCommunityIcons name="lock-outline" size={19} color={errors.password ? T.red : T.inkMute} />
-          <TextInput
-            style={{ flex: 1, fontSize: 15, color: T.ink, fontWeight: "500" }}
-            placeholder="••••••••"
-            placeholderTextColor={T.inkFaint}
-            secureTextEntry={!showPwd}
-            value={password}
-            onChangeText={t => { setPassword(t); if (errors.password) setErrors(e => ({ ...e, password: undefined })); }}
-          />
-          <TouchableOpacity onPress={() => setShowPwd(v => !v)} hitSlop={10}>
-            <MaterialCommunityIcons name={showPwd ? "eye-off-outline" : "eye-outline"} size={19} color={T.inkMute} />
-          </TouchableOpacity>
-        </View>
-        {errors.password && <Text style={{ fontSize: 11, color: T.red, marginBottom: 8, paddingLeft: 4 }}>{errors.password}</Text>}
+        <Field
+          icon="lock-outline"
+          placeholder="••••••••"
+          secureToggle
+          value={password}
+          onChangeText={t => { setPassword(t); if (errors.password) setErrors(e => ({ ...e, password: undefined })); }}
+          error={errors.password}
+        />
 
         {/* CTA */}
         <TouchableOpacity

@@ -36,7 +36,7 @@ Endpoints Implementados:
 
 Base de Datos:
   - SQLAlchemy con modelos async
-  - Migraciones de Alembic (preparadas)
+  - Esquema creado automáticamente al arrancar (create_all)
   - Relaciones entre usuarios, transportistas y paquetes
 
 

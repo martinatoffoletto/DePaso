@@ -146,6 +146,25 @@ export interface AdminActivity {
   recent_events: AdminShipmentEventActivity[];
 }
 
+// admin/schemas.py :: AdminCreateOrganizationRequest
+export interface AdminCreateOrganizationRequest {
+  name: string;
+  cuit: string;
+  email: string;
+  password: string;
+  kind: OrgKind;
+}
+
+// admin/schemas.py :: AdminCreateOrganizationResponse
+export interface AdminCreateOrganizationResponse {
+  organization_id: number;
+  name: string;
+  cuit: string;
+  kind: OrgKind;
+  owner_user_id: number;
+  owner_email: string;
+}
+
 /* ---------------------------------------------------------------------------
    Organizations (pymes B2B) — espejo de organizations/schemas.py
 --------------------------------------------------------------------------- */

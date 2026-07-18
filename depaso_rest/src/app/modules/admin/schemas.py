@@ -3,7 +3,7 @@ Admin module schemas.
 """
 from datetime import datetime
 
-from pydantic import BaseModel
+from pydantic import BaseModel, EmailStr, Field
 
 
 class DashboardResponse(BaseModel):
@@ -66,3 +66,23 @@ class ActivityResponse(BaseModel):
 
     recent_classifications: list[ClassificationActivityItem]
     recent_events: list[ShipmentEventActivityItem]
+
+
+class AdminCreateOrganizationRequest(BaseModel):
+    """Alta manual de una cuenta B2B (pyme/fletero): usuario dueño + organización,
+    creados por un admin (no self-service)."""
+
+    name: str = Field(..., min_length=1, max_length=255, description="Nombre de la empresa")
+    cuit: str = Field(..., pattern=r"^\d{2}-?\d{8}-?\d$", description="CUIT, ej. 30-71234567-8")
+    email: EmailStr
+    password: str = Field(..., min_length=8)
+    kind: str = Field(..., pattern=r"^(fleet|merchant)$")
+
+
+class AdminCreateOrganizationResponse(BaseModel):
+    organization_id: int
+    name: str
+    cuit: str
+    kind: str
+    owner_user_id: int
+    owner_email: str

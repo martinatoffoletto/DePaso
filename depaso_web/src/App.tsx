@@ -7,6 +7,8 @@ import { FleetPage } from "@/features/fleet/FleetPage";
 import { ShipmentsPage } from "@/features/shipments/ShipmentsPage";
 import { FinancePage } from "@/features/finance/FinancePage";
 import { AdminPage } from "@/features/admin/AdminPage";
+import { AltasPage } from "@/features/admin/AltasPage";
+import { CarriersPage } from "@/features/admin/CarriersPage";
 
 function FullScreenSpinner() {
   return (
@@ -24,7 +26,7 @@ function AdminRoute({ children }: { children: React.ReactNode }) {
 }
 
 export default function App() {
-  const { status } = useAuth();
+  const { status, user } = useAuth();
 
   if (status === "loading") return <FullScreenSpinner />;
 
@@ -37,9 +39,13 @@ export default function App() {
     );
   }
 
+  // El admin no tiene organización propia: su home es el panel de monitoreo,
+  // no el dashboard de pyme (que quedaría atascado en el onboarding de org).
+  const homePath = user?.user_type === "admin" ? "/admin" : "/dashboard";
+
   return (
     <Routes>
-      <Route path="/login" element={<Navigate to="/dashboard" replace />} />
+      <Route path="/login" element={<Navigate to={homePath} replace />} />
       <Route element={<AppShell />}>
         <Route path="/dashboard" element={<DashboardPage />} />
         <Route path="/flota" element={<FleetPage />} />
@@ -53,8 +59,24 @@ export default function App() {
             </AdminRoute>
           }
         />
+        <Route
+          path="/transportistas"
+          element={
+            <AdminRoute>
+              <CarriersPage />
+            </AdminRoute>
+          }
+        />
+        <Route
+          path="/altas"
+          element={
+            <AdminRoute>
+              <AltasPage />
+            </AdminRoute>
+          }
+        />
       </Route>
-      <Route path="*" element={<Navigate to="/dashboard" replace />} />
+      <Route path="*" element={<Navigate to={homePath} replace />} />
     </Routes>
   );
 }
