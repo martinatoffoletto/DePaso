@@ -1,4 +1,5 @@
 import { View, Text } from "react-native";
+import { ForestGradient } from "./ForestGradient";
 
 /**
  * Card verde "hero" con las franjas diagonales decorativas (la "ruta").
@@ -21,6 +22,7 @@ export function ForestHeroCard({
 }) {
   return (
     <View className={`bg-forest overflow-hidden ${className}`}>
+      <ForestGradient />
       {stripes === "top" ? (
         <>
           <View

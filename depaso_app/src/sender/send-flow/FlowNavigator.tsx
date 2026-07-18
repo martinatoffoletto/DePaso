@@ -8,6 +8,7 @@ import { AddressScreen }     from "./AddressScreen";
 import { RouteOfferScreen }  from "./RouteOfferScreen";
 import { SummaryScreen }     from "./SummaryScreen";
 import type { Quote } from "@/src/shared/types";
+import { PickupSchedule, PICKUP_ASAP } from "@/src/sender/pickupSchedule";
 
 type Step = "home" | "package" | "address" | "route_offer" | "summary";
 type DeliveryMode = "dedicada" | "colaborativa";
@@ -36,6 +37,7 @@ export function FlowNavigator() {
   const [destinationCoords, setDestinationCoords] = useState<Coords | null>(null);
   const [recipientName, setRecipientName]       = useState("");
   const [recipientPhone, setRecipientPhone]     = useState("");
+  const [schedule, setSchedule]                 = useState<PickupSchedule>(PICKUP_ASAP);
 
   // Offer state — default modality follows the user's saved preference (#5/#6).
   const preferCollaborative = useSettingsStore((s) => s.preferCollaborative);
@@ -56,6 +58,7 @@ export function FlowNavigator() {
     setDestinationCoords(null);
     setRecipientName("");
     setRecipientPhone("");
+    setSchedule(PICKUP_ASAP);
     setMode(preferCollaborative ? "colaborativa" : "dedicada");
     setQuote(null);
   }, [preferCollaborative]);
@@ -89,7 +92,7 @@ export function FlowNavigator() {
     if (step === "address") {
       return (
         <AddressScreen
-          initial={{ origin, destination, originCoords, destinationCoords, recipientName, recipientPhone }}
+          initial={{ origin, destination, originCoords, destinationCoords, recipientName, recipientPhone, schedule }}
           onBack={() => setStep("package")}
           onNext={(p) => {
             setOrigin(p.origin);
@@ -98,6 +101,7 @@ export function FlowNavigator() {
             setDestinationCoords(p.destinationCoords);
             setRecipientName(p.recipientName);
             setRecipientPhone(p.recipientPhone);
+            setSchedule(p.schedule);
             setStep("route_offer");
           }}
         />
@@ -140,11 +144,12 @@ export function FlowNavigator() {
         quote={quote}
         recipientName={recipientName}
         recipientPhone={recipientPhone}
+        schedule={schedule}
         onBack={() => setStep("route_offer")}
         onConfirm={resetAll}
       />
     );
-  }, [step, categoryId, weightKg, description, declaredValue, photoUri, photoServerUrl, origin, destination, originCoords, destinationCoords, recipientName, recipientPhone, mode, quote, resetAll]);
+  }, [step, categoryId, weightKg, description, declaredValue, photoUri, photoServerUrl, origin, destination, originCoords, destinationCoords, recipientName, recipientPhone, schedule, mode, quote, resetAll]);
 
   return <PaperProvider theme={MD3LightTheme}>{screen}</PaperProvider>;
 }

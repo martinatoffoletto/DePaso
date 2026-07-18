@@ -4,14 +4,18 @@ import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import * as ImagePicker from "expo-image-picker";
+import Animated, { FadeInDown } from "react-native-reanimated";
 import { useAuthStore } from "@/src/shared/session/authStore";
 import { co2Service } from "@/src/shared/api/co2";
-import type { ClientImpact } from "@/src/shared/types";
+import { shipmentsService } from "@/src/shared/api/shipments";
+import { ShipmentStatus, type ClientImpact, type Shipment } from "@/src/shared/types";
 import { ForestHeroCard, HeroStatsRow, HeroStat, HeroStatUnit } from "@/src/shared/ui/ForestHeroCard";
+import { AnimatedCounter } from "@/src/shared/ui/AnimatedCounter";
 import { ScanCorners } from "@/src/sender/components/ScanCorners";
+import { RecentShipmentCard } from "@/src/sender/components/RecentShipmentCard";
+import { HomeTipsSection } from "@/src/sender/components/HomeTipsSection";
 import { T } from "@/constants/tokens";
 
-type IconName = React.ComponentProps<typeof MaterialCommunityIcons>["name"];
 type HomeScreenProps = { onStart: (photoUri?: string | null) => void };
 
 const DAYS = ["DOM", "LUN", "MAR", "MIÉ", "JUE", "VIE", "SÁB"];
@@ -19,12 +23,6 @@ function getDateLabel() {
   const d = new Date();
   return `${DAYS[d.getDay()]} · ${d.getHours().toString().padStart(2, "0")}:${d.getMinutes().toString().padStart(2, "0")}`;
 }
-
-const RECENT = [
-  { title: "Zapatillas",  dest: "A Belgrano",  av: "MR", avBg: T.amber,   icon: "cube-outline"  as IconName },
-  { title: "Documentos",  dest: "A V. López",  av: "FC", avBg: T.violet,  icon: "email-outline" as IconName },
-  { title: "Plantas",     dest: "A Núñez",     av: "RP", avBg: T.emerald, icon: "leaf"           as IconName },
-];
 
 export function HomeScreen({ onStart }: HomeScreenProps) {
   const router = useRouter();
@@ -35,10 +33,20 @@ export function HomeScreen({ onStart }: HomeScreenProps) {
 
   const [photoUri, setPhotoUri] = useState<string | null>(null);
   const [impact, setImpact] = useState<ClientImpact | null>(null);
+  const [recent, setRecent] = useState<Shipment[]>([]);
 
   useEffect(() => {
     co2Service.getMyImpact()
       .then(setImpact)
+      .catch(() => {});
+    shipmentsService.getMyShipments(0, 20)
+      .then((list) => {
+        const latest = list
+          .filter((s) => s.status !== ShipmentStatus.CANCELLED)
+          .sort((a, b) => b.created_at.localeCompare(a.created_at))
+          .slice(0, 3);
+        setRecent(latest);
+      })
       .catch(() => {});
   }, []);
 
@@ -95,16 +103,23 @@ export function HomeScreen({ onStart }: HomeScreenProps) {
         </View>
 
         <HeroStatsRow className="mt-[18px]">
-          <HeroStat value={impact != null ? String(impact.shipments_delivered) : "—"} label="ENVÍOS" divider />
+          <HeroStat
+            value={impact != null ? <AnimatedCounter value={impact.shipments_delivered} /> : "—"}
+            label="ENVÍOS"
+            divider
+          />
           <HeroStat
             value={impact != null
-              ? <>{impact.total_co2_saved_kg.toFixed(1)}<HeroStatUnit>kg</HeroStatUnit></>
+              ? <><AnimatedCounter value={impact.total_co2_saved_kg} format={(n) => n.toFixed(1)} /><HeroStatUnit>kg</HeroStatUnit></>
               : "—"}
             label="CO₂ AHORRADO"
             valueColor={T.lime}
             divider
           />
-          <HeroStat value={user ? user.rating.toFixed(1) : "—"} label="REPUTACIÓN" />
+          <HeroStat
+            value={user ? <AnimatedCounter value={user.rating} format={(n) => n.toFixed(1)} /> : "—"}
+            label="REPUTACIÓN"
+          />
         </HeroStatsRow>
       </ForestHeroCard>
 
@@ -189,32 +204,25 @@ export function HomeScreen({ onStart }: HomeScreenProps) {
         )}
       </View>
 
-      {/* ── Volvé a mandar ── */}
-      <View>
-        <View className="flex-row justify-between items-baseline">
-          <Text className="text-[15px] font-semibold text-ink tracking-[-0.3px]">Volvé a mandar</Text>
-          <TouchableOpacity onPress={() => router.push("/(main)/envios")} hitSlop={8}>
-            <Text className="text-[10px] tracking-[1.5px] text-emeraldDeep uppercase">VER HISTORIAL</Text>
-          </TouchableOpacity>
-        </View>
-        <View className="flex-row gap-2 mt-[10px]">
-          {RECENT.map((r, i) => (
-            <TouchableOpacity key={i} className="flex-1 bg-card rounded-[14px] border border-border p-[10px]" onPress={() => onStart(null)} activeOpacity={0.78}>
-              <View className="w-[30px] h-[30px] rounded-lg bg-cardSoft border border-borderSoft items-center justify-center mb-2">
-                <MaterialCommunityIcons name={r.icon} size={14} color={T.inkSoft} />
-              </View>
-              <Text className="text-[12.5px] font-semibold text-ink" numberOfLines={1}>{r.title}</Text>
-              <Text className="text-[9px] tracking-[1px] text-inkMute uppercase mt-px" numberOfLines={1}>{r.dest}</Text>
-              <View
-                className="absolute top-[10px] right-[10px] w-[18px] h-[18px] rounded-full border-2 border-card items-center justify-center"
-                style={{ backgroundColor: r.avBg }}
-              >
-                <Text className="text-[7px] font-bold text-[#F4EFE3]">{r.av}</Text>
-              </View>
+      {/* ── Volvé a mandar (últimos envíos reales) ── */}
+      {recent.length > 0 && (
+        <View>
+          <View className="flex-row justify-between items-baseline">
+            <Text className="text-[15px] font-semibold text-ink tracking-[-0.3px]">Volvé a mandar</Text>
+            <TouchableOpacity onPress={() => router.push("/(main)/envios")} hitSlop={8}>
+              <Text className="text-[10px] tracking-[1.5px] text-emeraldDeep uppercase">VER HISTORIAL</Text>
             </TouchableOpacity>
-          ))}
+          </View>
+          <View className="flex-row gap-2 mt-[10px]">
+            {recent.map((s, i) => (
+              <RecentShipmentCard key={s.id} shipment={s} index={i} onPress={() => onStart(null)} />
+            ))}
+          </View>
         </View>
-      </View>
+      )}
+
+      {/* ── Tips ── */}
+      <HomeTipsSection onStartFlow={() => onStart(null)} onAddPhoto={handlePhotoZonePress} />
 
       {/* ── Eco band ── */}
       <TouchableOpacity

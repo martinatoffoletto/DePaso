@@ -156,7 +156,10 @@ export default function ProfileScreen() {
           <ProfileRow key="datos" icon="account-outline"    label="Datos personales"  value="Nombre y teléfono" onPress={() => setEditModal(true)} />,
           <ProfileRow key="pwd"   icon="lock-outline"       label="Cambiar contraseña" onPress={() => setPwdModal(true)} />,
           <ProfileRow key="dirs"  icon="map-marker-outline" label="Mis direcciones"   value={`${addresses.length} guardada${addresses.length !== 1 ? "s" : ""}`} onPress={() => setAddrModal(true)} />,
-          <ProfileRow key="pers"  icon="account-multiple-outline" label="Mis personas" value={`${contacts.length} guardada${contacts.length !== 1 ? "s" : ""}`} onPress={() => setContactModal(true)} />,
+          // "Mis personas" son destinatarios frecuentes para ENVIAR — un rider no envía.
+          ...(isCarrier ? [] : [
+            <ProfileRow key="pers" icon="account-multiple-outline" label="Mis personas" value={`${contacts.length} guardada${contacts.length !== 1 ? "s" : ""}`} onPress={() => setContactModal(true)} />,
+          ]),
         ]} />
 
         {isCarrier && (

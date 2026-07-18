@@ -3,6 +3,7 @@ import { Text } from "react-native-paper";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { Shipment, ShipmentStatus } from "@/src/shared/types";
 import { carrierPayout } from "@/src/shared/utils/payout";
+import { openExternalNavigation } from "@/src/carrier/navigation";
 import { useAddress } from "@/src/shared/hooks/useAddress";
 import { T } from "@/constants/tokens";
 import { money } from "./riderUi";
@@ -33,6 +34,11 @@ export function ActiveJobPanel({ shipment, advancing, onAdvance, onCancel }: {
   const destAddr = useAddress(shipment.destination_lat, shipment.destination_lon);
   const action = NEXT_ACTION[shipment.status];
   const statusInfo = STATUS_LABEL[shipment.status];
+
+  // Adonde el rider está yendo AHORA: al origen hasta retirar, después al destino.
+  const goingToDropoff = shipment.status === ShipmentStatus.IN_TRANSIT;
+  const navLat = goingToDropoff ? shipment.destination_lat : shipment.origin_lat;
+  const navLon = goingToDropoff ? shipment.destination_lon : shipment.origin_lon;
 
   return (
     <View className="bg-card border-[1.2px] border-forest rounded-[18px] p-[14px]">
@@ -83,19 +89,32 @@ export function ActiveJobPanel({ shipment, advancing, onAdvance, onCancel }: {
       )}
 
       {action && (
-        <TouchableOpacity
-          className="bg-forest rounded-[13px] h-[46px] flex-row items-center justify-center gap-2"
-          onPress={() => onAdvance(action.next)}
-          disabled={advancing}
-          activeOpacity={0.88}
-        >
-          {advancing
-            ? <ActivityIndicator color="#F4EFE3" size="small" />
-            : <>
-                <MaterialCommunityIcons name={action.icon} size={16} color="#F4EFE3" />
-                <Text className="text-[#F4EFE3] font-bold text-[13.5px]" style={{ color: "#F4EFE3" }}>{action.label}</Text>
-              </>}
-        </TouchableOpacity>
+        <View className="flex-row gap-2">
+          <TouchableOpacity
+            className="flex-1 bg-forest rounded-[13px] h-[46px] flex-row items-center justify-center gap-2"
+            onPress={() => onAdvance(action.next)}
+            disabled={advancing}
+            activeOpacity={0.88}
+          >
+            {advancing
+              ? <ActivityIndicator color="#F4EFE3" size="small" />
+              : <>
+                  <MaterialCommunityIcons name={action.icon} size={16} color="#F4EFE3" />
+                  <Text className="text-[#F4EFE3] font-bold text-[13.5px]" style={{ color: "#F4EFE3" }}>{action.label}</Text>
+                </>}
+          </TouchableOpacity>
+          <TouchableOpacity
+            className="w-[46px] h-[46px] rounded-[13px] border-[1.2px] border-forest bg-card items-center justify-center"
+            onPress={() => openExternalNavigation(
+              navLat, navLon,
+              goingToDropoff ? "Navegar a la entrega con…" : "Navegar al retiro con…",
+            )}
+            activeOpacity={0.85}
+            accessibilityLabel="Abrir en app de navegación"
+          >
+            <MaterialCommunityIcons name="navigation-variant-outline" size={19} color={T.forest} />
+          </TouchableOpacity>
+        </View>
       )}
 
       {shipment.status === ShipmentStatus.ASSIGNED && (

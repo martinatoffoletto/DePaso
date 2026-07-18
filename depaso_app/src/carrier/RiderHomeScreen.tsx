@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { View, ScrollView, TouchableOpacity, ActivityIndicator, Alert, RefreshControl, Text } from "react-native";
+import { View, ScrollView, TouchableOpacity, ActivityIndicator, Alert, RefreshControl, Switch, Text } from "react-native";
 import MapView, { Marker, Polyline, Region } from "react-native-maps";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -13,6 +13,8 @@ import { carriersService, routesService } from "@/src/shared/api/carriers";
 import { shipmentsService } from "@/src/shared/api/shipments";
 import { Carrier, CarrierRoute, CarrierSummary, FeedItem, Shipment, ShipmentStatus } from "@/src/shared/types";
 import { carrierPayout } from "@/src/shared/utils/payout";
+import { parseApiDate } from "@/src/shared/utils/dates";
+import { isSpaceWindow, visibleRoutes } from "@/src/carrier/routeUtils";
 import { T } from "@/constants/tokens";
 import { IncomingOfferModal } from "./IncomingOfferModal";
 import PublishTripScreen from "./PublishTripScreen";
@@ -20,6 +22,11 @@ import { useGpsPublisher } from "./useGpsPublisher";
 import { ActiveJobPanel } from "./components/ActiveJobPanel";
 import { OfferRow } from "./components/OfferRow";
 import { TripRow } from "./components/TripRow";
+import { OffersTeaser } from "./components/OffersTeaser";
+import { WeekEarningsCard } from "./components/WeekEarningsCard";
+import { WeeklyGoalCard } from "./components/WeeklyGoalCard";
+import { weekEarnings } from "./weekEarnings";
+import { useGoalStore } from "./goalStore";
 import { money } from "./components/riderUi";
 
 const ACTIVE_STATUSES: ShipmentStatus[] = [
@@ -45,25 +52,37 @@ export default function RiderHomeScreen() {
   const user = useAuthStore((s) => s.user);
   const online = useRiderStore((s) => s.online);
   const shiftStartedAt = useRiderStore((s) => s.shiftStartedAt);
+  const shiftBaseline = useRiderStore((s) => s.shiftBaselineEarnings);
   const goOnline = useRiderStore((s) => s.goOnline);
   const goOffline = useRiderStore((s) => s.goOffline);
+  const setShiftBaseline = useRiderStore((s) => s.setShiftBaseline);
   const firstName = user?.first_name ?? "Cadete";
 
   // El toggle "en línea" también vive en el backend (is_available): es lo que
   // mete al carrier en el pool on-demand del matching dedicado. Sin el sync,
   // el botón era puramente cosmético y ningún carrier real era matcheable.
   const setAvailability = useCallback((value: boolean) => {
-    if (value) goOnline(); else goOffline();
+    if (value) {
+      goOnline();
+      // Snapshot de lo ganado hasta ahora: el strip del turno muestra la
+      // diferencia contra este baseline, no el total histórico.
+      carriersService.getSummary()
+        .then((s) => setShiftBaseline(s.total_earnings))
+        .catch(() => setShiftBaseline(0));
+    } else {
+      goOffline();
+    }
     carriersService.updateProfile({ is_available: value }).catch(() => {
       // sin red: el estado local manda; el próximo load() reconcilia
     });
-  }, [goOnline, goOffline]);
+  }, [goOnline, goOffline, setShiftBaseline]);
 
   const [carrier, setCarrier] = useState<Carrier | null>(null);
   const [summary, setSummary] = useState<CarrierSummary | null>(null);
   const [routes, setRoutes] = useState<CarrierRoute[]>([]);
   const [feed, setFeed] = useState<FeedItem[]>([]);
   const [activeJobs, setActiveJobs] = useState<Shipment[]>([]);
+  const [deliveredJobs, setDeliveredJobs] = useState<Shipment[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [showPublish, setShowPublish] = useState(false);
@@ -74,6 +93,7 @@ export default function RiderHomeScreen() {
   const [now, setNow] = useState(Date.now());
   const [region, setRegion] = useState<Region | null>(null);
   const [spaceSaving, setSpaceSaving] = useState(false);
+  const [sheetCollapsed, setSheetCollapsed] = useState(false);
 
   // Shipment ids already announced — new ones auto-open the incoming modal.
   const seenOffersRef = useRef<Set<number>>(new Set());
@@ -94,8 +114,9 @@ export default function RiderHomeScreen() {
 
   const loadActive = useCallback(async () => {
     try {
-      const list = await shipmentsService.getAssignedShipments(0, 50);
+      const list = await shipmentsService.getAssignedShipments(0, 100);
       setActiveJobs(list.filter((s) => ACTIVE_STATUSES.includes(s.status)));
+      setDeliveredJobs(list.filter((s) => s.status === ShipmentStatus.DELIVERED));
     } catch {
       // keep previous state
     }
@@ -119,7 +140,9 @@ export default function RiderHomeScreen() {
       setSummary(sum);
       setRoutes(mine);
       await loadActive();
-      if (profile.is_verified && online) await loadFeed();
+      // El feed también se carga offline: alimenta el teaser de demanda
+      // ("hay N pedidos cerca tuyo") del home sin conectarse.
+      if (profile.is_verified) await loadFeed();
     } catch {
       setCarrier(null);
     } finally {
@@ -181,13 +204,34 @@ export default function RiderHomeScreen() {
 
   // "Dedicado por espacio": derived from the routes themselves — an active
   // dedicated window covering this moment means the toggle is on.
+  // parseApiDate: las fechas llegan UTC sin "Z" — con new Date() la ventana
+  // quedaba 3 h "en el futuro" y el toggle nunca prendía.
   const spaceRoute = useMemo(() => routes.find((r) =>
     r.kind === "dedicated_window" && r.is_active &&
-    new Date(r.window_start).getTime() <= now && now <= new Date(r.window_end).getTime(),
+    parseApiDate(r.window_start).getTime() <= now && now <= parseApiDate(r.window_end).getTime(),
   ) ?? null, [routes, now]);
 
   const usedKg = useMemo(() => activeJobs.reduce((acc, s) => acc + s.weight_kg, 0), [activeJobs]);
   const freeKg = carrier ? Math.max(0, carrier.capacity_kg - usedKg) : 0;
+
+  // Ganado en ESTE turno: total actual menos el snapshot tomado al conectarse.
+  const shiftEarned = summary != null && shiftBaseline != null
+    ? Math.max(0, summary.total_earnings - shiftBaseline)
+    : null;
+
+  const week = useMemo(() => weekEarnings(deliveredJobs), [deliveredJobs]);
+
+  // Meta semanal guardada en el dispositivo — hidratar una sola vez.
+  useEffect(() => {
+    useGoalStore.getState().hydrate();
+  }, []);
+
+  // Pausar el turno también apaga la ventana efímera del toggle (si la hay):
+  // sin esto quedaba activa e invisible en el backend hasta vencer.
+  function handlePause() {
+    if (spaceRoute && isSpaceWindow(spaceRoute)) void toggleSpaceMode();
+    setAvailability(false);
+  }
 
   async function toggleSpaceMode() {
     if (spaceSaving) return;
@@ -196,6 +240,7 @@ export default function RiderHomeScreen() {
       if (spaceRoute) {
         await routesService.deactivate(spaceRoute.id);
         setRoutes((r) => r.filter((x) => x.id !== spaceRoute.id));
+        setNow(Date.now());
         toast.info("Dedicado por espacio desactivado.");
       } else {
         const { status } = await Location.requestForegroundPermissionsAsync();
@@ -215,10 +260,17 @@ export default function RiderHomeScreen() {
           kind: "dedicated_window",
           origin_lat: pos.coords.latitude,
           origin_lon: pos.coords.longitude,
+          // destino == origen: marca de ventana efímera del toggle (ver
+          // routeUtils.isSpaceWindow) — no aparece en "viajes publicados".
+          destination_lat: pos.coords.latitude,
+          destination_lon: pos.coords.longitude,
           window_start: start.toISOString(),
           window_end: end.toISOString(),
         });
         setRoutes((r) => [...r, route]);
+        // El estado del toggle deriva de (routes, now): sin este tick, `now`
+        // queda hasta 30 s atrás de window_start y el switch no prende.
+        setNow(Date.now());
         toast.success(`Disponible por espacio durante ${SPACE_WINDOW_HOURS} h. Te llegan pedidos compatibles con tu capacidad.`);
       }
     } catch {
@@ -408,7 +460,7 @@ export default function RiderHomeScreen() {
               </View>
               <TouchableOpacity
                 className="bg-red rounded-xl flex-row items-center gap-[6px] px-4 py-[10px]"
-                onPress={() => setAvailability(false)}
+                onPress={handlePause}
                 activeOpacity={0.85}
               >
                 <MaterialCommunityIcons name="pause" size={14} color="#F4EFE3" />
@@ -417,12 +469,9 @@ export default function RiderHomeScreen() {
             </View>
 
             {/* "Dedicado por espacio" toggle — keeps taking chained orders */}
-            <TouchableOpacity
-              className={`self-start mt-2 flex-row items-center gap-2 rounded-[12px] px-3 py-2 border-[1.2px] ${spaceRoute ? "bg-forest border-forest" : "bg-card border-border"}`}
+            <View
+              className={`self-start mt-2 flex-row items-center gap-[6px] rounded-[12px] pl-3 pr-1 py-[2px] border-[1.2px] ${spaceRoute ? "bg-forest border-forest" : "bg-card border-border"}`}
               style={{ shadowColor: "#000", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.15, shadowRadius: 10, elevation: 4 }}
-              onPress={toggleSpaceMode}
-              disabled={spaceSaving}
-              activeOpacity={0.85}
             >
               {spaceSaving ? (
                 <ActivityIndicator size={12} color={spaceRoute ? T.lime : T.forest} />
@@ -430,41 +479,59 @@ export default function RiderHomeScreen() {
                 <MaterialCommunityIcons name="truck-cargo-container" size={14} color={spaceRoute ? T.lime : T.inkSoft} />
               )}
               <Text className={`text-[11.5px] font-bold ${spaceRoute ? "text-[#F4EFE3]" : "text-inkSoft"}`}>
-                Dedicado por espacio {spaceRoute ? "ON" : "OFF"}
+                Dedicado por espacio
               </Text>
-            </TouchableOpacity>
+              <Switch
+                value={!!spaceRoute}
+                onValueChange={toggleSpaceMode}
+                disabled={spaceSaving}
+                trackColor={{ false: T.border, true: T.lime }}
+                thumbColor="#F4EFE3"
+                ios_backgroundColor={T.border}
+                style={{ transform: [{ scaleX: 0.72 }, { scaleY: 0.72 }] }}
+              />
+            </View>
           </View>
 
-          {/* Bottom sheet */}
+          {/* Bottom sheet — tap the handle/strip to collapse it over the map */}
           <View
             className="absolute left-0 right-0 bottom-0 bg-bg rounded-t-[28px] px-4 pt-3"
-            style={{ maxHeight: "58%", shadowColor: T.forest, shadowOffset: { width: 0, height: -16 }, shadowOpacity: 0.2, shadowRadius: 40, elevation: 12 }}
+            style={{
+              maxHeight: "58%",
+              paddingBottom: sheetCollapsed ? insets.bottom + 6 : 0,
+              shadowColor: T.forest, shadowOffset: { width: 0, height: -16 }, shadowOpacity: 0.2, shadowRadius: 40, elevation: 12,
+            }}
           >
-            <View className="w-[38px] h-1 bg-border rounded-[3px] self-center mb-3" />
+            <TouchableOpacity onPress={() => setSheetCollapsed((c) => !c)} activeOpacity={0.85}>
+              <View className="w-[38px] h-1 bg-border rounded-[3px] self-center" />
+              <View className="items-center mb-1">
+                <MaterialCommunityIcons name={sheetCollapsed ? "chevron-up" : "chevron-down"} size={18} color={T.inkMute} />
+              </View>
 
-            {/* Earnings + capacity strip */}
-            <View className="flex-row items-center justify-between mb-3 px-1">
-              <View>
-                <Text className="text-[9px] tracking-[1.5px] text-inkMute uppercase font-bold">Ganado (total)</Text>
-                <Text className="text-[24px] font-bold text-ink tracking-[-0.8px] mt-px">
-                  {summary ? money(summary.total_earnings) : "—"}
-                </Text>
-              </View>
-              <View className="items-center">
-                <Text className="text-[9px] tracking-[1.5px] text-inkMute uppercase font-bold">En curso</Text>
-                <Text className="text-[24px] font-bold text-ink tracking-[-0.8px] mt-px">{activeJobs.length}</Text>
-              </View>
-              {carrier && (
-                <View className="items-end">
-                  <Text className="text-[9px] tracking-[1.5px] text-inkMute uppercase font-bold">Capacidad libre</Text>
-                  <Text className="text-[24px] font-bold tracking-[-0.8px] mt-px" style={{ color: freeKg > 0 ? T.ink : T.red }}>
-                    {freeKg.toFixed(0)}<Text className="text-[13px] text-inkMute font-semibold"> / {carrier.capacity_kg.toFixed(0)} kg</Text>
+              {/* Earnings + capacity strip */}
+              <View className="flex-row items-center justify-between mb-3 px-1">
+                <View>
+                  <Text className="text-[9px] tracking-[1.5px] text-inkMute uppercase font-bold">Ganado (turno)</Text>
+                  <Text className="text-[24px] font-bold text-ink tracking-[-0.8px] mt-px">
+                    {shiftEarned != null ? money(shiftEarned) : "—"}
                   </Text>
                 </View>
-              )}
-            </View>
+                <View className="items-center">
+                  <Text className="text-[9px] tracking-[1.5px] text-inkMute uppercase font-bold">En curso</Text>
+                  <Text className="text-[24px] font-bold text-ink tracking-[-0.8px] mt-px">{activeJobs.length}</Text>
+                </View>
+                {carrier && (
+                  <View className="items-end">
+                    <Text className="text-[9px] tracking-[1.5px] text-inkMute uppercase font-bold">Capacidad libre</Text>
+                    <Text className="text-[24px] font-bold tracking-[-0.8px] mt-px" style={{ color: freeKg > 0 ? T.ink : T.red }}>
+                      {freeKg.toFixed(0)}<Text className="text-[13px] text-inkMute font-semibold"> / {carrier.capacity_kg.toFixed(0)} kg</Text>
+                    </Text>
+                  </View>
+                )}
+              </View>
+            </TouchableOpacity>
 
-            <ScrollView
+            {!sheetCollapsed && <ScrollView
               contentContainerStyle={{ gap: 8, paddingBottom: insets.bottom + 16 }}
               showsVerticalScrollIndicator={false}
             >
@@ -516,7 +583,7 @@ export default function RiderHomeScreen() {
                   <OfferRow key={item.shipment_id} item={item} onPress={() => setOffer(item)} />
                 ))
               )}
-            </ScrollView>
+            </ScrollView>}
           </View>
         </View>
       ) : (
@@ -566,6 +633,13 @@ export default function RiderHomeScreen() {
             </View>
           )}
 
+          {/* Demanda actual: pedidos compatibles esperando */}
+          {visibleFeed.length > 0 && (
+            <View className="px-4 pt-3">
+              <OffersTeaser count={visibleFeed.length} onConnect={() => setAvailability(true)} />
+            </View>
+          )}
+
           {/* Hero */}
           <View className="px-4 pt-[14px]">
             <View className="bg-forest rounded-[24px] px-5 pt-[22px] pb-5 overflow-hidden">
@@ -601,6 +675,13 @@ export default function RiderHomeScreen() {
             </View>
           </View>
 
+          {/* Semana: ganancias por día + meta */}
+          <View className="px-4 pt-[14px] gap-2">
+            <Text className="text-sm font-bold text-ink tracking-[-0.3px]">Tu semana</Text>
+            <WeekEarningsCard week={week} onOpenEarnings={() => router.push("/(main)/pagos")} />
+            <WeeklyGoalCard weekEarned={week.total} />
+          </View>
+
           {/* Stats */}
           <View className="px-4 pt-[14px]">
             <Text className="text-sm font-bold text-ink tracking-[-0.3px] mb-2">Tu resumen</Text>
@@ -634,7 +715,7 @@ export default function RiderHomeScreen() {
                 <Text className="text-[10px] tracking-[1.5px] text-emeraldDeep uppercase font-bold">Publicar</Text>
               </TouchableOpacity>
             </View>
-            {routes.filter((r) => r.is_active).length === 0 ? (
+            {visibleRoutes(routes).length === 0 ? (
               <TouchableOpacity
                 className="bg-card border border-border border-dashed rounded-2xl px-4 py-5 items-center gap-2"
                 onPress={() => setShowPublish(true)}
@@ -647,7 +728,7 @@ export default function RiderHomeScreen() {
               </TouchableOpacity>
             ) : (
               <View className="gap-2">
-                {routes.filter((r) => r.is_active).map((r) => <TripRow key={r.id} route={r} />)}
+                {visibleRoutes(routes).map((r) => <TripRow key={r.id} route={r} />)}
               </View>
             )}
           </View>

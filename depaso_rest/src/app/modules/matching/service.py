@@ -214,6 +214,13 @@ class MatchingService:
         # Active deliveries shape what can still be offered: they consume
         # capacity and anchor the zone where chained pickups make sense.
         active = await self.shipment_repo.list_active_by_carrier(carrier_id)
+
+        # Exclusividad del dedicado (espejo del accept, spec 3.3): con un
+        # dedicado en curso no se ofrece NADA, aunque sobre capacidad —
+        # cualquier accept fallaría con CARRIER_ON_DEDICATED_TRIP.
+        if any(s.modality == ShipmentModality.DEDICATED for s in active):
+            return []
+
         reserved_kg = sum(s.weight_kg for s in active)
         active_dropoffs = [Point(s.destination_lat, s.destination_lon) for s in active]
         carrier_pos = (
@@ -275,6 +282,10 @@ class MatchingService:
                     ],
                 ))
             else:
+                # Un dedicado no se comparte con nada en curso: ofrecerlo con
+                # trabajo activo garantiza un CARRIER_BUSY al aceptar.
+                if active:
+                    continue
                 # BY_AVAILABILITY: el cliente pidió un carrier con ventana de
                 # disponibilidad publicada — sin ventana activa no se ofrece.
                 if (shipment.assignment_mode == AssignmentMode.BY_AVAILABILITY
@@ -302,11 +313,7 @@ class MatchingService:
                     declared_value=shipment.declared_value,
                     score=round(score, 4),
                     distance_to_pickup_km=round(distance, 2) if distance is not None else None,
-                    explanation=(
-                        ["Encadena con tus entregas en curso"]
-                        if active else
-                        ["Envío dedicado: te desplazás especialmente para este pedido"]
-                    ),
+                    explanation=["Envío dedicado: te desplazás especialmente para este pedido"],
                 ))
 
         items.sort(key=lambda i: i.score, reverse=True)

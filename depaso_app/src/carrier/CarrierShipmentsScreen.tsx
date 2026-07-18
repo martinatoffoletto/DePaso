@@ -5,20 +5,35 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   RefreshControl,
+  Alert,
   Text,
 } from "react-native";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useFocusEffect } from "@react-navigation/native";
 import { useRouter } from "expo-router";
-import { carriersService } from "@/src/shared/api/carriers";
+import { carriersService, routesService } from "@/src/shared/api/carriers";
 import { shipmentsService } from "@/src/shared/api/shipments";
-import { CarrierSummary, Shipment, ShipmentStatus } from "@/src/shared/types";
+import { CarrierRoute, CarrierSummary, Shipment, ShipmentStatus } from "@/src/shared/types";
 import { T } from "@/constants/tokens";
 import { EmptyState } from "@/src/shared/ui/EmptyState";
+import { parseApiDate } from "@/src/shared/utils/dates";
 import { HistoryRow } from "./components/HistoryRow";
+import { PublishedRouteRow } from "./components/PublishedRouteRow";
+import { DayPickerSheet } from "./components/DayPickerSheet";
+import { groupByRecency } from "./history";
+import { visibleRoutes } from "./routeUtils";
+import PublishTripScreen from "./PublishTripScreen";
 
 const PAGE_SIZE = 20;
+
+type HistoryFilter = "all" | "delivered" | "cancelled";
+
+const FILTERS: { key: HistoryFilter; label: string }[] = [
+  { key: "all", label: "Todos" },
+  { key: "delivered", label: "Entregados" },
+  { key: "cancelled", label: "Cancelados" },
+];
 
 // The delivery lifecycle is managed from the operational map (Inicio) —
 // this screen is history only.
@@ -38,23 +53,52 @@ export default function CarrierShipmentsScreen() {
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
   const [error, setError] = useState(false);
+  const [filter, setFilter] = useState<HistoryFilter>("all");
+  const [tab, setTab] = useState<"historial" | "publicados">("historial");
+  const [routes, setRoutes] = useState<CarrierRoute[]>([]);
+  const [showPublish, setShowPublish] = useState(false);
+  const [dayFilter, setDayFilter] = useState<Date | null>(null);
+  const [calOpen, setCalOpen] = useState(false);
 
   const active = shipments.filter((sh) => ACTIVE.includes(sh.status));
   const past = shipments.filter(
     (sh) => !ACTIVE.includes(sh.status) && sh.status !== ShipmentStatus.PENDING,
   );
+  const filtered = past.filter((sh) =>
+    filter === "all"
+      ? true
+      : filter === "delivered"
+        ? sh.status === ShipmentStatus.DELIVERED
+        : sh.status === ShipmentStatus.CANCELLED,
+  );
+
+  const sameDayAs = (iso: string, d: Date) => {
+    const t = parseApiDate(iso);
+    return t.getFullYear() === d.getFullYear() && t.getMonth() === d.getMonth() && t.getDate() === d.getDate();
+  };
+  const groups = dayFilter
+    ? (() => {
+        const items = filtered.filter((sh) => sameDayAs(sh.updated_at, dayFilter));
+        const title = dayFilter.toLocaleDateString("es-AR", { weekday: "long", day: "numeric", month: "long" });
+        return items.length > 0 ? [{ title, items }] : [];
+      })()
+    : groupByRecency(filtered);
+
+  const myRoutes = visibleRoutes(routes);
 
   async function load(asRefresh = false) {
     if (asRefresh) setRefreshing(true);
     else setLoading(true);
     setError(false);
     try {
-      const [list, sum] = await Promise.all([
+      const [list, sum, mine] = await Promise.all([
         shipmentsService.getAssignedShipments(0, PAGE_SIZE),
         carriersService.getSummary(),
+        routesService.mine().catch(() => [] as CarrierRoute[]),
       ]);
       setShipments(list);
       setSummary(sum);
+      setRoutes(mine);
       setHasMore(list.length === PAGE_SIZE);
     } catch {
       setError(true);
@@ -87,8 +131,41 @@ export default function CarrierShipmentsScreen() {
     }, []),
   );
 
+  // Buscar un día puntual: si el historial paginado quedó corto, traer más
+  // de una vez para que el día elegido realmente aparezca.
+  const pickDay = async (d: Date) => {
+    setDayFilter(d);
+    setCalOpen(false);
+    if (hasMore) {
+      try {
+        const list = await shipmentsService.getAssignedShipments(0, 200);
+        setShipments(list);
+        setHasMore(list.length === 200);
+      } catch { /* se busca sobre lo ya cargado */ }
+    }
+  };
+
+  const removeRoute = (r: CarrierRoute) => {
+    Alert.alert("Eliminar viaje", "¿Dar de baja este viaje publicado?", [
+      { text: "No, volver", style: "cancel" },
+      {
+        text: "Sí, eliminar", style: "destructive",
+        onPress: async () => {
+          try {
+            await routesService.deactivate(r.id);
+            setRoutes((prev) => prev.filter((x) => x.id !== r.id));
+          } catch {
+            Alert.alert("Error", "No se pudo eliminar el viaje.");
+          }
+        },
+      },
+    ]);
+  };
+
   return (
     <View className="flex-1 bg-bg" style={{ paddingTop: insets.top }}>
+      {showPublish && <PublishTripScreen onClose={() => { setShowPublish(false); load(); }} />}
+
       {/* ── Forest hero with stats ── */}
       <View className="px-4 pt-3">
         <View className="bg-forest rounded-[24px] px-5 pt-5 pb-[22px] overflow-hidden">
@@ -110,9 +187,9 @@ export default function CarrierShipmentsScreen() {
                   icon: "package-variant-closed" as const,
                 },
                 {
-                  label: "Ganancias",
-                  value: `$${Math.round(summary.total_earnings / 1000).toFixed(1)}k`,
-                  icon: "cash-multiple" as const,
+                  label: "En curso",
+                  value: String(summary.active_shipments),
+                  icon: "moped-outline" as const,
                 },
                 {
                   label: "Reputación",
@@ -153,6 +230,30 @@ export default function CarrierShipmentsScreen() {
         </View>
       </View>
 
+      {/* ── Tabs: historial de entregas vs viajes publicados ── */}
+      <View className="flex-row mx-4 mt-3 bg-card border border-border rounded-[14px] p-[3px]">
+        {([
+          { key: "historial" as const, label: "Historial", icon: "history" as const },
+          { key: "publicados" as const, label: "Publicados", icon: "map-marker-path" as const },
+        ]).map((t) => {
+          const selected = tab === t.key;
+          return (
+            <TouchableOpacity
+              key={t.key}
+              className={`flex-1 flex-row items-center justify-center gap-[6px] rounded-[11px] py-[9px] ${selected ? "bg-forest" : ""}`}
+              onPress={() => setTab(t.key)}
+              activeOpacity={0.85}
+            >
+              <MaterialCommunityIcons name={t.icon} size={14} color={selected ? "#F4EFE3" : T.inkMute} />
+              <Text className={`text-[12.5px] font-bold ${selected ? "text-[#F4EFE3]" : "text-inkMute"}`}>
+                {t.label}
+                {t.key === "publicados" && myRoutes.length > 0 ? ` (${myRoutes.length})` : ""}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+
       {loading ? (
         <View className="items-center justify-center gap-[10px] p-10">
           <ActivityIndicator size="large" color={T.forest} />
@@ -165,6 +266,41 @@ export default function CarrierShipmentsScreen() {
           ctaLabel="Reintentar"
           onCta={() => load()}
         />
+      ) : tab === "publicados" ? (
+        <ScrollView
+          contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 16, gap: 10, paddingBottom: insets.bottom + 32 }}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={() => load(true)} tintColor={T.forest} />
+          }
+          showsVerticalScrollIndicator={false}
+        >
+          <TouchableOpacity
+            className="bg-forest rounded-[14px] py-[13px] flex-row items-center justify-center gap-2"
+            onPress={() => setShowPublish(true)}
+            activeOpacity={0.88}
+          >
+            <MaterialCommunityIcons name="plus" size={16} color="#F4EFE3" />
+            <Text className="text-[#F4EFE3] font-bold text-[13.5px]">Publicar un viaje</Text>
+          </TouchableOpacity>
+
+          {myRoutes.length === 0 ? (
+            <View className="items-center justify-center gap-[10px] p-10">
+              <View className="w-[72px] h-[72px] rounded-[22px] bg-cardSoft items-center justify-center border border-border mb-1">
+                <MaterialCommunityIcons name="map-marker-plus-outline" size={34} color={T.inkMute} />
+              </View>
+              <Text className="text-base text-ink font-bold tracking-[-0.3px] text-center">
+                No tenés viajes publicados
+              </Text>
+              <Text className="text-[13px] text-inkMute text-center">
+                Publicá tu ruta habitual o una ventana de disponibilidad y recibí pedidos que te queden de paso.
+              </Text>
+            </View>
+          ) : (
+            myRoutes.map((r) => (
+              <PublishedRouteRow key={r.id} route={r} onRemove={() => removeRoute(r)} />
+            ))
+          )}
+        </ScrollView>
       ) : (
         <ScrollView
           contentContainerStyle={{
@@ -221,6 +357,44 @@ export default function CarrierShipmentsScreen() {
             </TouchableOpacity>
           )}
 
+          {/* Filter chips */}
+          {past.length > 0 && (
+            <View className="flex-row gap-[6px] flex-wrap">
+              {FILTERS.map((f) => {
+                const selected = filter === f.key;
+                return (
+                  <TouchableOpacity
+                    key={f.key}
+                    className={`rounded-full px-[14px] py-[7px] border ${selected ? "bg-forest border-forest" : "bg-card border-border"}`}
+                    onPress={() => setFilter(f.key)}
+                    activeOpacity={0.8}
+                  >
+                    <Text className={`text-[12px] font-semibold ${selected ? "text-[#F4EFE3]" : "text-inkSoft"}`}>
+                      {f.label}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+              <TouchableOpacity
+                className={`flex-row items-center gap-[5px] rounded-full px-[12px] py-[7px] border ${dayFilter ? "bg-forest border-forest" : "bg-card border-border"}`}
+                onPress={() => setCalOpen(true)}
+                activeOpacity={0.8}
+              >
+                <MaterialCommunityIcons name="calendar-search" size={13} color={dayFilter ? "#F4EFE3" : T.inkSoft} />
+                <Text className={`text-[12px] font-semibold ${dayFilter ? "text-[#F4EFE3]" : "text-inkSoft"}`}>
+                  {dayFilter
+                    ? dayFilter.toLocaleDateString("es-AR", { day: "numeric", month: "short" })
+                    : "Día"}
+                </Text>
+                {dayFilter && (
+                  <TouchableOpacity onPress={() => setDayFilter(null)} hitSlop={8}>
+                    <MaterialCommunityIcons name="close-circle" size={14} color="#F4EFE3" />
+                  </TouchableOpacity>
+                )}
+              </TouchableOpacity>
+            </View>
+          )}
+
           {past.length === 0 ? (
             <View className="items-center justify-center gap-[10px] p-10">
               <View className="w-[72px] h-[72px] rounded-[22px] bg-cardSoft items-center justify-center border border-border mb-1">
@@ -237,15 +411,26 @@ export default function CarrierShipmentsScreen() {
                 Cuando completes entregas, van a aparecer acá con su detalle.
               </Text>
             </View>
-          ) : (
-            <>
-              <Text className="text-[9.5px] tracking-[2px] text-inkMute uppercase font-bold px-[2px]">
-                HISTORIAL
+          ) : groups.length === 0 ? (
+            <View className="items-center justify-center gap-2 p-8">
+              <MaterialCommunityIcons name="filter-off-outline" size={26} color={T.inkMute} />
+              <Text className="text-[13px] text-inkMute text-center">
+                {dayFilter
+                  ? `No hay viajes el ${dayFilter.toLocaleDateString("es-AR", { day: "numeric", month: "long" })}.`
+                  : `No hay viajes ${filter === "delivered" ? "entregados" : "cancelados"} en tu historial.`}
               </Text>
-              {past.map((sh) => (
-                <HistoryRow key={sh.id} shipment={sh} />
-              ))}
-            </>
+            </View>
+          ) : (
+            groups.map((g) => (
+              <View key={g.title} className="gap-[10px]">
+                <Text className="text-[9.5px] tracking-[2px] text-inkMute uppercase font-bold px-[2px] mt-1">
+                  {g.title}
+                </Text>
+                {g.items.map((sh) => (
+                  <HistoryRow key={sh.id} shipment={sh} />
+                ))}
+              </View>
+            ))
           )}
 
           {loadingMore && (
@@ -255,6 +440,14 @@ export default function CarrierShipmentsScreen() {
           )}
         </ScrollView>
       )}
+
+      <DayPickerSheet
+        visible={calOpen}
+        selected={dayFilter}
+        onSelect={pickDay}
+        onClose={() => setCalOpen(false)}
+        title="Buscar viajes de un día"
+      />
     </View>
   );
 }

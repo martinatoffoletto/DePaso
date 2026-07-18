@@ -1,21 +1,23 @@
-import { useCallback, useState } from "react";
-import { View, ScrollView, ActivityIndicator, RefreshControl, Text } from "react-native";
+import { useCallback, useMemo, useState } from "react";
+import { View, ScrollView, TouchableOpacity, ActivityIndicator, RefreshControl, Text } from "react-native";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useFocusEffect } from "@react-navigation/native";
 import { carriersService } from "@/src/shared/api/carriers";
-import { carrierPayout } from "@/src/shared/utils/payout";
 import { shipmentsService } from "@/src/shared/api/shipments";
 import { CarrierSummary, Shipment, ShipmentStatus } from "@/src/shared/types";
 import { EmptyState } from "@/src/shared/ui/EmptyState";
 import { T } from "@/constants/tokens";
-import { PACKAGE_LABEL_SHORT } from "@/src/shared/utils/packageCategory";
+import { weekEarnings, weekRangeLabel, shipmentsOfWeek, dayIndexInWeek, mondayOf } from "./weekEarnings";
+import { WeekEarningsCard } from "./components/WeekEarningsCard";
+import { WeeklyGoalCard } from "./components/WeeklyGoalCard";
+import { PaymentRow } from "./components/PaymentRow";
+import { DayPickerSheet } from "./components/DayPickerSheet";
+import { money } from "./components/riderUi";
 
-const SIZE_LABEL = PACKAGE_LABEL_SHORT;
-
-function money(n: number): string {
-  return `$${Math.round(n).toLocaleString("es-AR")}`;
-}
+const DAY_NAMES = ["lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo"];
+const DAY_MS = 86_400_000;
+const WEEK_MS = 7 * DAY_MS;
 
 export default function RiderEarningsScreen() {
   const insets = useSafeAreaInsets();
@@ -25,6 +27,11 @@ export default function RiderEarningsScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(false);
 
+  // 0 = semana actual, -1 = anterior, etc. Cambiar de semana limpia el día elegido.
+  const [weekOffset, setWeekOffset] = useState(0);
+  const [selectedDay, setSelectedDay] = useState<number | null>(null);
+  const [calOpen, setCalOpen] = useState(false);
+
   const load = useCallback(async (asRefresh = false) => {
     if (asRefresh) setRefreshing(true);
     else setLoading(true);
@@ -32,7 +39,7 @@ export default function RiderEarningsScreen() {
     try {
       const [sum, list] = await Promise.all([
         carriersService.getSummary(),
-        shipmentsService.getAssignedShipments().catch(() => [] as Shipment[]),
+        shipmentsService.getAssignedShipments(0, 200).catch(() => [] as Shipment[]),
       ]);
       setSummary(sum);
       setDelivered(list.filter((s) => s.status === ShipmentStatus.DELIVERED));
@@ -46,6 +53,38 @@ export default function RiderEarningsScreen() {
   }, []);
 
   useFocusEffect(useCallback(() => { load(); }, [load]));
+
+  const refDate = useMemo(() => {
+    const d = new Date();
+    d.setDate(d.getDate() + weekOffset * 7);
+    return d;
+  }, [weekOffset]);
+
+  const week = useMemo(() => weekEarnings(delivered, refDate), [delivered, refDate]);
+  const weekList = useMemo(() => shipmentsOfWeek(delivered, refDate), [delivered, refDate]);
+  const list = useMemo(
+    () => (selectedDay == null ? weekList : weekList.filter((s) => dayIndexInWeek(s, refDate) === selectedDay)),
+    [weekList, selectedDay, refDate],
+  );
+
+  const weekTitle = weekOffset === 0 ? "Esta semana" : weekOffset === -1 ? "Semana pasada" : weekRangeLabel(refDate);
+
+  const changeWeek = (delta: number) => {
+    setWeekOffset((o) => Math.min(0, o + delta));
+    setSelectedDay(null);
+  };
+
+  // Saltar a un día puntual del calendario: posiciona la semana y marca el día.
+  const jumpToDate = (d: Date) => {
+    const wk = Math.round((mondayOf(d).getTime() - mondayOf(new Date()).getTime()) / WEEK_MS);
+    setWeekOffset(Math.min(0, wk));
+    setSelectedDay((d.getDay() + 6) % 7);
+    setCalOpen(false);
+  };
+
+  const selectedDate = selectedDay != null
+    ? new Date(mondayOf(refDate).getTime() + selectedDay * DAY_MS)
+    : null;
 
   if (loading) {
     return (
@@ -72,93 +111,89 @@ export default function RiderEarningsScreen() {
   return (
     <View className="flex-1 bg-bg" style={{ paddingTop: insets.top }}>
       <ScrollView
-        contentContainerStyle={{ paddingBottom: insets.bottom + 32 }}
+        contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 12, gap: 10, paddingBottom: insets.bottom + 32 }}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => load(true)} tintColor={T.forest} />}
         showsVerticalScrollIndicator={false}
       >
-        {/* Hero — total earnings */}
-        <View className="px-4 pt-3">
-          <View className="bg-forest rounded-[24px] px-5 pt-5 pb-[22px] overflow-hidden">
-            <Text className="text-[10px] tracking-[2px] text-[#F4EFE3]/80 uppercase font-bold">Ganado en total</Text>
-            <Text className="text-[44px] font-bold text-lime tracking-[-2px] leading-[46px] mt-1">
-              {summary ? money(summary.total_earnings) : "—"}
-            </Text>
-            <View className="flex-row items-center gap-2 mt-3">
-              <View className="flex-row items-center gap-[5px] bg-[#F4EFE3]/10 px-[9px] py-1 rounded-lg">
-                <MaterialCommunityIcons name="package-variant-closed" size={12} color="#F4EFE3" />
-                <Text className="text-[11px] text-[#F4EFE3] font-semibold">
-                  {summary ? summary.deliveries_completed : 0} entregas
-                </Text>
-              </View>
-              <View className="flex-row items-center gap-[5px] bg-[#F4EFE3]/10 px-[9px] py-1 rounded-lg">
-                <MaterialCommunityIcons name="leaf" size={12} color={T.lime} />
-                <Text className="text-[11px] text-[#F4EFE3] font-semibold">
-                  {summary ? summary.total_co2_saved_kg.toFixed(0) : 0} kg CO₂
-                </Text>
-              </View>
+        <Text className="text-[26px] font-bold text-ink tracking-[-0.8px]">Pagos</Text>
+
+        {/* Week navigator */}
+        <View className="flex-row items-center justify-between bg-card border border-border rounded-2xl px-2 py-2">
+          <TouchableOpacity
+            className="w-9 h-9 rounded-xl items-center justify-center"
+            onPress={() => changeWeek(-1)}
+            hitSlop={8}
+          >
+            <MaterialCommunityIcons name="chevron-left" size={20} color={T.ink} />
+          </TouchableOpacity>
+          <TouchableOpacity className="items-center flex-row gap-[6px]" onPress={() => setCalOpen(true)} activeOpacity={0.7}>
+            <View className="items-center">
+              <Text className="text-[13.5px] font-bold text-ink">{weekTitle}</Text>
+              <Text className="text-[10.5px] text-inkMute mt-px">{weekRangeLabel(refDate)}</Text>
             </View>
-          </View>
+            <MaterialCommunityIcons name="calendar-search" size={16} color={T.inkMute} />
+          </TouchableOpacity>
+          <TouchableOpacity
+            className={`w-9 h-9 rounded-xl items-center justify-center ${weekOffset === 0 ? "opacity-25" : ""}`}
+            onPress={() => changeWeek(1)}
+            disabled={weekOffset === 0}
+            hitSlop={8}
+          >
+            <MaterialCommunityIcons name="chevron-right" size={20} color={T.ink} />
+          </TouchableOpacity>
         </View>
 
-        {/* Stat tiles */}
-        <View className="px-4 pt-[14px]">
-          <View className="flex-row gap-2">
-            <View className="flex-1 bg-card border border-border rounded-2xl px-[14px] py-3">
-              <MaterialCommunityIcons name="star-outline" size={16} color={T.amber} />
-              <Text className="text-[22px] font-bold text-ink tracking-[-0.6px] mt-1">
-                {summary ? summary.reputation.toFixed(1) : "—"}
-              </Text>
-              <Text className="text-[9px] tracking-[1.5px] text-inkMute uppercase mt-px">Reputación</Text>
-            </View>
-            <View className="flex-1 bg-card border border-border rounded-2xl px-[14px] py-3">
-              <MaterialCommunityIcons name="moped-outline" size={16} color={T.emeraldDeep} />
-              <Text className="text-[22px] font-bold text-ink tracking-[-0.6px] mt-1">
-                {summary ? summary.active_shipments : "—"}
-              </Text>
-              <Text className="text-[9px] tracking-[1.5px] text-inkMute uppercase mt-px">En curso</Text>
-            </View>
-            <View className="flex-1 bg-card border border-border rounded-2xl px-[14px] py-3">
-              <MaterialCommunityIcons name="cash-multiple" size={16} color={T.forest} />
-              <Text className="text-[22px] font-bold text-ink tracking-[-0.6px] mt-1">
-                {summary && summary.deliveries_completed > 0
-                  ? money(summary.total_earnings / summary.deliveries_completed)
-                  : "—"}
-              </Text>
-              <Text className="text-[9px] tracking-[1.5px] text-inkMute uppercase mt-px">Promedio</Text>
-            </View>
-          </View>
-        </View>
+        {/* Week chart — tap a bar to filter that day */}
+        <WeekEarningsCard week={week} title={weekTitle} selectedDay={selectedDay} onSelectDay={setSelectedDay} />
 
-        {/* Recent delivered payments */}
-        <View className="px-4 pt-5">
-          <Text className="text-sm font-bold text-ink tracking-[-0.3px] mb-2">Cobros recientes</Text>
-          {delivered.length === 0 ? (
-            <View className="bg-card border border-border rounded-2xl px-4 py-6 items-center gap-2">
-              <MaterialCommunityIcons name="wallet-outline" size={28} color={T.inkMute} />
-              <Text className="text-[13px] text-inkMute text-center">
-                Todavía no tenés cobros. Completá entregas para verlas acá.
-              </Text>
-            </View>
-          ) : (
-            <View className="gap-2">
-              {delivered.map((sh) => (
-                <View key={sh.id} className="flex-row items-center gap-3 bg-card border border-borderSoft rounded-[14px] p-[14px]">
-                  <View className="w-9 h-9 rounded-xl bg-mint items-center justify-center">
-                    <MaterialCommunityIcons name="check" size={16} color={T.forest} />
-                  </View>
-                  <View className="flex-1">
-                    <Text className="text-[10px] tracking-[1.5px] text-inkMute font-bold">DP-{String(sh.id).padStart(4, "0")}</Text>
-                    <Text className="text-[12px] text-inkMute mt-px">{SIZE_LABEL[sh.package_size]} · Entregado</Text>
-                  </View>
-                  {sh.estimated_price != null && (
-                    <Text className="text-sm font-bold text-emeraldDeep">+{money(carrierPayout(sh.estimated_price))}</Text>
-                  )}
-                </View>
-              ))}
-            </View>
+        {/* Weekly goal only makes sense on the current week */}
+        {weekOffset === 0 && <WeeklyGoalCard weekEarned={week.total} />}
+
+        {/* Per-delivery breakdown */}
+        <View className="flex-row items-baseline justify-between mt-1">
+          <Text className="text-sm font-bold text-ink tracking-[-0.3px]">
+            {selectedDay == null ? "Cobros de la semana" : `Cobros del ${DAY_NAMES[selectedDay]}`}
+          </Text>
+          {selectedDay != null && (
+            <TouchableOpacity onPress={() => setSelectedDay(null)} hitSlop={8}>
+              <Text className="text-[10px] tracking-[1.5px] text-emeraldDeep uppercase font-bold">Ver semana</Text>
+            </TouchableOpacity>
           )}
         </View>
+
+        {list.length === 0 ? (
+          <View className="bg-card border border-border rounded-2xl px-4 py-6 items-center gap-2">
+            <MaterialCommunityIcons name="wallet-outline" size={28} color={T.inkMute} />
+            <Text className="text-[13px] text-inkMute text-center">
+              {selectedDay == null
+                ? "Sin cobros en esta semana."
+                : `Sin cobros el ${DAY_NAMES[selectedDay]}.`}
+            </Text>
+          </View>
+        ) : (
+          <View className="gap-2">
+            {list.map((sh) => <PaymentRow key={sh.id} shipment={sh} />)}
+          </View>
+        )}
+
+        {/* Historic footer — deliberately quiet */}
+        {summary && (
+          <Text className="text-[11.5px] text-inkMute text-center mt-3">
+            Histórico: {money(summary.total_earnings)} en {summary.deliveries_completed}{" "}
+            {summary.deliveries_completed === 1 ? "entrega" : "entregas"}
+            {summary.deliveries_completed > 0 &&
+              ` · promedio ${money(summary.total_earnings / summary.deliveries_completed)}`}
+          </Text>
+        )}
       </ScrollView>
+
+      <DayPickerSheet
+        visible={calOpen}
+        selected={selectedDate}
+        onSelect={jumpToDate}
+        onClose={() => setCalOpen(false)}
+        title="Buscar cobros de un día"
+      />
     </View>
   );
 }

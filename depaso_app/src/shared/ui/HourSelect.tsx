@@ -5,10 +5,12 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { T } from "@/constants/tokens";
 
 /** Hour dropdown — opens a bottom sheet with 24 options. */
-export function HourSelect({ value, onSelect, disabled }: {
+export function HourSelect({ value, onSelect, disabled, title = "Hora de inicio", placeholder = "Elegí la hora" }: {
   value: number | null;
   onSelect: (hour: number) => void;
   disabled?: boolean;
+  title?: string;
+  placeholder?: string;
 }) {
   const [open, setOpen] = useState(false);
   const insets = useSafeAreaInsets();
@@ -22,7 +24,7 @@ export function HourSelect({ value, onSelect, disabled }: {
       >
         <MaterialCommunityIcons name="clock-outline" size={16} color={T.inkMute} />
         <Text className={`flex-1 text-[15px] font-medium ${value != null ? "text-ink" : "text-inkFaint"}`}>
-          {value != null ? `${String(value).padStart(2, "0")}:00` : "Elegí la hora"}
+          {value != null ? `${String(value).padStart(2, "0")}:00` : placeholder}
         </Text>
         <MaterialCommunityIcons name="chevron-down" size={18} color={T.inkMute} />
       </TouchableOpacity>
@@ -30,7 +32,7 @@ export function HourSelect({ value, onSelect, disabled }: {
         <TouchableOpacity className="flex-1 bg-black/40" activeOpacity={1} onPress={() => setOpen(false)}>
           <View className="absolute left-0 right-0 bottom-0 bg-bg rounded-t-[24px] pt-3" style={{ paddingBottom: insets.bottom + 8, maxHeight: "60%" }}>
             <View className="w-[38px] h-1 bg-border rounded-[3px] self-center mb-2" />
-            <Text className="text-sm font-bold text-ink text-center mb-2">Hora de inicio</Text>
+            <Text className="text-sm font-bold text-ink text-center mb-2">{title}</Text>
             <ScrollView showsVerticalScrollIndicator={false}>
               {Array.from({ length: 24 }).map((_, h) => (
                 <TouchableOpacity

@@ -2,6 +2,7 @@ import { View } from "react-native";
 import { Text } from "react-native-paper";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { PackageCategory, Shipment, ShipmentStatus } from "@/src/shared/types";
+import { parseApiDate } from "@/src/shared/utils/dates";
 import { T } from "@/constants/tokens";
 
 /**
@@ -33,7 +34,7 @@ export function timelineSteps(status: ShipmentStatus) {
 }
 
 export function formatDate(iso: string): string {
-  const d = new Date(iso);
+  const d = parseApiDate(iso);
   return d.toLocaleDateString("es-AR", { day: "numeric", month: "short" }).toUpperCase();
 }
 

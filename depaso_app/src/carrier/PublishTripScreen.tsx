@@ -7,9 +7,10 @@ import { routesService } from "@/src/shared/api/carriers";
 import { CarrierRoute } from "@/src/shared/types";
 import { AddressField, SelectedAddress } from "@/src/shared/ui/AddressField";
 import { FieldLabel } from "@/src/shared/ui/Field";
-import { HourSelect } from "./components/HourSelect";
-import { MiniCalendar } from "./components/MiniCalendar";
-import { RouteAddress } from "./components/RouteAddress";
+import { HourSelect } from "@/src/shared/ui/HourSelect";
+import { MiniCalendar } from "@/src/shared/ui/MiniCalendar";
+import { visibleRoutes } from "@/src/carrier/routeUtils";
+import { PublishedRouteRow } from "./components/PublishedRouteRow";
 import { T } from "@/constants/tokens";
 
 const DAYS = [
@@ -164,7 +165,7 @@ export default function PublishTripScreen({ onClose }: { onClose: () => void }) 
     }
   }
 
-  const activeRoutes = myRoutes.filter((r) => r.is_active);
+  const activeRoutes = visibleRoutes(myRoutes);
 
   return (
     <Modal visible animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
@@ -364,39 +365,7 @@ export default function PublishTripScreen({ onClose }: { onClose: () => void }) 
             <View className="gap-2">
               <FieldLabel text="Viajes activos" />
               {activeRoutes.map((r) => (
-                <View key={r.id} className="flex-row items-center gap-3 bg-card rounded-[14px] border border-borderSoft p-3">
-                  <View className="w-[34px] h-[34px] rounded-[10px] bg-mint items-center justify-center border border-border">
-                    <MaterialCommunityIcons
-                      name={r.kind === "dedicated_window" ? "calendar-clock" : "map-marker-path"}
-                      size={16}
-                      color={T.forest}
-                    />
-                  </View>
-                  <View className="flex-1">
-                    {r.destination_lat != null ? (
-                      <View className="flex-row items-center gap-1">
-                        <RouteAddress lat={r.origin_lat} lon={r.origin_lon} />
-                        <MaterialCommunityIcons name="arrow-right" size={12} color={T.inkMute} />
-                        <RouteAddress lat={r.destination_lat} lon={r.destination_lon ?? 0} />
-                      </View>
-                    ) : (
-                      <RouteAddress lat={r.origin_lat} lon={r.origin_lon} />
-                    )}
-                    {r.kind === "dedicated_window" ? (
-                      <Text className="text-[10px] tracking-[0.5px] text-inkMute mt-1">
-                        {new Date(r.window_start).toLocaleDateString("es-AR")}{" "}
-                        {new Date(r.window_start).toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" })}
-                        {" → "}
-                        {new Date(r.window_end).toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" })}
-                      </Text>
-                    ) : r.recurrence_days ? (
-                      <Text className="text-[10px] tracking-[0.5px] text-inkMute mt-1">{r.recurrence_days.toUpperCase()}</Text>
-                    ) : null}
-                  </View>
-                  <TouchableOpacity onPress={() => remove(r.id)} hitSlop={10} className="p-1" accessibilityLabel="Eliminar viaje">
-                    <MaterialCommunityIcons name="trash-can-outline" size={18} color={T.red} />
-                  </TouchableOpacity>
-                </View>
+                <PublishedRouteRow key={r.id} route={r} onRemove={() => remove(r.id)} />
               ))}
             </View>
           )}

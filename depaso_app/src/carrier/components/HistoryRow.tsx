@@ -4,10 +4,11 @@ import { Shipment, ShipmentStatus } from "@/src/shared/types";
 import { carrierPayout } from "@/src/shared/utils/payout";
 import { useAddress } from "@/src/shared/hooks/useAddress";
 import { PACKAGE_LABEL_SHORT as SIZE_LABEL } from "@/src/shared/utils/packageCategory";
+import { parseApiDate } from "@/src/shared/utils/dates";
 import { T } from "@/constants/tokens";
 
 function formatDate(iso: string): string {
-  const d = new Date(iso);
+  const d = parseApiDate(iso);
   return d.toLocaleDateString("es-AR", { day: "numeric", month: "short" }) +
     " · " + d.toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" });
 }

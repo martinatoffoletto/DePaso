@@ -12,6 +12,9 @@ import { reverseGeocode } from "@/src/shared/utils/geocoding";
 import { searchAddresses, formatAddress, Suggestion } from "@/src/shared/utils/addressSearch";
 import { useAuthStore } from "@/src/shared/session/authStore";
 import { useAddressBookStore } from "@/src/shared/profile/addressBookStore";
+import { PickupScheduleCard } from "@/src/sender/components/PickupScheduleCard";
+import { SavedAddressesModal } from "@/src/sender/components/SavedAddressesModal";
+import { PickupSchedule, PICKUP_ASAP, pickupScheduleValid } from "@/src/sender/pickupSchedule";
 import type { Coords } from "./FlowNavigator";
 
 type IconName = React.ComponentProps<typeof MaterialCommunityIcons>["name"];
@@ -26,6 +29,7 @@ export type AddressPayload = {
   destinationCoords: Coords | null;
   recipientName: string;
   recipientPhone: string;
+  schedule: PickupSchedule;
 };
 
 type Props = {
@@ -46,18 +50,21 @@ export function AddressScreen({ initial, onBack, onNext }: Props) {
   const [destCoords, setDestCoords]       = useState<Coords | null>(initial?.destinationCoords ?? null);
   const [recipientName, setRecipientName] = useState(initial?.recipientName ?? "");
   const [recipientPhone, setRecipientPhone] = useState(initial?.recipientPhone ?? "");
+  const [schedule, setSchedule]           = useState<PickupSchedule>(initial?.schedule ?? PICKUP_ASAP);
 
   const [activeField, setActiveField]   = useState<"origin" | "destination" | null>(null);
   const [suggestions, setSuggestions]   = useState<Suggestion[]>([]);
   const [searching, setSearching]       = useState(false);
   const [noResults, setNoResults]       = useState(false);
   const [locLoading, setLocLoading]     = useState(false);
+  const [addrBookOpen, setAddrBookOpen] = useState(false);
 
   const debounceRef   = useRef<ReturnType<typeof setTimeout> | null>(null);
   const origInputRef  = useRef<RNTextInput>(null);
   const destInputRef  = useRef<RNTextInput>(null);
 
-  const canContinue = origin.trim().length > 3 && destination.trim().length > 3;
+  const addressesOk = origin.trim().length > 3 && destination.trim().length > 3;
+  const canContinue = addressesOk && pickupScheduleValid(schedule);
 
   // ── Autocomplete ────────────────────────────────────────────────────────────
   const handleTextChange = useCallback((text: string, field: "origin" | "destination") => {
@@ -191,7 +198,7 @@ export function AddressScreen({ initial, onBack, onNext }: Props) {
         const r = await searchAddresses(destination);
         if (r[0]) dc = { latitude: parseFloat(r[0].lat), longitude: parseFloat(r[0].lon) };
       }
-      onNext({ origin, destination, originCoords: oc, destinationCoords: dc, recipientName, recipientPhone });
+      onNext({ origin, destination, originCoords: oc, destinationCoords: dc, recipientName, recipientPhone, schedule });
     } finally {
       setResolving(false);
     }
@@ -381,10 +388,17 @@ export function AddressScreen({ initial, onBack, onNext }: Props) {
         <View>
           <View className="flex-row items-center justify-between mb-[10px]">
             <Text className="text-sm font-semibold text-ink tracking-[-0.2px]">Direcciones guardadas</Text>
-            <Text className="text-[9px] tracking-[1.5px] text-emeraldDeep uppercase">VER TODAS</Text>
+            <TouchableOpacity onPress={() => setAddrBookOpen(true)} hitSlop={8} activeOpacity={0.7}>
+              <Text className="text-[9px] tracking-[1.5px] text-emeraldDeep uppercase">VER TODAS</Text>
+            </TouchableOpacity>
           </View>
+          {savedAddrs.length === 0 && (
+            <Text className="text-xs text-inkMute">
+              Todavía no guardaste direcciones. Podés agregarlas desde tu perfil.
+            </Text>
+          )}
           <View className="flex-row gap-2">
-            {savedAddrs.map((sv) => (
+            {savedAddrs.slice(0, 3).map((sv) => (
               <TouchableOpacity
                 key={sv.id}
                 className="flex-1 bg-card rounded-[14px] border border-border p-[10px]"
@@ -455,18 +469,17 @@ export function AddressScreen({ initial, onBack, onNext }: Props) {
           </View>
         </View>
 
-        {/* Schedule chip */}
-        <View className="bg-card rounded-2xl border border-border p-[14px] flex-row items-center gap-3">
-          <MaterialCommunityIcons name="clock-outline" size={18} color={T.forest} />
-          <View className="flex-1">
-            <Text className="text-[9px] tracking-[1.5px] text-inkMute uppercase">¿CUÁNDO LO RETIRAMOS?</Text>
-            <Text className="text-[13.5px] text-ink font-medium mt-0.5">Hoy · Lo antes posible</Text>
-          </View>
-          <View className="bg-bg rounded-lg px-[10px] py-[5px]">
-            <Text className="text-[9px] tracking-[1px] text-ink font-bold uppercase">CAMBIAR</Text>
-          </View>
-        </View>
+        {/* Schedule */}
+        <PickupScheduleCard value={schedule} onChange={setSchedule} />
       </ScrollView>
+
+      <SavedAddressesModal
+        visible={addrBookOpen}
+        addresses={savedAddrs}
+        targetLabel={activeField === "origin" ? "origen" : "destino"}
+        onSelect={(a) => { setAddrBookOpen(false); handleSavedAddrPress(a.address); }}
+        onClose={() => setAddrBookOpen(false)}
+      />
 
       {/* Sticky CTA */}
       <View className="absolute bottom-0 left-0 right-0 px-4 pt-6" style={{ paddingBottom: insets.bottom + 16 }}>
@@ -482,7 +495,7 @@ export function AddressScreen({ initial, onBack, onNext }: Props) {
           ) : (
             <>
               <Text className="text-[#F4EFE3] font-semibold text-[15px]">
-                {canContinue ? "Continuar · Ver ruta" : "Ingresá las direcciones"}
+                {canContinue ? "Continuar · Ver ruta" : addressesOk ? "Elegí el horario de retiro" : "Ingresá las direcciones"}
               </Text>
               {canContinue && <MaterialCommunityIcons name="arrow-right" size={18} color="#F4EFE3" />}
             </>

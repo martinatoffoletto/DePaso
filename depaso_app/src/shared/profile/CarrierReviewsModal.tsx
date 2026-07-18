@@ -6,6 +6,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { T } from "@/constants/tokens";
 import { carriersService } from "@/src/shared/api/carriers";
 import { CarrierRating } from "@/src/shared/types";
+import { parseApiDate } from "@/src/shared/utils/dates";
 import { EmptyState } from "@/src/shared/ui/EmptyState";
 import { SkeletonCard } from "@/src/shared/ui/Skeleton";
 
@@ -70,7 +71,7 @@ export function CarrierReviewsModal({ visible, onClose }: { visible: boolean; on
                 <View className="flex-row items-center justify-between">
                   <Stars n={r.stars} />
                   <Text className="text-[11px] text-inkMute">
-                    {new Date(r.created_at).toLocaleDateString("es-AR", { day: "numeric", month: "short", year: "numeric" })}
+                    {parseApiDate(r.created_at).toLocaleDateString("es-AR", { day: "numeric", month: "short", year: "numeric" })}
                   </Text>
                 </View>
                 {r.comment ? <Text className="text-[13.5px] text-ink leading-[19px]">{r.comment}</Text> : null}

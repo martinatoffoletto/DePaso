@@ -12,9 +12,19 @@ function sameDay(a: Date, b: Date): boolean {
   return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
 }
 
-/** Compact month calendar — past days disabled, tap to pick a day. */
-export function MiniCalendar({ selected, onSelect }: { selected: Date | null; onSelect: (d: Date) => void }) {
+/**
+ * Compact month calendar — tap to pick a day.
+ * mode "future" (default): días pasados deshabilitados (programar algo).
+ * mode "past": días futuros deshabilitados (buscar en el historial).
+ */
+export function MiniCalendar({ selected, onSelect, mode = "future" }: {
+  selected: Date | null;
+  onSelect: (d: Date) => void;
+  mode?: "future" | "past";
+}) {
   const [monthOffset, setMonthOffset] = useState(0);
+  const minOffset = mode === "past" ? -12 : 0;
+  const maxOffset = mode === "past" ? 0 : 2;
   const today = new Date();
   const base = new Date(today.getFullYear(), today.getMonth() + monthOffset, 1);
   const daysInMonth = new Date(base.getFullYear(), base.getMonth() + 1, 0).getDate();
@@ -29,15 +39,20 @@ export function MiniCalendar({ selected, onSelect }: { selected: Date | null; on
     <View className="bg-card rounded-[14px] border-[1.2px] border-border p-3">
       <View className="flex-row items-center justify-between mb-2">
         <TouchableOpacity
-          onPress={() => setMonthOffset((m) => Math.max(0, m - 1))}
+          onPress={() => setMonthOffset((m) => Math.max(minOffset, m - 1))}
           hitSlop={10}
-          className={monthOffset === 0 ? "opacity-30" : ""}
-          disabled={monthOffset === 0}
+          className={monthOffset === minOffset ? "opacity-30" : ""}
+          disabled={monthOffset === minOffset}
         >
           <MaterialCommunityIcons name="chevron-left" size={20} color={T.ink} />
         </TouchableOpacity>
         <Text className="text-[13px] font-bold text-ink">{MONTHS[base.getMonth()]} {base.getFullYear()}</Text>
-        <TouchableOpacity onPress={() => setMonthOffset((m) => Math.min(2, m + 1))} hitSlop={10}>
+        <TouchableOpacity
+          onPress={() => setMonthOffset((m) => Math.min(maxOffset, m + 1))}
+          hitSlop={10}
+          className={monthOffset === maxOffset ? "opacity-30" : ""}
+          disabled={monthOffset === maxOffset}
+        >
           <MaterialCommunityIcons name="chevron-right" size={20} color={T.ink} />
         </TouchableOpacity>
       </View>
@@ -50,7 +65,8 @@ export function MiniCalendar({ selected, onSelect }: { selected: Date | null; on
         {cells.map((day, i) => {
           if (day === null) return <View key={`b${i}`} style={{ width: "14.28%" }} className="h-9" />;
           const date = new Date(base.getFullYear(), base.getMonth(), day);
-          const isPast = date < new Date(today.getFullYear(), today.getMonth(), today.getDate());
+          const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+          const isDisabled = mode === "past" ? date > todayStart : date < todayStart;
           const isSelected = selected != null && sameDay(date, selected);
           const isToday = sameDay(date, today);
           return (
@@ -58,12 +74,12 @@ export function MiniCalendar({ selected, onSelect }: { selected: Date | null; on
               key={day}
               style={{ width: "14.28%" }}
               className="h-9 items-center justify-center"
-              onPress={() => !isPast && onSelect(date)}
-              disabled={isPast}
+              onPress={() => !isDisabled && onSelect(date)}
+              disabled={isDisabled}
               activeOpacity={0.7}
             >
               <View className={`w-8 h-8 rounded-[10px] items-center justify-center ${isSelected ? "bg-forest" : isToday ? "bg-mint" : ""}`}>
-                <Text className={`text-[13px] font-semibold ${isSelected ? "text-[#F4EFE3]" : isPast ? "text-inkFaint" : isToday ? "text-forest" : "text-ink"}`}>
+                <Text className={`text-[13px] font-semibold ${isSelected ? "text-[#F4EFE3]" : isDisabled ? "text-inkFaint" : isToday ? "text-forest" : "text-ink"}`}>
                   {day}
                 </Text>
               </View>
