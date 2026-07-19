@@ -8,6 +8,7 @@ import {
   CarrierUpdatePayload,
   FeedItem,
   RouteCreatePayload,
+  RouteUpdatePayload,
   TrackedPosition,
 } from "../types";
 
@@ -56,6 +57,11 @@ export const routesService = {
 
   async mine(): Promise<CarrierRoute[]> {
     const response = await apiClient.get<CarrierRoute[]>("/routes/mine");
+    return response.data;
+  },
+
+  async update(routeId: number, payload: RouteUpdatePayload): Promise<CarrierRoute> {
+    const response = await apiClient.patch<CarrierRoute>(`/routes/${routeId}`, payload);
     return response.data;
   },
 

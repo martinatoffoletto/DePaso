@@ -1,20 +1,17 @@
 import { useEffect, useState } from "react";
-import { View, TouchableOpacity, ScrollView, ActivityIndicator } from "react-native";
+import { View, TouchableOpacity, ScrollView } from "react-native";
 import MapView, { Marker, Polyline } from "react-native-maps";
 import { Text } from "react-native-paper";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { T } from "@/constants/tokens";
 import { StepDots } from "@/src/sender/components/StepDots";
+import { ProductOptionCard } from "@/src/sender/components/ProductOptionCard";
+import { InlineWindowPicker } from "@/src/sender/components/InlineWindowPicker";
 import { shipmentsService } from "@/src/shared/api/shipments";
-import type { Quote } from "@/src/shared/types";
+import type { Quote, ProductMode } from "@/src/shared/types";
+import { PickupSchedule, pickupScheduleValid, pickupScheduleLabel, todayISO } from "@/src/sender/pickupSchedule";
 import type { Coords } from "./FlowNavigator";
-
-function fmtPrice(v: number | undefined): string {
-  return v != null ? `$${v.toLocaleString("es-AR")}` : "—";
-}
-
-type DeliveryMode = "dedicada" | "colaborativa";
 
 const MAP_HEIGHT = 300;
 const SHEET_OVERLAP = 38;
@@ -31,27 +28,33 @@ type Props = {
   originCoords: Coords | null;
   destinationCoords: Coords | null;
   categoryId: string;
-  initialMode?: DeliveryMode;
+  initialMode?: ProductMode;
+  schedule: PickupSchedule;
+  onScheduleChange: (s: PickupSchedule) => void;
   onBack: () => void;
-  onNext: (mode: DeliveryMode, quote: Quote | null) => void;
+  onNext: (mode: ProductMode, quote: Quote | null) => void;
 };
 
-export function RouteOfferScreen({ origin, destination, originCoords, destinationCoords, categoryId, initialMode, onBack, onNext }: Props) {
+export function RouteOfferScreen({
+  origin, destination, originCoords, destinationCoords, categoryId,
+  initialMode, schedule, onScheduleChange, onBack, onNext,
+}: Props) {
   const insets = useSafeAreaInsets();
-  // Mudanzas/fletes (XL) van siempre en viaje dedicado (spec 3.3) — el
-  // backend rechaza XL colaborativo, así que acá ni se ofrece.
+  // Mudanzas/fletes (XL) van siempre en viaje dedicado (spec 3.3): "De paso"
+  // (colaborativo) no se ofrece — el backend rechaza XL colaborativo.
   const isXl = categoryId === "xl";
-  const [mode, setMode] = useState<DeliveryMode>(isXl ? "dedicada" : (initialMode ?? "colaborativa"));
+  const clamp = (m: ProductMode): ProductMode => (isXl && m === "depaso" ? "ya" : m);
+  const [mode, setMode] = useState<ProductMode>(clamp(initialMode ?? "ya"));
   useEffect(() => {
-    if (isXl) setMode("dedicada");
-  }, [isXl]);
+    if (isXl && mode === "depaso") setMode("ya");
+  }, [isXl, mode]);
+
   const [quote, setQuote] = useState<Quote | null>(null);
   const [quoteLoading, setQuoteLoading] = useState(true);
   const [quoteError, setQuoteError] = useState(false);
   const [retryTick, setRetryTick] = useState(0);
 
   const hasCoords = !!originCoords && !!destinationCoords;
-  const isCollab = mode === "colaborativa";
 
   useEffect(() => {
     if (!hasCoords) { setQuoteLoading(false); return; }
@@ -86,6 +89,20 @@ export function RouteOfferScreen({ origin, destination, originCoords, destinatio
 
   const originLabel = origin.split(",")[0] || "Origen";
   const destLabel   = destination.split(",")[0] || "Destino";
+
+  // "Hoy" exige una franja válida (retiro programado); sin ella no se continúa.
+  const selectHoy = () => {
+    setMode("hoy");
+    if (schedule.kind !== "window") {
+      onScheduleChange({ kind: "window", date: todayISO(), startHour: null, endHour: null });
+    }
+  };
+  const hoyWindowValid = schedule.kind === "window" && pickupScheduleValid(schedule);
+  const hoyNeedsWindow = mode === "hoy" && !hoyWindowValid;
+  const canContinue = !hoyNeedsWindow;
+
+  const depasoSelected = mode === "depaso";
+  const routesNow = quote?.collaborative_routes_now ?? 0;
 
   return (
     <View className="flex-1 bg-bg">
@@ -184,8 +201,8 @@ export function RouteOfferScreen({ origin, destination, originCoords, destinatio
             showsVerticalScrollIndicator={false}
             contentContainerStyle={{ paddingHorizontal: 16, gap: 10, paddingBottom: insets.bottom + 90 }}
           >
-            <Text className="text-[10px] tracking-[2.5px] text-emeraldDeep uppercase">PASO 03 · ELEGÍ EL VIAJE</Text>
-            <Text className="text-[22px] font-bold text-ink tracking-[-0.7px] leading-6 mb-[2px]">¿Cómo lo enviamos?</Text>
+            <Text className="text-[10px] tracking-[2.5px] text-emeraldDeep uppercase">PASO 03 · ¿CUÁNDO LO NECESITÁS?</Text>
+            <Text className="text-[22px] font-bold text-ink tracking-[-0.7px] leading-6 mb-[2px]">Elegí tu envío</Text>
 
             {quoteError && (
               <View className="flex-row items-center gap-2 bg-redBg border border-red/30 rounded-xl px-3 py-[10px]">
@@ -197,77 +214,94 @@ export function RouteOfferScreen({ origin, destination, originCoords, destinatio
               </View>
             )}
 
-            {/* Dedicada card */}
-            <TouchableOpacity
-              className={`bg-card rounded-2xl border-[1.5px] p-3 px-[14px] flex-row items-center gap-3 overflow-hidden ${mode === "dedicada" ? "border-forest" : "border-border"}`}
-              onPress={() => setMode("dedicada")}
-              activeOpacity={0.8}
-            >
-              <View className={`w-[22px] h-[22px] rounded-full border-2 items-center justify-center ${mode === "dedicada" ? "border-forest" : "border-border"}`}>
-                {mode === "dedicada" && <View className="w-[10px] h-[10px] rounded-full bg-forest" />}
-              </View>
-              <View className="flex-1">
-                <View className="flex-row items-center gap-[6px] mb-[2px]">
-                  <Text className="text-[15px] font-bold text-ink tracking-[-0.3px]">Sólo tu envío</Text>
-                  <View className="bg-bg rounded px-[5px] py-[2px]"><Text className="text-[8px] tracking-[1px] text-inkMute uppercase">DEDICADA</Text></View>
-                </View>
-                <View className="flex-row gap-[10px] items-center">
+            {/* Ya — dedicado por demanda */}
+            <ProductOptionCard
+              selected={mode === "ya"}
+              onPress={() => setMode("ya")}
+              title="Ya"
+              badgeLabel="DEDICADA"
+              badgeTone="neutral"
+              loading={quoteLoading}
+              price={quote?.price_dedicated}
+              meta={
+                <View className="flex-row gap-[8px] items-center">
                   <Text className="text-[11.5px] text-inkMute">{quote ? `${quote.eta_dedicated_min} min` : "—"}</Text>
-                  <Text className="text-[11.5px] text-inkMute">· Directo</Text>
+                  <Text className="text-[11.5px] text-inkMute">· Un cadete sale ahora, sólo por tu envío</Text>
                 </View>
-              </View>
-              {quoteLoading
-                ? <ActivityIndicator size="small" color={T.forest} />
-                : <Text className="text-lg font-bold text-ink tracking-[-0.5px]">{fmtPrice(quote?.price_dedicated)}</Text>}
-            </TouchableOpacity>
+              }
+            />
 
-            {/* Colaborativa card — no disponible para fletes (XL) */}
+            {/* Hoy — dedicado por espacio (retiro programado en la franja) */}
+            <ProductOptionCard
+              selected={mode === "hoy"}
+              onPress={selectHoy}
+              title="Hoy"
+              badgeLabel="PROGRAMADA"
+              badgeTone="scheduled"
+              loading={quoteLoading}
+              price={quote?.price_scheduled}
+              meta={
+                <Text className="text-[11.5px] text-inkMute">
+                  {hoyWindowValid ? pickupScheduleLabel(schedule) : "Retiro en tu franja · esperá y ahorrá"}
+                </Text>
+              }
+            >
+              {mode === "hoy" && (
+                <InlineWindowPicker schedule={schedule} onChange={onScheduleChange} />
+              )}
+            </ProductOptionCard>
+
+            {/* De paso — colaborativo (no disponible para fletes XL) */}
             {isXl ? (
               <View className="rounded-2xl border border-border border-dashed bg-cardSoft p-3 px-[14px] flex-row items-center gap-3">
                 <MaterialCommunityIcons name="account-group-outline" size={20} color={T.inkMute} />
                 <View className="flex-1">
-                  <Text className="text-[13.5px] font-semibold text-inkSoft">Compartir viaje no disponible</Text>
+                  <Text className="text-[13.5px] font-semibold text-inkSoft">«De paso» no disponible</Text>
                   <Text className="text-[11.5px] text-inkMute mt-[2px]">
                     Las mudanzas y fletes van siempre en un viaje dedicado, por su volumen.
                   </Text>
                 </View>
               </View>
             ) : (
-            <TouchableOpacity
-              className={`rounded-2xl border-[1.5px] p-3 px-[14px] flex-row items-center gap-3 overflow-hidden ${isCollab ? "bg-forest border-forest" : "bg-card border-border"}`}
-              style={isCollab ? { shadowColor: T.forest, shadowOffset: { width: 0, height: 12 }, shadowOpacity: 0.4, shadowRadius: 24, elevation: 5 } : undefined}
-              onPress={() => setMode("colaborativa")}
-              activeOpacity={0.8}
-            >
-              {/* decorative lime blob */}
-              {isCollab && <View className="absolute -right-[10px] -top-[10px] w-[130px] h-[90px] rounded-[60px] bg-lime opacity-[0.16]" />}
-
-              <View className={`w-[22px] h-[22px] rounded-full border-2 items-center justify-center ${isCollab ? "border-lime" : "border-border"}`}>
-                {isCollab && <View className="w-[10px] h-[10px] rounded-full bg-lime" />}
-              </View>
-              <View className="flex-1 relative">
-                <View className="flex-row items-center gap-[6px] mb-[2px]">
-                  <Text className={`text-[15px] font-bold tracking-[-0.3px] ${isCollab ? "text-[#F4EFE3]" : "text-ink"}`}>Compartí el viaje</Text>
-                  <View className="bg-lime rounded px-[5px] py-[2px]"><Text className="text-[8px] tracking-[1px] text-forest font-bold uppercase">ECO −43%</Text></View>
-                </View>
-                <View className="flex-row gap-[10px] items-center">
-                  <Text className={`text-[11.5px] ${isCollab ? "text-[#F4EFE3]/80" : "text-inkMute"}`}>
-                    {quote ? `${quote.eta_collaborative_min} min` : "—"}
-                  </Text>
-                  <Text className={`text-[11.5px] font-semibold ${isCollab ? "text-lime" : "text-emeraldDeep"}`}>
-                    {quote ? `−${quote.co2_savings_estimate_kg.toFixed(1)} kg CO₂` : ""}
-                  </Text>
-                </View>
-              </View>
-              <View className="items-end relative">
-                {quoteLoading
-                  ? <ActivityIndicator size="small" color={isCollab ? T.lime : T.forest} />
-                  : <>
-                      <Text className={`text-lg font-bold tracking-[-0.5px] ${isCollab ? "text-[#F4EFE3]" : "text-ink"}`}>{fmtPrice(quote?.price_collaborative)}</Text>
-                      <Text className={`text-[10px] line-through ${isCollab ? "text-[#F4EFE3]/60" : "text-inkFaint"}`}>{fmtPrice(quote?.price_dedicated)}</Text>
-                    </>}
-              </View>
-            </TouchableOpacity>
+              <ProductOptionCard
+                variant="eco"
+                selected={depasoSelected}
+                dimmed={routesNow === 0}
+                onPress={() => setMode("depaso")}
+                title="De paso"
+                badgeLabel="ECO −43%"
+                badgeTone="eco"
+                loading={quoteLoading}
+                price={quote?.price_collaborative}
+                strikePrice={quote?.price_dedicated}
+                meta={
+                  <View className="flex-row gap-[10px] items-center">
+                    <Text className="text-[11.5px]" style={{ color: depasoSelected ? "#F4EFE3" : T.inkMute }}>
+                      {quote ? `${quote.eta_collaborative_min} min` : "—"}
+                    </Text>
+                    <Text className="text-[11.5px] font-semibold" style={{ color: depasoSelected ? T.lime : T.emeraldDeep }}>
+                      {quote ? `−${quote.co2_savings_estimate_kg.toFixed(1)} kg CO₂` : ""}
+                    </Text>
+                  </View>
+                }
+              >
+                {quote && (
+                  <View className="mt-[10px]">
+                    {routesNow > 0 ? (
+                      <View className={`self-start flex-row items-center gap-[6px] rounded-full px-[10px] py-[5px] ${depasoSelected ? "bg-lime" : "bg-mint"}`}>
+                        <View className="w-[5px] h-[5px] rounded-full bg-emeraldDeep" />
+                        <Text className="text-[10.5px] font-bold text-forest">
+                          {routesNow} {routesNow === 1 ? "viaje compatible" : "viajes compatibles"} ahora
+                        </Text>
+                      </View>
+                    ) : (
+                      <Text className="text-[11px] leading-4" style={{ color: depasoSelected ? "#F4EFE3" : T.inkMute }}>
+                        Nadie va en camino ahora — tu envío queda publicado y te avisamos apenas alguien coincida.
+                      </Text>
+                    )}
+                  </View>
+                )}
+              </ProductOptionCard>
             )}
 
             {/* Eco strip */}
@@ -277,7 +311,7 @@ export function RouteOfferScreen({ origin, destination, originCoords, destinatio
                   <MaterialCommunityIcons name="leaf" size={15} color={T.forest} />
                 </View>
                 <Text className="flex-1 text-[11.5px] text-inkSoft leading-4">
-                  Al sumar tu paquete a un viaje que ya existe, evitás un vehículo extra en la calle.
+                  «De paso» suma tu paquete a un viaje que ya existe: evitás un vehículo extra en la calle.
                 </Text>
               </View>
             )}
@@ -288,13 +322,16 @@ export function RouteOfferScreen({ origin, destination, originCoords, destinatio
       {/* Sticky footer CTA */}
       <View className="absolute bottom-0 left-0 right-0 px-4 pt-6 z-20" style={{ paddingBottom: insets.bottom + 12 }}>
         <TouchableOpacity
-          className="bg-forest rounded-2xl h-[54px] flex-row items-center justify-center gap-[10px]"
-          style={{ shadowColor: T.forest, shadowOffset: { width: 0, height: 12 }, shadowOpacity: 0.45, shadowRadius: 24, elevation: 5 }}
-          onPress={() => onNext(mode, quote)}
+          className={`rounded-2xl h-[54px] flex-row items-center justify-center gap-[10px] ${canContinue ? "bg-forest" : "bg-inkMute"}`}
+          style={canContinue ? { shadowColor: T.forest, shadowOffset: { width: 0, height: 12 }, shadowOpacity: 0.45, shadowRadius: 24, elevation: 5 } : undefined}
+          onPress={() => canContinue && onNext(mode, quote)}
           activeOpacity={0.88}
+          disabled={!canContinue}
         >
-          <Text className="text-[#F4EFE3] font-semibold text-[15px]" style={{ color: "#F4EFE3" }}>Continuar · Resumen</Text>
-          <MaterialCommunityIcons name="arrow-right" size={18} color="#F4EFE3" />
+          <Text className="text-[#F4EFE3] font-semibold text-[15px]" style={{ color: "#F4EFE3" }}>
+            {canContinue ? "Continuar · Resumen" : "Elegí la franja de retiro"}
+          </Text>
+          {canContinue && <MaterialCommunityIcons name="arrow-right" size={18} color="#F4EFE3" />}
         </TouchableOpacity>
       </View>
     </View>

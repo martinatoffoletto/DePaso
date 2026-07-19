@@ -12,9 +12,8 @@ import { reverseGeocode } from "@/src/shared/utils/geocoding";
 import { searchAddresses, formatAddress, Suggestion } from "@/src/shared/utils/addressSearch";
 import { useAuthStore } from "@/src/shared/session/authStore";
 import { useAddressBookStore } from "@/src/shared/profile/addressBookStore";
-import { PickupScheduleCard } from "@/src/sender/components/PickupScheduleCard";
 import { SavedAddressesModal } from "@/src/sender/components/SavedAddressesModal";
-import { PickupSchedule, PICKUP_ASAP, pickupScheduleValid } from "@/src/sender/pickupSchedule";
+import { PICKUP_ASAP } from "@/src/sender/pickupSchedule";
 import type { Coords } from "./FlowNavigator";
 
 type IconName = React.ComponentProps<typeof MaterialCommunityIcons>["name"];
@@ -50,7 +49,7 @@ export function AddressScreen({ initial, onBack, onNext }: Props) {
   const [destCoords, setDestCoords]       = useState<Coords | null>(initial?.destinationCoords ?? null);
   const [recipientName, setRecipientName] = useState(initial?.recipientName ?? "");
   const [recipientPhone, setRecipientPhone] = useState(initial?.recipientPhone ?? "");
-  const [schedule, setSchedule]           = useState<PickupSchedule>(initial?.schedule ?? PICKUP_ASAP);
+  const schedule = PICKUP_ASAP;
 
   const [activeField, setActiveField]   = useState<"origin" | "destination" | null>(null);
   const [suggestions, setSuggestions]   = useState<Suggestion[]>([]);
@@ -64,7 +63,7 @@ export function AddressScreen({ initial, onBack, onNext }: Props) {
   const destInputRef  = useRef<RNTextInput>(null);
 
   const addressesOk = origin.trim().length > 3 && destination.trim().length > 3;
-  const canContinue = addressesOk && pickupScheduleValid(schedule);
+  const canContinue = addressesOk;
 
   // ── Autocomplete ────────────────────────────────────────────────────────────
   const handleTextChange = useCallback((text: string, field: "origin" | "destination") => {
@@ -469,8 +468,7 @@ export function AddressScreen({ initial, onBack, onNext }: Props) {
           </View>
         </View>
 
-        {/* Schedule */}
-        <PickupScheduleCard value={schedule} onChange={setSchedule} />
+
       </ScrollView>
 
       <SavedAddressesModal
@@ -495,7 +493,7 @@ export function AddressScreen({ initial, onBack, onNext }: Props) {
           ) : (
             <>
               <Text className="text-[#F4EFE3] font-semibold text-[15px]">
-                {canContinue ? "Continuar · Ver ruta" : addressesOk ? "Elegí el horario de retiro" : "Ingresá las direcciones"}
+                {canContinue ? "Continuar · Ver ruta" : "Ingresá las direcciones"}
               </Text>
               {canContinue && <MaterialCommunityIcons name="arrow-right" size={18} color="#F4EFE3" />}
             </>

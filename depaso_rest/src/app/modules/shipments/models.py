@@ -36,7 +36,10 @@ class Shipment(Base, TimestampMixin):
     # Recipient contact at the destination, so the assigned carrier can reach them.
     recipient_name = Column(String(120), nullable=True)
     recipient_phone = Column(String(30), nullable=True)
-    estimated_price = Column(Float, nullable=True)
+    # Nunca a convenir: create_shipment/update_shipment SIEMPRE calculan el
+    # precio (pricing.price_for) antes de persistir — NOT NULL cierra el
+    # bypass de un insert directo que dejara el envío sin precio.
+    estimated_price = Column(Float, nullable=False)
     co2_savings_kg = Column(Float, nullable=True)
 
 

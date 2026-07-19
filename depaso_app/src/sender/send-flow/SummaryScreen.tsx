@@ -13,7 +13,7 @@ import { shipmentsService } from "@/src/shared/api/shipments";
 import { co2EquivalenceLabel } from "@/src/sender/co2";
 import { PACKAGE_LABEL } from "@/src/shared/utils/packageCategory";
 import { PickupSchedule, pickupScheduleLabel } from "@/src/sender/pickupSchedule";
-import { DeliveryMode, AssignmentMode, PackageCategory, Quote } from "@/src/shared/types";
+import { DeliveryMode, AssignmentMode, PackageCategory, Quote, ProductMode } from "@/src/shared/types";
 
 
 const SIZE_LABEL = PACKAGE_LABEL;
@@ -30,7 +30,7 @@ type SummaryScreenProps = {
   declaredValue?: number | null;
   photoUri?: string | null;
   photoServerUrl?: string | null;
-  mode: "dedicada" | "colaborativa";
+  mode: ProductMode;
   quote: Quote | null;
   recipientName?: string;
   recipientPhone?: string;
@@ -48,13 +48,29 @@ export function SummaryScreen({
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const [loading, setLoading] = useState(false);
-  // Retiro inmediato o a hora exacta matchea on demand; una franja horaria
-  // matchea por disponibilidad (cadete cuya ruta pasa dentro de la ventana).
-  const assignmentMode = schedule.kind === "window" ? AssignmentMode.BY_AVAILABILITY : AssignmentMode.ON_DEMAND;
-  const isCollaborative = mode === "colaborativa";
+  const isCollaborative = mode === "depaso";
+  // Mapeo producto → taxonomía interna (MODALIDADES.md §4.1 / gap §7):
+  //   ya     → dedicado + on_demand      (cadete saliendo ya)
+  //   hoy    → dedicado + by_availability (retiro programado en la franja)
+  //   depaso → colaborativo; by_availability si eligió franja, on_demand si no
+  const deliveryMode = isCollaborative ? DeliveryMode.COLLABORATIVE : DeliveryMode.DEDICATED;
+  const assignmentMode =
+    mode === "ya"
+      ? AssignmentMode.ON_DEMAND
+      : mode === "hoy"
+      ? AssignmentMode.BY_AVAILABILITY
+      : schedule.kind === "window"
+      ? AssignmentMode.BY_AVAILABILITY
+      : AssignmentMode.ON_DEMAND;
   const price = quote
-    ? (isCollaborative ? quote.price_collaborative : quote.price_dedicated)
+    ? mode === "ya"
+      ? quote.price_dedicated
+      : mode === "hoy"
+      ? quote.price_scheduled
+      : quote.price_collaborative
     : null;
+  const productLabel = mode === "ya" ? "Ya" : mode === "hoy" ? "Hoy" : "De paso";
+  const productIcon = mode === "ya" ? "lightning-bolt" : mode === "hoy" ? "clock-check-outline" : "account-group-outline";
 
   const handleConfirm = async () => {
     if (!originCoords || !destinationCoords) return;
@@ -62,7 +78,7 @@ export function SummaryScreen({
     try {
       const shipment = await shipmentsService.createShipment({
         package_size: categoryId as PackageCategory,
-        modality: mode === "dedicada" ? DeliveryMode.DEDICATED : DeliveryMode.COLLABORATIVE,
+        modality: deliveryMode,
         assignment_mode: assignmentMode,
         origin_lat: originCoords.latitude,
         origin_lon: originCoords.longitude,
@@ -201,9 +217,9 @@ export function SummaryScreen({
 
           <View className="h-px bg-borderSoft" />
           <SummaryRow
-            icon={isCollaborative ? "account-group-outline" : "lightning-bolt"}
-            label="Modalidad"
-            value={isCollaborative ? "Colaborativa" : "Dedicada"}
+            icon={productIcon}
+            label="Envío"
+            value={productLabel}
           />
           <View className="h-px bg-borderSoft" />
           <SummaryRow icon="clock-outline" label="Retiro" value={pickupScheduleLabel(schedule)} />

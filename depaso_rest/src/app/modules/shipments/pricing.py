@@ -27,6 +27,14 @@ PER_KM: dict[str, float] = {
 # the detour, not the full journey -> ~43% cheaper (consistent with survey ranges).
 COLLABORATIVE_DISCOUNT = 0.43
 
+# Tier "Hoy" (dedicated por espacio / by_availability): the pickup is scheduled
+# inside a carrier's declared window, so the cost of approaching the pickup is
+# shared across the orders of that window instead of charged to a single trip.
+# Intermediate discount between the full dedicated fare (100%) and the
+# collaborative -43%; sits inside the WTP/WTA gap measured in the survey
+# (sender WTP $3.000-6.000 vs carrier WTA $2.500-5.000). To calibrate.
+SCHEDULED_DISCOUNT = 0.18
+
 # Collaborative takes longer: the carrier follows their own route first.
 COLLABORATIVE_TIME_FACTOR = 1.9
 
@@ -56,18 +64,32 @@ def quote(origin: Point, destination: Point, package_size: str) -> dict:
     distance = road_km(origin, destination)
     dedicated = BASE_FARE[package_size] + PER_KM[package_size] * distance
     collaborative = dedicated * (1 - COLLABORATIVE_DISCOUNT)
+    scheduled = dedicated * (1 - SCHEDULED_DISCOUNT)
     eta_dedicated = eta_minutes(distance, QUOTE_VEHICLE)
 
     return {
         "distance_km": round(distance, 2),
         "price_dedicated": round(dedicated, 0),
+        "price_scheduled": round(scheduled, 0),
         "price_collaborative": round(collaborative, 0),
         "eta_dedicated_min": eta_dedicated,
         "eta_collaborative_min": round(eta_dedicated * COLLABORATIVE_TIME_FACTOR),
     }
 
 
-def price_for(origin: Point, destination: Point, package_size: str, modality: str) -> float:
-    """Final estimated price for the chosen modality."""
+def price_for(origin: Point, destination: Point, package_size: str,
+              modality: str, assignment_mode: str | None = None) -> float:
+    """Final estimated price for the chosen modality + assignment.
+
+    Three price tiers (spec MODALIDADES.md §5):
+    - collaborative ("De paso"): -43%, same in both assignment modes (the price
+      reflects the shared trip, not who declared it).
+    - dedicated + by_availability ("Hoy"): intermediate scheduled discount.
+    - dedicated + on_demand / anything else ("Ya"): full dedicated fare.
+    """
     q = quote(origin, destination, package_size)
-    return q["price_collaborative"] if modality == "collaborative" else q["price_dedicated"]
+    if modality == "collaborative":
+        return q["price_collaborative"]
+    if assignment_mode == "by_availability":
+        return q["price_scheduled"]
+    return q["price_dedicated"]

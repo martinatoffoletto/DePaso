@@ -4,16 +4,19 @@ import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { T } from "@/constants/tokens";
 
-/** Hour dropdown — opens a bottom sheet with 24 options. */
-export function HourSelect({ value, onSelect, disabled, title = "Hora de inicio", placeholder = "Elegí la hora" }: {
+/** Hour dropdown — opens a bottom sheet with filtered options. */
+export function HourSelect({ value, onSelect, disabled, title = "Hora de inicio", placeholder = "Elegí la hora", minHour = 0 }: {
   value: number | null;
   onSelect: (hour: number) => void;
   disabled?: boolean;
   title?: string;
   placeholder?: string;
+  /** Earliest selectable hour (inclusive). Hours before this are hidden. */
+  minHour?: number;
 }) {
   const [open, setOpen] = useState(false);
   const insets = useSafeAreaInsets();
+  const hours = Array.from({ length: 24 }).map((_, i) => i).filter(h => h >= minHour);
   return (
     <>
       <TouchableOpacity
@@ -34,7 +37,7 @@ export function HourSelect({ value, onSelect, disabled, title = "Hora de inicio"
             <View className="w-[38px] h-1 bg-border rounded-[3px] self-center mb-2" />
             <Text className="text-sm font-bold text-ink text-center mb-2">{title}</Text>
             <ScrollView showsVerticalScrollIndicator={false}>
-              {Array.from({ length: 24 }).map((_, h) => (
+              {hours.map((h) => (
                 <TouchableOpacity
                   key={h}
                   className={`px-6 py-3 flex-row items-center justify-between ${value === h ? "bg-mint" : ""}`}

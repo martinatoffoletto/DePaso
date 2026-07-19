@@ -26,9 +26,11 @@ from src.app.modules.shipments.schemas import (
 from src.app.modules.shipments.service import ShipmentService
 from src.app.modules.shipments.repository import ShipmentRepository
 from src.app.modules.carriers.repository import CarrierRepository
+from src.app.modules.carriers.models import Carrier
 from src.app.modules.users.repository import UserRepository
 from src.app.modules.routes.repository import RouteRepository
 from src.app.modules.co2.service import CO2Service
+from src.app.modules.matching.service import MatchingService
 
 router = APIRouter(prefix="/shipments", tags=["shipments"])
 
@@ -49,16 +51,64 @@ async def _carrier_for_user(user_id: int, db: AsyncSession):
     return carrier
 
 
+async def _enrich_shipments(shipments: list, db: AsyncSession) -> list[ShipmentResponse]:
+    """Batch-attach sender_rating and carrier_name to each ShipmentResponse (2 queries total)."""
+    from src.app.modules.users.models import User
+    ids = [s.id for s in shipments]
+    ratings_map = await ShipmentRepository(db).ratings_by_shipment_ids(ids)
+
+    # Batch-fetch carrier names: carrier_id → "Nombre Apellido"
+    carrier_ids = [s.carrier_id for s in shipments if s.carrier_id is not None]
+    carrier_name_map: dict[int, str] = {}
+    if carrier_ids:
+        from sqlalchemy import select as sa_select
+        result = await db.execute(
+            sa_select(Carrier.id, User.first_name, User.last_name)
+            .join(User, User.id == Carrier.user_id)
+            .where(Carrier.id.in_(carrier_ids))
+        )
+        carrier_name_map = {row.id: f"{row.first_name} {row.last_name}" for row in result.all()}
+
+    out: list[ShipmentResponse] = []
+    for s in shipments:
+        resp = ShipmentResponse.model_validate(s)
+        resp.sender_rating = ratings_map.get(s.id)
+        resp.carrier_name = carrier_name_map.get(s.carrier_id) if s.carrier_id else None
+        out.append(resp)
+    return out
+
+
+async def _collaborative_routes_now(db: AsyncSession, origin: Point, destination: Point) -> int:
+    """Live collaborative availability for the quote's "De paso" tier. Best-effort:
+    if the signal cannot be computed (e.g. OSRM down) it returns 0 rather than
+    breaking the quote — a price quote must never 500 over an availability hint."""
+    try:
+        matching = MatchingService(
+            shipment_repo=ShipmentRepository(db),
+            carrier_repo=CarrierRepository(db),
+            route_repo=RouteRepository(db),
+        )
+        return await matching.count_compatible_routes(origin, destination)
+    except Exception:  # noqa: BLE001 — the signal is optional, never fatal to a quote
+        return 0
+
+
 @router.post("/quote", response_model=QuoteResponse)
-async def get_quote(data: QuoteRequest):
-    """Price both modalities upfront — no hidden charges (survey finding #1)."""
+async def get_quote(data: QuoteRequest, db: AsyncSession = Depends(get_db)):
+    """Price the three tiers (Ya / Hoy / De paso) upfront — no hidden charges
+    (survey finding #1) — plus the live collaborative availability signal."""
     origin = Point(data.origin_lat, data.origin_lon)
     destination = Point(data.destination_lat, data.destination_lon)
     q = pricing.quote(origin, destination, data.package_size)
     # Optimistic CO2 estimate for the offer screen: a collaborative match with
     # zero detour saves the full dedicated trip emissions (reference vehicle).
     co2 = CO2Service().calculate_direct_emissions(q["distance_km"], pricing.QUOTE_VEHICLE)
-    return QuoteResponse(**q, co2_savings_estimate_kg=round(co2, 3))
+    routes_now = await _collaborative_routes_now(db, origin, destination)
+    return QuoteResponse(
+        **q,
+        co2_savings_estimate_kg=round(co2, 3),
+        collaborative_routes_now=routes_now,
+    )
 
 
 @router.post("", response_model=ShipmentResponse, status_code=status.HTTP_201_CREATED)
@@ -107,11 +157,12 @@ async def list_my_shipments(
     current_user_id: CurrentUserId,
     skip: int = 0,
     limit: int = 20,
+    db: AsyncSession = Depends(get_db),
     service: ShipmentService = Depends(get_shipment_service),
 ):
     """Shipments created by the current user (client history, RF-SHP)."""
     shipments, _ = await service.list_shipments_by_client(current_user_id, skip, limit)
-    return [ShipmentResponse.model_validate(s) for s in shipments]
+    return await _enrich_shipments(shipments, db)
 
 
 @router.get("/assigned", response_model=list[ShipmentResponse])
@@ -132,10 +183,12 @@ async def list_assigned_shipments(
 async def get_shipment(
     shipment_id: int,
     current_user_id: CurrentUserId,
+    db: AsyncSession = Depends(get_db),
     service: ShipmentService = Depends(get_shipment_service),
 ):
     shipment = await service.get_shipment_for_user(shipment_id, current_user_id)
-    return ShipmentResponse.model_validate(shipment)
+    results = await _enrich_shipments([shipment], db)
+    return results[0]
 
 
 @router.get("/{shipment_id}/events", response_model=list[ShipmentEventResponse])

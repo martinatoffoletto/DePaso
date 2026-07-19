@@ -74,7 +74,8 @@ class FeedItemResponse(BaseModel):
     origin_lon: float
     destination_lat: float
     destination_lon: float
-    estimated_price: float | None
+    # Siempre calculado en create/update — nunca "a convenir" (spec: ver shipments/schemas.py).
+    estimated_price: float
     photo_url: str | None = None
     description: str | None = None
     declared_value: float | None = None

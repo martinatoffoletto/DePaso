@@ -149,7 +149,7 @@ export default function MisEnviosScreen() {
               >
                 <Text className={`text-[12.5px] ${isActive ? "font-semibold text-ink" : "font-medium text-inkSoft"}`}>{t.label}</Text>
                 <View className={`rounded px-[5px] py-px ${isActive ? "bg-forest" : "bg-border"}`}>
-                  <Text className={`text-[9px] tracking-[0.5px] font-bold ${isActive ? "text-lime" : "text-inkSoft"}`}>{t.count}</Text>
+                  <Text className="text-[9px] tracking-[0.5px] font-bold" style={{ color: isActive ? T.lime : T.inkSoft }}>{t.count}</Text>
                 </View>
               </TouchableOpacity>
             );
@@ -254,7 +254,6 @@ export default function MisEnviosScreen() {
           shipment={selectedShipment}
           onClose={() => setSelectedShipment(null)}
           onCancel={() => { setSelectedShipment(null); load(); }}
-          onPaid={() => { setSelectedShipment(null); load(); }}
         />
       )}
 

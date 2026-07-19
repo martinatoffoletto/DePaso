@@ -14,12 +14,14 @@ import { shipmentsService } from "@/src/shared/api/shipments";
 import { Carrier, CarrierRoute, CarrierSummary, FeedItem, Shipment, ShipmentStatus } from "@/src/shared/types";
 import { carrierPayout } from "@/src/shared/utils/payout";
 import { parseApiDate } from "@/src/shared/utils/dates";
-import { isSpaceWindow, visibleRoutes } from "@/src/carrier/routeUtils";
+import { effectiveWindow, isSpaceWindow, todayOccurrence, tripSession, visibleRoutes } from "@/src/carrier/routeUtils";
 import { T } from "@/constants/tokens";
 import { IncomingOfferModal } from "./IncomingOfferModal";
 import PublishTripScreen from "./PublishTripScreen";
 import { useGpsPublisher } from "./useGpsPublisher";
 import { ActiveJobPanel } from "./components/ActiveJobPanel";
+import { ActiveTripCard, ActiveTripBanner } from "./components/ActiveTripCard";
+import { TripDetailModal } from "./components/TripDetailModal";
 import { OfferRow } from "./components/OfferRow";
 import { TripRow } from "./components/TripRow";
 import { OffersTeaser } from "./components/OffersTeaser";
@@ -94,6 +96,9 @@ export default function RiderHomeScreen() {
   const [region, setRegion] = useState<Region | null>(null);
   const [spaceSaving, setSpaceSaving] = useState(false);
   const [sheetCollapsed, setSheetCollapsed] = useState(false);
+  const [detailRoute, setDetailRoute] = useState<CarrierRoute | null>(null);
+  const [editRoute, setEditRoute] = useState<CarrierRoute | null>(null);
+  const [startingTrip, setStartingTrip] = useState(false);
 
   // Shipment ids already announced — new ones auto-open the incoming modal.
   const seenOffersRef = useRef<Set<number>>(new Set());
@@ -211,6 +216,17 @@ export default function RiderHomeScreen() {
     parseApiDate(r.window_start).getTime() <= now && now <= parseApiDate(r.window_end).getTime(),
   ) ?? null, [routes, now]);
 
+  // Sesión de trayectoria viva (colaborativo, ver MODALIDADES.md): un trayecto
+  // habitual/especial en ventana AHORA o por arrancar en ≤30 min. Derivado de
+  // (routes, now) — sin estado propio, así nunca queda un id viejo colgado.
+  const trip = useMemo(() => tripSession(routes, now), [routes, now]);
+  // Pedidos del feed que matchean ESTE trayecto (el backend adjunta route_id
+  // a las ofertas colaborativas): son los que están "listos" al conectarse.
+  const tripOffers = useMemo(
+    () => (trip ? visibleFeed.filter((f) => f.route_id === trip.route.id) : []),
+    [trip, visibleFeed],
+  );
+
   const usedKg = useMemo(() => activeJobs.reduce((acc, s) => acc + s.weight_kg, 0), [activeJobs]);
   const freeKg = carrier ? Math.max(0, carrier.capacity_kg - usedKg) : 0;
 
@@ -277,6 +293,47 @@ export default function RiderHomeScreen() {
       toast.error("No se pudo actualizar tu disponibilidad por espacio.");
     } finally {
       setSpaceSaving(false);
+    }
+  }
+
+  // Iniciar la sesión de trayecto. Si la ventana de hoy todavía no abrió
+  // (arranque adelantado), se corre la apertura a AHORA vía PATCH — el feed
+  // colaborativo del backend solo ofrece dentro de la ventana (window_contains),
+  // así que sin esto "empezar antes" sería puramente cosmético.
+  async function startTrip(routeArg?: CarrierRoute) {
+    const target = routeArg ?? trip?.route;
+    if (!target) { setAvailability(true); return; }
+    setStartingTrip(true);
+    try {
+      if (!effectiveWindow(target, Date.now())) {
+        const start = new Date();
+        const occ = todayOccurrence(target);
+        // Conservar el cierre de la franja de hoy; si ya pasó, abrir 4 h.
+        const end = occ.end > start ? occ.end : new Date(start.getTime() + 4 * 3_600_000);
+        const updated = await routesService.update(target.id, {
+          window_start: start.toISOString(),
+          window_end: end.toISOString(),
+        });
+        setRoutes((rs) => rs.map((r) => (r.id === updated.id ? updated : r)));
+        setNow(Date.now());
+      }
+      setDetailRoute(null);
+      setAvailability(true);
+    } catch {
+      toast.error("No se pudo iniciar el trayecto.");
+    } finally {
+      setStartingTrip(false);
+    }
+  }
+
+  async function removeRoute(route: CarrierRoute) {
+    try {
+      await routesService.deactivate(route.id);
+      setRoutes((rs) => rs.filter((r) => r.id !== route.id));
+      setDetailRoute(null);
+      toast.info("Viaje eliminado.");
+    } catch {
+      Alert.alert("Error", "No se pudo eliminar el viaje.");
     }
   }
 
@@ -398,6 +455,22 @@ export default function RiderHomeScreen() {
   return (
     <View className="flex-1 bg-bg">
       {showPublish && <PublishTripScreen onClose={() => { setShowPublish(false); load(); }} />}
+      {editRoute && (
+        <PublishTripScreen
+          editRoute={editRoute}
+          onClose={() => { setEditRoute(null); setDetailRoute(null); load(); }}
+        />
+      )}
+      {detailRoute && !editRoute && (
+        <TripDetailModal
+          route={detailRoute}
+          starting={startingTrip}
+          onStartNow={() => startTrip(detailRoute)}
+          onEdit={() => { const r = detailRoute; setDetailRoute(null); setEditRoute(r); }}
+          onRemove={() => removeRoute(detailRoute)}
+          onClose={() => setDetailRoute(null)}
+        />
+      )}
       {offer && (
         <IncomingOfferModal
           item={offer}
@@ -468,8 +541,11 @@ export default function RiderHomeScreen() {
               </TouchableOpacity>
             </View>
 
-            {/* "Dedicado por espacio" toggle — keeps taking chained orders */}
-            <View
+            {/* "Dedicado por espacio" toggle — keeps taking chained orders.
+                Con una trayectoria en ventana se oculta: "libre en una zona"
+                contradice estar recorriendo una ruta (solo queda visible si la
+                ventana ya estaba prendida, para poder apagarla). */}
+            {(!trip || !!spaceRoute) && <View
               className={`self-start mt-2 flex-row items-center gap-[6px] rounded-[12px] pl-3 pr-1 py-[2px] border-[1.2px] ${spaceRoute ? "bg-forest border-forest" : "bg-card border-border"}`}
               style={{ shadowColor: "#000", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.15, shadowRadius: 10, elevation: 4 }}
             >
@@ -490,7 +566,17 @@ export default function RiderHomeScreen() {
                 ios_backgroundColor={T.border}
                 style={{ transform: [{ scaleX: 0.72 }, { scaleY: 0.72 }] }}
               />
-            </View>
+            </View>}
+
+            {/* Trayectoria viva en curso (colaborativo habitual/especial) */}
+            {trip && (
+              <ActiveTripBanner
+                route={trip.route}
+                windowStart={trip.window.start}
+                windowEnd={trip.window.end}
+                upcoming={trip.upcoming}
+              />
+            )}
           </View>
 
           {/* Bottom sheet — tap the handle/strip to collapse it over the map */}
@@ -633,8 +719,24 @@ export default function RiderHomeScreen() {
             </View>
           )}
 
+          {/* Trayecto habitual/especial en ventana: pedidos ya listos + arranque
+              explícito de la sesión (colaborativo por espacio, MODALIDADES.md) */}
+          {trip && (
+            <View className="px-4 pt-3">
+              <ActiveTripCard
+                route={trip.route}
+                windowStart={trip.window.start}
+                windowEnd={trip.window.end}
+                offersCount={tripOffers.length}
+                upcoming={trip.upcoming}
+                starting={startingTrip}
+                onStart={() => startTrip()}
+              />
+            </View>
+          )}
+
           {/* Demanda actual: pedidos compatibles esperando */}
-          {visibleFeed.length > 0 && (
+          {!trip && visibleFeed.length > 0 && (
             <View className="px-4 pt-3">
               <OffersTeaser count={visibleFeed.length} onConnect={() => setAvailability(true)} />
             </View>
@@ -728,7 +830,11 @@ export default function RiderHomeScreen() {
               </TouchableOpacity>
             ) : (
               <View className="gap-2">
-                {visibleRoutes(routes).map((r) => <TripRow key={r.id} route={r} />)}
+                {visibleRoutes(routes).map((r) => (
+                  <TouchableOpacity key={r.id} onPress={() => setDetailRoute(r)} activeOpacity={0.85}>
+                    <TripRow route={r} />
+                  </TouchableOpacity>
+                ))}
               </View>
             )}
           </View>

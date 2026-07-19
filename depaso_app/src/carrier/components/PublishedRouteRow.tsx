@@ -14,7 +14,7 @@ export function PublishedRouteRow({ route: r, onRemove }: {
     <View className="flex-row items-center gap-3 bg-card rounded-[14px] border border-borderSoft p-3">
       <View className="w-[34px] h-[34px] rounded-[10px] bg-mint items-center justify-center border border-border">
         <MaterialCommunityIcons
-          name={r.kind === "dedicated_window" ? "calendar-clock" : "map-marker-path"}
+          name={r.kind === "dedicated_window" ? "calendar-clock" : r.recurrence_days ? "repeat" : "calendar-star"}
           size={16}
           color={T.forest}
         />
@@ -29,16 +29,16 @@ export function PublishedRouteRow({ route: r, onRemove }: {
         ) : (
           <RouteAddress lat={r.origin_lat} lon={r.origin_lon} />
         )}
-        {r.kind === "dedicated_window" ? (
+        {r.recurrence_days ? (
+          <Text className="text-[10px] tracking-[0.5px] text-inkMute mt-1">{r.recurrence_days.toUpperCase()}</Text>
+        ) : (
           <Text className="text-[10px] tracking-[0.5px] text-inkMute mt-1">
             {parseApiDate(r.window_start).toLocaleDateString("es-AR")}{" "}
             {parseApiDate(r.window_start).toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" })}
             {" → "}
             {parseApiDate(r.window_end).toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" })}
           </Text>
-        ) : r.recurrence_days ? (
-          <Text className="text-[10px] tracking-[0.5px] text-inkMute mt-1">{r.recurrence_days.toUpperCase()}</Text>
-        ) : null}
+        )}
       </View>
       {onRemove && (
         <TouchableOpacity onPress={onRemove} hitSlop={10} className="p-1" accessibilityLabel="Eliminar viaje">

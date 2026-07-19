@@ -127,7 +127,7 @@ class ShipmentService:
         estimated_price = pricing.price_for(
             Point(origin_lat, origin_lon),
             Point(destination_lat, destination_lon),
-            package_size, modality,
+            package_size, modality, assignment_mode,
         )
         shipment = await self.repository.create(
             client_id=client_id,
@@ -207,8 +207,9 @@ class ShipmentService:
             updates.get("weight_kg", shipment.weight_kg),
         )
 
-        # If origin, destination, package_size or modality changed, recalculate price
-        needs_repricing = any(k in updates for k in ("origin_lat", "origin_lon", "destination_lat", "destination_lon", "package_size", "modality"))
+        # If origin, destination, package_size, modality or assignment_mode
+        # changed, recalculate price (assignment_mode drives the "Hoy" tier).
+        needs_repricing = any(k in updates for k in ("origin_lat", "origin_lon", "destination_lat", "destination_lon", "package_size", "modality", "assignment_mode"))
         if needs_repricing:
             origin = Point(
                 updates.get("origin_lat", shipment.origin_lat),
@@ -220,7 +221,8 @@ class ShipmentService:
             )
             pkg_size = updates.get("package_size", shipment.package_size)
             modality = updates.get("modality", shipment.modality)
-            updates["estimated_price"] = pricing.price_for(origin, dest, pkg_size, modality)
+            assignment_mode = updates.get("assignment_mode", shipment.assignment_mode)
+            updates["estimated_price"] = pricing.price_for(origin, dest, pkg_size, modality, assignment_mode)
 
         updated = await self.repository.update(shipment_id, **updates)
         return updated

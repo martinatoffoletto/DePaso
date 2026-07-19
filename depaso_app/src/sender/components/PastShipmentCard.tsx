@@ -5,7 +5,7 @@ import { useRouter } from "expo-router";
 import { DeliveryMode, Shipment, ShipmentStatus } from "@/src/shared/types";
 import { PACKAGE_LABEL_SHORT as SIZE_LABEL } from "@/src/shared/utils/packageCategory";
 import { T } from "@/constants/tokens";
-import { AvatarBubble, CADETE_COLORS, MiniRouteLine, PackageThumb, formatDate, useAddress } from "./shipmentsUi";
+import { AvatarBubble, CADETE_COLORS, MiniRouteLine, PackageThumb, formatDate, useAddress, carrierInitials } from "./shipmentsUi";
 
 /** Card de un envío pasado (entregado o cancelado) en el historial. */
 export function PastShipmentCard({ item, onPress, onRate }: { item: Shipment; onPress: () => void; onRate: () => void }) {
@@ -75,16 +75,29 @@ export function PastShipmentCard({ item, onPress, onRate }: { item: Shipment; on
 
       {/* Cadete row */}
       <View className="flex-row items-center gap-[10px] pt-1">
-        <AvatarBubble initials="C" color={avatarColor} size={28} />
+        <AvatarBubble initials={carrierInitials(item.carrier_name ?? undefined)} color={avatarColor} size={28} />
         <View className="flex-1">
-          <Text className="text-xs text-ink font-medium">Cadete</Text>
+          <Text className="text-xs text-ink font-medium">{item.carrier_name ?? "Cadete"}</Text>
           <Text className="text-[9px] tracking-[1px] text-inkMute uppercase mt-px">1 VIAJE JUNTOS</Text>
         </View>
         {isDelivered && (
-          <TouchableOpacity className="flex-row items-center gap-[5px] bg-forest px-[10px] py-[6px] rounded-lg" activeOpacity={0.85} onPress={onRate}>
-            <MaterialCommunityIcons name="star-outline" size={11} color={T.lime} />
-            <Text className="text-[11.5px] font-semibold text-[#F4EFE3]" style={{ color: "#F4EFE3" }}>Calificar</Text>
-          </TouchableOpacity>
+          item.sender_rating != null ? (
+            <View className="flex-row items-center gap-[2px]">
+              {[1, 2, 3, 4, 5].map(n => (
+                <MaterialCommunityIcons
+                  key={n}
+                  name={n <= item.sender_rating! ? "star" : "star-outline"}
+                  size={14}
+                  color={n <= item.sender_rating! ? T.amber : T.border}
+                />
+              ))}
+            </View>
+          ) : (
+            <TouchableOpacity className="flex-row items-center gap-[5px] bg-forest px-[10px] py-[6px] rounded-lg" activeOpacity={0.85} onPress={onRate}>
+              <MaterialCommunityIcons name="star-outline" size={11} color={T.lime} />
+              <Text className="text-[11.5px] font-semibold text-[#F4EFE3]" style={{ color: "#F4EFE3" }}>Calificar</Text>
+            </TouchableOpacity>
+          )
         )}
         {isCancelled && (
           <TouchableOpacity className="border border-border px-[10px] py-[6px] rounded-lg" activeOpacity={0.85} onPress={() => router.push("/(main)/enviar")}>

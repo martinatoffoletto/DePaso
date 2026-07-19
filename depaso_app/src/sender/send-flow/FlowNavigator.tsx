@@ -7,11 +7,10 @@ import { PackageScreen }     from "./PackageScreen";
 import { AddressScreen }     from "./AddressScreen";
 import { RouteOfferScreen }  from "./RouteOfferScreen";
 import { SummaryScreen }     from "./SummaryScreen";
-import type { Quote } from "@/src/shared/types";
+import type { Quote, ProductMode } from "@/src/shared/types";
 import { PickupSchedule, PICKUP_ASAP } from "@/src/sender/pickupSchedule";
 
 type Step = "home" | "package" | "address" | "route_offer" | "summary";
-type DeliveryMode = "dedicada" | "colaborativa";
 
 export interface Coords {
   latitude: number;
@@ -39,10 +38,21 @@ export function FlowNavigator() {
   const [recipientPhone, setRecipientPhone]     = useState("");
   const [schedule, setSchedule]                 = useState<PickupSchedule>(PICKUP_ASAP);
 
-  // Offer state — default modality follows the user's saved preference (#5/#6).
+  // Offer state — `mode` is null until the user explicitly picks a product; the
+  // effective default is derived (below) from the schedule + saved preference.
   const preferCollaborative = useSettingsStore((s) => s.preferCollaborative);
-  const [mode, setMode] = useState<DeliveryMode>(preferCollaborative ? "colaborativa" : "dedicada");
+  const [mode, setMode] = useState<ProductMode | null>(null);
   const [quote, setQuote] = useState<Quote | null>(null);
+
+  // Default product (MODALIDADES.md §4.1): franja elegida → "hoy"; si no, la
+  // preferencia guardada (colaborativa → "depaso", si no → "ya"). XL nunca es
+  // "depaso" (colaborativo prohibido por volumen).
+  const isXl = categoryId === "xl";
+  const effectiveMode: ProductMode = useMemo(() => {
+    const base: ProductMode = mode ?? (schedule.kind === "window" ? "hoy" : preferCollaborative ? "depaso" : "ya");
+    if (isXl && base === "depaso") return schedule.kind === "window" ? "hoy" : "ya";
+    return base;
+  }, [mode, schedule.kind, preferCollaborative, isXl]);
 
   const resetAll = useCallback(() => {
     setStep("home");
@@ -59,9 +69,9 @@ export function FlowNavigator() {
     setRecipientName("");
     setRecipientPhone("");
     setSchedule(PICKUP_ASAP);
-    setMode(preferCollaborative ? "colaborativa" : "dedicada");
+    setMode(null);
     setQuote(null);
-  }, [preferCollaborative]);
+  }, []);
 
   const screen = useMemo(() => {
     if (step === "home") {
@@ -116,7 +126,9 @@ export function FlowNavigator() {
           originCoords={originCoords}
           destinationCoords={destinationCoords}
           categoryId={categoryId}
-          initialMode={mode}
+          initialMode={effectiveMode}
+          schedule={schedule}
+          onScheduleChange={setSchedule}
           onBack={() => setStep("address")}
           onNext={(selectedMode, q) => {
             setMode(selectedMode);
@@ -140,7 +152,7 @@ export function FlowNavigator() {
         declaredValue={declaredValue}
         photoUri={photoUri}
         photoServerUrl={photoServerUrl}
-        mode={mode}
+        mode={effectiveMode}
         quote={quote}
         recipientName={recipientName}
         recipientPhone={recipientPhone}
@@ -149,7 +161,7 @@ export function FlowNavigator() {
         onConfirm={resetAll}
       />
     );
-  }, [step, categoryId, weightKg, description, declaredValue, photoUri, photoServerUrl, origin, destination, originCoords, destinationCoords, recipientName, recipientPhone, schedule, mode, quote, resetAll]);
+  }, [step, categoryId, weightKg, description, declaredValue, photoUri, photoServerUrl, origin, destination, originCoords, destinationCoords, recipientName, recipientPhone, schedule, effectiveMode, quote, resetAll]);
 
   return <PaperProvider theme={MD3LightTheme}>{screen}</PaperProvider>;
 }

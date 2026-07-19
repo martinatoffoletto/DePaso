@@ -104,6 +104,49 @@ def test_price_for_dedicated_greater_than_collaborative():
     assert p_ded > p_col
 
 
+# --- scheduled tier ("Hoy" / dedicated by_availability) ----------------------
+
+def test_quote_includes_scheduled_price():
+    q = pricing.quote(MICROCENTRO, CABALLITO, PackageSize.M)
+    assert "price_scheduled" in q
+    assert q["price_scheduled"] > 0
+
+
+def test_scheduled_between_collaborative_and_dedicated():
+    """The "Hoy" tier is the middle rung of the price ladder (MODALIDADES §5)."""
+    q = pricing.quote(MICROCENTRO, CABALLITO, PackageSize.L)
+    assert q["price_collaborative"] < q["price_scheduled"] < q["price_dedicated"]
+
+
+def test_scheduled_discount_matches_constant():
+    q = pricing.quote(MICROCENTRO, CABALLITO, PackageSize.M)
+    expected = round(q["price_dedicated"] * (1 - pricing.SCHEDULED_DISCOUNT), 0)
+    assert q["price_scheduled"] == pytest.approx(expected, abs=1.0)
+
+
+def test_price_for_dedicated_by_availability_is_scheduled():
+    q = pricing.quote(MICROCENTRO, CABALLITO, PackageSize.M)
+    p = pricing.price_for(MICROCENTRO, CABALLITO, PackageSize.M,
+                          "dedicated", "by_availability")
+    assert p == q["price_scheduled"]
+
+
+def test_price_for_dedicated_on_demand_is_full_fare():
+    q = pricing.quote(MICROCENTRO, CABALLITO, PackageSize.M)
+    p = pricing.price_for(MICROCENTRO, CABALLITO, PackageSize.M,
+                          "dedicated", "on_demand")
+    assert p == q["price_dedicated"]
+
+
+def test_price_for_collaborative_same_in_both_assignment_modes():
+    """Collaborative costs the same whether the signal came from demand or space."""
+    p_demand = pricing.price_for(MICROCENTRO, CABALLITO, PackageSize.M,
+                                 "collaborative", "on_demand")
+    p_space = pricing.price_for(MICROCENTRO, CABALLITO, PackageSize.M,
+                                "collaborative", "by_availability")
+    assert p_demand == p_space
+
+
 def test_base_fare_present_for_all_sizes():
     """BASE_FARE must have entries for all four size categories."""
     for size in (PackageSize.S, PackageSize.M, PackageSize.L, PackageSize.XL):

@@ -3,6 +3,7 @@ import { Text } from "react-native-paper";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { CarrierRoute } from "@/src/shared/types";
 import { useAddress } from "@/src/shared/hooks/useAddress";
+import { parseApiDate } from "@/src/shared/utils/dates";
 import { T } from "@/constants/tokens";
 
 /** Published collaborative trip card (offline state). */
@@ -13,12 +14,12 @@ export function TripRow({ route }: { route: CarrierRoute }) {
     <View className="bg-card border border-border rounded-2xl px-[14px] py-3">
       <View className="flex-row items-center gap-2 mb-[10px]">
         <MaterialCommunityIcons
-          name={route.kind === "dedicated_window" ? "calendar-clock" : "map-marker-path"}
+          name={route.kind === "dedicated_window" ? "calendar-clock" : route.recurrence_days ? "repeat" : "calendar-star"}
           size={14}
           color={T.emeraldDeep}
         />
         <Text className="text-[11px] tracking-[1px] text-inkMute font-bold uppercase">
-          {route.kind === "dedicated_window" ? "Ventana dedicada" : "Ruta habitual"}
+          {route.kind === "dedicated_window" ? "Ventana dedicada" : route.recurrence_days ? "Ruta habitual" : "Viaje especial"}
         </Text>
       </View>
       <View className="flex-row items-center">
@@ -32,9 +33,15 @@ export function TripRow({ route }: { route: CarrierRoute }) {
           <View className="w-[9px] h-[9px] rounded-[2px] bg-emerald rotate-45" />
         </View>
       </View>
-      {route.recurrence_days && (
+      {route.recurrence_days ? (
         <Text className="text-[10px] tracking-[1px] text-inkMute uppercase mt-2">{route.recurrence_days.replace(/,/g, " · ")}</Text>
-      )}
+      ) : route.kind === "collaborative_route" ? (
+        <Text className="text-[10px] tracking-[1px] text-inkMute uppercase mt-2">
+          {parseApiDate(route.window_start).toLocaleDateString("es-AR", { weekday: "short", day: "numeric", month: "short" })}
+          {" · "}
+          {parseApiDate(route.window_start).toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" })}
+        </Text>
+      ) : null}
     </View>
   );
 }

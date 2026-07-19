@@ -171,6 +171,10 @@ export interface Shipment {
   co2_savings_kg?: number;
   recipient_name?: string | null;
   recipient_phone?: string | null;
+  /** Stars (1-5) if the sender already rated this shipment, null/undefined otherwise. */
+  sender_rating?: number | null;
+  /** Full name of the assigned carrier ("Nombre Apellido"), null if not yet assigned. */
+  carrier_name?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -211,11 +215,24 @@ export interface ShipmentCreatePayload {
 export interface Quote {
   distance_km: number;
   price_dedicated: number;
+  /** Tarifa del tier "Hoy" (dedicado por espacio) — descuento intermedio sobre el dedicado. */
+  price_scheduled: number;
   price_collaborative: number;
   eta_dedicated_min: number;
   eta_collaborative_min: number;
   co2_savings_estimate_kg: number;
+  /** Trayectorias colaborativas vivas compatibles con este origen-destino ahora mismo. */
+  collaborative_routes_now: number;
 }
+
+/**
+ * Producto que elige el remitente — responde "¿cuándo lo necesitás?". Nunca ve
+ * la taxonomía interna (dedicado/colaborativo × demanda/espacio). Ver MODALIDADES.md §4.1.
+ *   ya     → dedicated + on_demand      (cadete exclusivo saliendo ya)
+ *   hoy    → dedicated + by_availability (retiro programado en la franja)
+ *   depaso → collaborative              (va con alguien que ya viajaba)
+ */
+export type ProductMode = "ya" | "hoy" | "depaso";
 
 export interface ShipmentEvent {
   id: number;
@@ -279,6 +296,18 @@ export interface RouteCreatePayload {
   destination_lon?: number;
   window_start: string;
   window_end: string;
+  recurrence_days?: string;
+}
+
+/** PATCH /routes/{id} — solo campos presentes; el backend ignora None (no
+ * permite limpiar recurrence_days, por eso la variante no se cambia al editar). */
+export interface RouteUpdatePayload {
+  origin_lat?: number;
+  origin_lon?: number;
+  destination_lat?: number;
+  destination_lon?: number;
+  window_start?: string;
+  window_end?: string;
   recurrence_days?: string;
 }
 

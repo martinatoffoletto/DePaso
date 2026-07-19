@@ -219,6 +219,16 @@ class ShipmentRepository(BaseRepository[Shipment]):
         )
         return list(result.scalars().all())
 
+    async def ratings_by_shipment_ids(self, shipment_ids: list[int]) -> dict[int, int]:
+        """Return {shipment_id: stars} for the given shipment IDs (batch, no N+1)."""
+        if not shipment_ids:
+            return {}
+        result = await self.db.execute(
+            select(Rating.shipment_id, Rating.stars)
+            .where(Rating.shipment_id.in_(shipment_ids))
+        )
+        return {row.shipment_id: row.stars for row in result.all()}
+
     async def carrier_rating_avg(self, carrier_id: int) -> float | None:
         """Average stars for a carrier across all ratings."""
         result = (

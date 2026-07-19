@@ -319,6 +319,39 @@ class MatchingService:
         items.sort(key=lambda i: i.score, reverse=True)
         return items[:limit]
 
+    async def count_compatible_routes(self, pickup: Point, dropoff: Point) -> int:
+        """How many live collaborative trajectories could take this route right now.
+
+        Availability signal for the sender's "De paso" product (MODALIDADES.md
+        §4.1), NOT a ranking: it counts active collaborative_route trajectories
+        whose effective window contains now and whose detour stays within the
+        collaborative cap. It deliberately ignores carrier verification/capacity
+        and the shipment's weight/size — those are enforced later at accept time;
+        here we only answer "is anyone plausibly going that way now?".
+        """
+        if self.route_repo is None:
+            return 0
+        now = _naive_utcnow()
+        routes = [
+            r for r in await self.route_repo.list_active_in_window(now)
+            if r.kind == "collaborative_route" and window_contains(r, now)
+        ]
+        if not routes:
+            return 0
+        # All detours requested from OSRM in parallel (like _best_route_match).
+        detours = await asyncio.gather(*[
+            self.osrm.detour(
+                Point(r.origin_lat, r.origin_lon),
+                Point(r.destination_lat, r.destination_lon),
+                pickup, dropoff,
+            )
+            for r in routes
+        ])
+        return sum(
+            1 for d in detours
+            if d.detour_ratio <= MAX_DETOUR_RATIO_COLLABORATIVE
+        )
+
     async def _best_route_match(self, routes, pickup: Point, dropoff: Point):
         """Lowest-detour route accepting this shipment, or None if all exceed the cap.
 

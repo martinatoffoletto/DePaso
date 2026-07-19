@@ -11,7 +11,6 @@ import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import * as ImagePicker from "expo-image-picker";
-import Animated, { FadeInDown } from "react-native-reanimated";
 import { useAuthStore } from "@/src/shared/session/authStore";
 import { co2Service } from "@/src/shared/api/co2";
 import { shipmentsService } from "@/src/shared/api/shipments";

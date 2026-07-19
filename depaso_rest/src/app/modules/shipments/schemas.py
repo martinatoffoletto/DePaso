@@ -63,11 +63,16 @@ class ShipmentResponse(ShipmentBase):
     carrier_id: int | None = None
     status: str
     payment_status: str = "pending"
-    estimated_price: float | None = None
+    # Siempre calculado en create/update (pricing.price_for) — nunca "a convenir".
+    estimated_price: float
     declared_value: float | None = None
     co2_savings_kg: float | None = None
     recipient_name: str | None = None
     recipient_phone: str | None = None
+    # Stars (1-5) if the sender already rated this shipment, None otherwise.
+    sender_rating: int | None = None
+    # Full name of the assigned carrier ("Nombre Apellido"), None if not yet assigned.
+    carrier_name: str | None = None
     created_at: datetime
     updated_at: datetime
 
@@ -107,14 +112,20 @@ class QuoteRequest(BaseModel):
 
 
 class QuoteResponse(BaseModel):
-    """Both modality prices + ETAs + estimated CO2 benefit."""
+    """The three price tiers (Ya / Hoy / De paso) + ETAs + estimated CO2 benefit
+    + live collaborative availability signal (MODALIDADES.md §4.1, §5)."""
 
     distance_km: float
     price_dedicated: float
+    price_scheduled: float
     price_collaborative: float
     eta_dedicated_min: int
     eta_collaborative_min: int
     co2_savings_estimate_kg: float
+    # How many live collaborative trajectories are compatible with this route
+    # right now — the honest availability signal for "De paso" (never promise a
+    # discount that depends on an offer that may not exist).
+    collaborative_routes_now: int = 0
 
 
 class StatusUpdateRequest(BaseModel):
