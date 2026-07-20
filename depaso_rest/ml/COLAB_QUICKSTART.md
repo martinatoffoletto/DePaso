@@ -43,22 +43,26 @@ MODEL_DIR= f"{ML_DIR}/models"
 
 ---
 
-## 2. Download Open Images V7 (~900 images, ~10 min)
+## 2. Download Open Images V7 (~2600 images, ~15-20 min)
 
 ```bash
 !python {ML_DIR}/dataset/download_open_images.py \
     --out {RAW_DIR} \
-    --per-class 225
+    --per-class 650
 ```
 
-This writes `raw/images/` and `raw/labels.csv` with 4 classes:
-`Envelope→s`, `Box→m`, `Suitcase→l`, `Furniture→xl`.
+`--per-class` is now a budget **per DePaso category** (was per Open Images class
+in v1). Each category maps to one or more OI classes:
+`s`←Envelope/Book, `m`←Box, `l`←Suitcase, `xl`←Furniture/Couch/Bed/Table.
+An unavailable OI class is skipped with a warning instead of aborting.
 
-**Add your own photos** (fotos propias, ~30% of the dataset):
+**Add your own photos** (fotos propias, ~100-140):
 - Drop images in `raw/images/`
-- Append rows to `raw/labels.csv` with the correct `lighting`, `angle`,
-  `background`, and `has_reference_object` values filled in (these are the
-  bias dimensions evaluated in the thesis).
+- Append rows to `raw/labels.csv`. Put most of class `s` here, and shoot
+  **~60-80 photos with a reference object** (`has_reference_object=True`,
+  ideally with/without pairs). v1 had ZERO of these, leaving the model's second
+  input dead while production sends `ref=1`. Bias columns (`lighting`, `angle`,
+  `background`) are annotated in step 4b — leave them `unknown` for now.
 
 ---
 
@@ -72,6 +76,28 @@ This writes `raw/images/` and `raw/labels.csv` with 4 classes:
 
 Produces `clean/images/` (normalised JPEGs, max 1024 px) and `clean/labels.csv`
 with perceptual-hash duplicates removed.
+
+---
+
+## 4b. Annotate bias conditions (before splitting)
+
+Open Images rows land with `lighting`/`angle`/`background = unknown`. Annotate a
+sample so the bias report isn't empty (this was the v1 gap):
+
+```bash
+# generate a template: all your photos + a sample of Open Images (~180 rows)
+!python {ML_DIR}/dataset/annotate_bias.py template \
+    --data {CLEAN_DIR} --out {CLEAN_DIR}/annotation_template.csv --sample-oi 180
+```
+
+Fill `lighting` (`natural`/`artificial`/`baja`), `angle`
+(`frontal`/`cenital`/`oblicuo`), `background` (`liso`/`desordenado`/`exterior`)
+in the CSV (Sheets/Excel), then merge it back:
+
+```bash
+!python {ML_DIR}/dataset/annotate_bias.py apply \
+    --data {CLEAN_DIR} --annotations {CLEAN_DIR}/annotation_template.csv
+```
 
 ---
 
@@ -95,9 +121,12 @@ The test set is frozen from this point — it is the sole input to `evaluate_bia
     --out-dir  {MODEL_DIR}
 ```
 
-- Phase A: frozen MobileNetV2 base, trains the custom head (up to 20 epochs).
-- Phase B: unfreezes the last 30 layers, fine-tunes at lr=1e-5 (up to 10 epochs).
-- EarlyStopping (patience=5) on val_loss prevents overfitting.
+- Phase A: frozen MobileNetV2 base, trains the custom head (up to 40 epochs).
+- Phase B: unfreezes the last 60 layers, fine-tunes at lr=1e-5 (up to 25 epochs).
+- EarlyStopping (patience=8, restore_best_weights) + ReduceLROnPlateau on val_loss.
+- Balanced `class_weight` from the train split + label smoothing 0.1 (curbs the
+  v1 "M-vacuum"). Augmentation runs on raw pixels in the data pipeline.
+- Expect ~30-60 min on a T4 with the ~2000-image dataset.
 
 Output files in `models/`:
 ```

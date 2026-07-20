@@ -27,6 +27,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from train_classifier import CATEGORIES, make_dataset  # noqa: E402
 
 BIAS_DIMENSIONS = ["lighting", "angle", "background", "has_reference_object"]
+MIN_GROUP_N = 5  # bias groups smaller than this are too noisy to read into
 
 
 def predict_all(model: tf.keras.Model, df: pd.DataFrame) -> np.ndarray:
@@ -41,7 +42,9 @@ def plot_confusion(cm: np.ndarray, out_path: Path) -> None:
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
 
-    cm_norm = cm.astype("float") / cm.sum(axis=1, keepdims=True)
+    row_sums = cm.sum(axis=1, keepdims=True)
+    cm_norm = np.divide(cm.astype("float"), row_sums,
+                        out=np.zeros_like(cm, dtype="float"), where=row_sums != 0)
     fig, ax = plt.subplots(figsize=(6, 5))
     im = ax.imshow(cm_norm, cmap="Greens", vmin=0, vmax=1)
     ax.set_xticks(range(len(CATEGORIES)), [c.upper() for c in CATEGORIES])
@@ -59,7 +62,11 @@ def plot_confusion(cm: np.ndarray, out_path: Path) -> None:
 
 
 def bias_table(df: pd.DataFrame, y_true: np.ndarray, y_pred: np.ndarray) -> pd.DataFrame:
-    """Accuracy per condition group, for every bias dimension in the metadata."""
+    """Accuracy per condition group, for every bias dimension in the metadata.
+
+    Groups smaller than MIN_GROUP_N are dropped: with a ~250-row test set a
+    group of 1-2 images produces meaningless 0%/100% accuracies that would
+    pollute the thesis table."""
     rows = []
     overall = accuracy_score(y_true, y_pred)
     rows.append({"dimension": "overall", "group": "all", "n": len(df),
@@ -69,11 +76,14 @@ def bias_table(df: pd.DataFrame, y_true: np.ndarray, y_pred: np.ndarray) -> pd.D
             continue
         for group, idx in df.groupby(dim).groups.items():
             mask = df.index.isin(idx)
+            n = int(mask.sum())
+            if n < MIN_GROUP_N:
+                continue
             acc = accuracy_score(y_true[mask], y_pred[mask])
             rows.append({
                 "dimension": dim,
                 "group": str(group),
-                "n": int(mask.sum()),
+                "n": n,
                 "accuracy": round(acc, 4),
                 "delta_vs_overall": round(acc - overall, 4),
             })
@@ -115,11 +125,15 @@ def main(data_dir: Path, model_dir: Path) -> None:
     reports = model_dir / "reports"
     reports.mkdir(exist_ok=True)
 
-    report = classification_report(y_true, y_pred, target_names=[c.upper() for c in CATEGORIES])
+    labels = list(range(len(CATEGORIES)))  # keep all 4 classes even if one is never predicted
+    report = classification_report(
+        y_true, y_pred, labels=labels,
+        target_names=[c.upper() for c in CATEGORIES], zero_division=0,
+    )
     (reports / "classification_report.txt").write_text(report)
     print(report)
 
-    cm = confusion_matrix(y_true, y_pred)
+    cm = confusion_matrix(y_true, y_pred, labels=labels)
     plot_confusion(cm, reports / "confusion_matrix.png")
 
     table = bias_table(test_df, y_true, y_pred)

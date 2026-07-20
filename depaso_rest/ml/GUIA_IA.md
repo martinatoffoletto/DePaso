@@ -5,10 +5,14 @@ tener el clasificador de tamaño de paquete entrenado, evaluado (con análisis d
 capítulo de IA) e integrado al backend.
 
 > **Dos aclaraciones que aligeran el trabajo:**
-> 1. **La mayoría del dataset son fotos públicas** (Open Images, ~90%). Tus fotos propias son un
->    complemento chico (**~100**, no cientos), sobre todo de la clase `s` (sobres/documentos).
+> 1. **La mayoría del dataset son fotos públicas** (Open Images, ~85-90%). Tus fotos propias son un
+>    complemento (**~100-140**), sobre todo de la clase `s` (sobres/documentos) y con
+>    **objeto de referencia** (ver §4 — el v1 no tenía ninguna y quedó un input muerto).
 > 2. **No tenés que medir nada.** El modelo clasifica en 4 categorías `s|m|l|xl` mirando la foto;
 >    a cada una le ponés la categoría a ojo. No hay reglas, centímetros ni volúmenes.
+
+> **⚠️ Esta guía describe la corrida v2.** El v1 ya se entrenó (test 61.7%) y se diagnosticó;
+> los cambios del pipeline para llegar al objetivo (≥75-80%) están resumidos en **§10 (de v1 a v2)**.
 
 ---
 
@@ -20,18 +24,19 @@ capítulo de IA) e integrado al backend.
   objeto de escala conocida, como un celular o una botella).
 - **Cómo:** 3 notebooks que corren en **Google Colab** (la MacBook no tiene GPU). Cada uno llama
   a los scripts del pipeline que ya están en el repo — vos solo corrés celdas.
-- **Cuánto:** ~1200 imágenes (~90% de Open Images automático + ~100 fotos tuyas), 2 etapas de
-  entrenamiento, y un reporte de sesgos que va casi directo a la tesis.
-- **Objetivo de accuracy:** ≥80% (mínimo defendible: 75%).
+- **Cuánto:** ~2000-2200 imágenes limpias (~2600 crudas de Open Images antes de dedup +
+  ~100-140 fotos tuyas), 2 etapas de entrenamiento, y un reporte de sesgos que va casi directo
+  a la tesis.
+- **Objetivo de accuracy:** ≥80% (mínimo defendible: 75%). El v1 quedó en 61.7% (ver §10).
 
 ```
-Paso 1 (notebook 01)      Paso 2 (notebook 02)      Paso 3 (notebook 03)
-┌────────────────────┐    ┌───────────────────┐    ┌──────────────────────┐
-│ Open Images + tus  │ →  │ Entrenar (GPU)    │ →  │ Evaluar + sesgos     │
-│ fotos → limpiar →  │    │ MobileNetV2 2     │    │ → figuras tesis →    │
-│ split 70/15/15     │    │ etapas → .keras   │    │ integrar al backend  │
-└────────────────────┘    └───────────────────┘    └──────────────────────┘
-   CPU, ~15-20 min           GPU T4, ~20-40 min        GPU, ~5 min
+Paso 1 (notebook 01)              Paso 2 (notebook 02)      Paso 3 (notebook 03)
+┌──────────────────────────┐      ┌───────────────────┐    ┌──────────────────────┐
+│ Open Images + tus fotos  │  →   │ Entrenar (GPU)    │ →  │ Evaluar + sesgos     │
+│ → limpiar → ANOTAR sesgos│      │ MobileNetV2 2     │    │ → figuras tesis →    │
+│ → split 70/15/15         │      │ etapas → .keras   │    │ integrar al backend  │
+└──────────────────────────┘      └───────────────────┘    └──────────────────────┘
+   CPU, ~25-35 min                   GPU T4, ~30-60 min        GPU, ~5 min
 ```
 
 ---
@@ -52,6 +57,7 @@ ml/
 ├── dataset/
 │   ├── download_open_images.py  (lo llaman los notebooks, no lo corrés a mano)
 │   ├── build_dataset.py
+│   ├── annotate_bias.py         ← NUEVO: plantilla de anotación de sesgos + volcado
 │   └── make_splits.py
 ├── train_classifier.py
 └── evaluate_bias.py
@@ -90,11 +96,16 @@ guardan el dataset y el modelo, para que no se pierdan cuando Colab reinicia).
 ### Paso 1 — Dataset (`notebooks/01_dataset.ipynb`)
 
 1. **Setup**: monta Drive, clona el repo, instala dependencias.
-2. **Open Images V7**: baja ~300 imágenes por clase (`Envelope→s`, `Box→m`, `Suitcase→l`,
-   `Furniture→xl`) — el grueso del dataset. Automático, ~10 min.
-3. **Tus fotos propias (~100)** (ver sección 4): las subís y las etiquetás. Opcional pero suma.
+2. **Open Images V7**: baja ~650 imágenes **por categoría** (`s`←Envelope/Book, `m`←Box,
+   `l`←Suitcase, `xl`←Furniture/Couch/Bed/Table) — el grueso del dataset. Automático, ~15-20 min.
+   El cupo por defecto subió de 225 a 650 (ver §10).
+3. **Tus fotos propias (~100-140)** (ver sección 4): las subís y las etiquetás. Meté ahí la
+   clase `s` y **~60-80 con objeto de referencia** (`has_reference_object=True`).
 4. **Limpiar**: dedup por hash perceptual, normaliza tamaño/formato.
-5. **Split 70/15/15**: estratificado por categoría y por condición de sesgo. El `test.csv` queda
+5. **Anotar sesgos** (`annotate_bias.py`): genera una plantilla con tus fotos + una muestra de
+   Open Images (~180 filas), la completás con `lighting`/`angle`/`background`, y la volcás al
+   dataset. Sin este paso el análisis de sesgos queda vacío (fue el agujero del v1). Ver §4.
+6. **Split 70/15/15**: estratificado por categoría y por condición de sesgo. El `test.csv` queda
    **congelado** (no se toca al entrenar).
 
 **Sale:** `MyDrive/depaso_ml/dataset/clean/` con `images/`, `labels.csv`, `train/val/test.csv`.
@@ -102,9 +113,13 @@ guardan el dataset y el modelo, para que no se pierdan cuando Colab reinicia).
 ### Paso 2 — Entrenamiento (`notebooks/02_entrenamiento.ipynb`)
 
 1. **Verificá la GPU** (primera celda; si no hay, cambiá el tipo de entorno a T4).
-2. **Entrená**: Etapa A (base congelada, cabeza nueva, ≤20 épocas) → Etapa B (fine-tuning de las
-   últimas 30 capas, lr bajo, ≤10 épocas). EarlyStopping corta si sobreajusta.
-3. **Revisá** `metadata.json`: el `best_val_accuracy` te dice si llegaste al objetivo.
+2. **Entrená**: Etapa A (base congelada, cabeza nueva, ≤40 épocas) → Etapa B (fine-tuning de las
+   últimas 60 capas, lr bajo, ≤25 épocas). EarlyStopping (`restore_best_weights`) + ReduceLROnPlateau
+   cortan/bajan el lr solos, así que el número de épocas es un techo, no algo que corra entero.
+   El script calcula `class_weight` del train y usa label smoothing 0.1 (ver §10).
+3. **Revisá** `metadata.json`: `best_val_accuracy` te dice si llegaste al objetivo, y ahora incluye
+   `train_class_counts`, `class_weight` y `ref_flag_train_positives` (provenance para la tesis).
+   Si te avisa `⚠️ solo N imágenes con has_reference_object=1`, sumá fotos con objeto de referencia.
 
 **Sale:** `MyDrive/depaso_ml/models/` con `cargo_classifier_v1.keras`, `test_split.csv`,
 `metadata.json`. **Guardá las curvas de entrenamiento** que imprime — van a la tesis.
@@ -123,10 +138,18 @@ capítulo de IA**.
 
 ---
 
-## 4. Cómo sacar y etiquetar tus fotos (~100, sin medir)
+## 4. Cómo sacar y etiquetar tus fotos (~100-140, sin medir)
 
-Con **~100 fotos propias** alcanza. **No tenés que medir nada**: a cada foto le ponés la
+Con **~100-140 fotos propias** alcanza. **No tenés que medir nada**: a cada foto le ponés la
 categoría a ojo. Las otras columnas son etiquetas simples de la escena (o `unknown` si no sabés).
+
+> **Objeto de referencia — obligatorio esta vuelta.** En el v1 **el 100% del dataset** tenía
+> `has_reference_object=False`, así que el segundo input del modelo nunca vio un `1` y quedó
+> muerto — pero la app en producción manda `ref=1` (el picker asume que hay un objeto de escala),
+> o sea que en inferencia el modelo recibe algo que nunca vio (out-of-distribution). **Sacá
+> ~60-80 fotos con un objeto de escala conocida** (celular, botella, mano) **repartidas por
+> clase** y marcalas `has_reference_object=True`. Lo ideal son **pares** de la misma escena con y
+> sin el objeto: aíslan el efecto del flag y sirven de figura para la tesis.
 
 | Dimensión | Valores a usar | Por qué |
 |---|---|---|
@@ -154,6 +177,27 @@ mi_mueble_07.jpg,xl,artificial,oblicuo,exterior,False,propia
 ```
 
 El notebook 01 tiene una celda con `pandas` para agregar filas sin editar el CSV a mano.
+
+### Anotar las condiciones de sesgo (`annotate_bias.py`)
+
+Las fotos de Open Images entran con `lighting`/`angle`/`background` en `unknown` (no las podemos
+anotar a mano de a miles). Para que el análisis de sesgos no quede vacío, **después de limpiar**
+(`build_dataset.py`) y **antes de partir** (`make_splits.py`) corrés:
+
+```bash
+# 1) genera la plantilla: TODAS tus fotos + una muestra de Open Images (~180 filas)
+python ml/dataset/annotate_bias.py template --data ml/dataset/clean \
+    --out ml/dataset/annotation_template.csv --sample-oi 180
+# 2) abrís annotation_template.csv (Excel/Sheets) y completás lighting/angle/background
+# 3) volcás las anotaciones al dataset
+python ml/dataset/annotate_bias.py apply --data ml/dataset/clean \
+    --annotations ml/dataset/annotation_template.csv
+```
+
+Anotá **al menos tus fotos propias + ~150-180 de Open Images** (~200-320 filas en total). Valores:
+`lighting`: `natural`/`artificial`/`baja` · `angle`: `frontal`/`cenital`/`oblicuo` ·
+`background`: `liso`/`desordenado`/`exterior`. Lo que dejes en `unknown` simplemente no aparece
+en la tabla de sesgos. El notebook 01 tiene celdas para estos tres pasos.
 
 ---
 
@@ -231,6 +275,14 @@ Entrenamiento:
 - [ ] `best_val_accuracy` ≥ 75% (idealmente ≥ 80%).
 - [ ] Guardé `metadata.json` + curvas para la tesis.
 
+Anotación de sesgos (NUEVO):
+- [ ] Corrí `annotate_bias.py template`, completé el CSV y corrí `annotate_bias.py apply` **antes** del split.
+- [ ] Anoté mis fotos propias + ~150-180 de Open Images.
+
+Objeto de referencia (NUEVO):
+- [ ] Saqué ~60-80 fotos con `has_reference_object=True` repartidas por clase (idealmente pares).
+- [ ] El entrenamiento NO tiró el `⚠️` de "solo N imágenes con has_reference_object=1".
+
 Evaluación + integración:
 - [ ] `03_evaluacion.ipynb` generó los 4 reports.
 - [ ] Revisé grupos con ⚠️ (>10 pts por debajo) y anoté la mitigación.
@@ -253,6 +305,25 @@ modelo v1 ≥75% **15-sep**.
 | `Unknown categories: {...}` al entrenar | Hay una fila en `labels.csv` con una categoría que no es `s/m/l/xl`. Corregila. |
 | Accuracy baja (<75%) | Sumá fotos propias de las clases/condiciones que rinden peor (mirá `bias_analysis.md`) y reentrená. |
 | El backend usa el stub y no el modelo | El `.keras` no está en `VISION_MODEL_PATH`. Revisá la ruta en `depaso_rest/.env`. |
+| `no se pudo bajar 'X', se saltea` en la descarga | Esa clase de Open Images no está disponible en tu versión; el script sigue con las demás. No es un error. |
+
+---
+
+## 10. De v1 a v2 — qué cambió y por qué
+
+El **v1** se entrenó en Colab (T4) y dio **61.7% de accuracy en test** (n=162). El diagnóstico
+mostró cuatro problemas concretos; el pipeline v2 ataca cada uno:
+
+| Problema del v1 | Evidencia | Cambio en v2 |
+|---|---|---|
+| **Augmentation rota** | `RandomBrightness`/`RandomContrast` corrían sobre valores ya normalizados a `[-1,1]`, con `value_range=(0,255)` por defecto → **recortaban toda la imagen a ~0** (input en blanco). | La augmentation se movió al pipeline de datos y corre sobre píxeles crudos `[0,255]` **antes** de `preprocess_input`. Además es más fuerte (flip / rot ±20° / zoom ±25% / brillo ±0.3 / contraste ±0.3). |
+| **"M" como aspirador** | M precision 0.42 (>50% de las predicciones "m" eran falsas): el modelo defaulteaba a `m` ante ambigüedad de escala. | `class_weight` balanceado del train + **label smoothing 0.1**; y más datos/variedad en `s`/`l`/`xl` para que `m` no sea el "default". |
+| **Segundo input muerto** | `has_reference_object=False` en el 100% del dataset; en producción la app manda `ref=1` (out-of-distribution). | Workflow para fotos propias con objeto de referencia (~60-80, §4) + un `⚠️` en el entrenamiento si el train tiene <20 positivos. |
+| **Sesgos sin datos** | `lighting`/`angle`/`background` = `unknown` en todas las filas → `bias_analysis` vacío. | `annotate_bias.py`: plantilla + volcado, se anotan las propias + una muestra de Open Images (§4). |
+| **Cómputo desperdiciado** | 30 épocas terminaban en segundos; dataset chico (1079). | Dataset ~2x (cupo 225→650/categoría), schedule más largo (40+25 épocas) con EarlyStopping(`restore_best_weights`) + ReduceLROnPlateau, y 60 capas descongeladas (antes 30). |
+
+**El nombre del archivo sigue siendo `cargo_classifier_v1.keras`** (la ruta que carga el backend no
+cambia); el salto v1→v2 se registra en `metadata.json` (`"version": "v2"`).
 
 ---
 

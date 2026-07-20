@@ -13,6 +13,10 @@ import os
 TEST_DB_FILE = "./depaso_test.db"
 os.environ.setdefault("RATE_LIMIT_ENABLED", "false")
 os.environ.setdefault("DATABASE_URL", f"sqlite:///{TEST_DB_FILE}")
+# La suite corre SIEMPRE contra el stub de visión: con un modelo real cargado,
+# los bytes falsos de los tests fallan al decodificar (422) y los resultados
+# dejan de ser determinísticos. Path inexistente -> load_model falla -> stub.
+os.environ.setdefault("VISION_MODEL_PATH", "./ml/models/__stub_only_in_tests__.keras")
 
 import pytest
 from sqlalchemy import create_engine

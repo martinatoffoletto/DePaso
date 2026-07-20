@@ -415,6 +415,7 @@ daños.
 | Señal de disponibilidad colaborativa | ✅ `collaborative_routes_now` (`matching.count_compatible_routes`: trayectorias vivas en ventana, desvío ≤15%) |
 | Precio siempre obligatorio | ✅ `estimated_price` NOT NULL en modelo, schema y DB — nunca "a convenir" |
 | Modos de trabajo del carrier | ✅ toggle en línea + toggle espacio (oculto con trayecto activo) + Habitual/Especial + banner 30′ antes + `TripDetailModal` (iniciar/modificar/eliminar) |
+| Turno en zona anticipado | ✅ publicable desde "Publicar viaje" (día Hoy/Mañana/fecha + franja + zona); el feed acerca pedidos "Hoy" desde 30′ antes de la ventana (`WINDOW_FEED_LEAD_MIN`, espejo de `TRIP_LEAD_MS`); el toggle sigue siendo el atajo "turno ya" y no interfiere con turnos publicados |
 | Navegación externa | ✅ botón "Navegar" (`ActiveJobPanel` → `openExternalNavigation`: Google Maps / Waze / Apple Maps) |
 | Penalidad única por cancelar tras aceptar | ✅ `carrier_cancel`: −0,3 reputación + reapertura del envío (§6) |
 | `assignment_mode` en colaborativos | Se guarda pero el matching no lo lee — **correcto por diseño**: la distinción es la dirección del flujo (push en vivo vs feed en ventana) |
