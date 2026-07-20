@@ -1,0 +1,30 @@
+{
+  "version": "v1",
+  "trained_at": "2026-07-20T00:38:09.637887+00:00",
+  "categories": [
+    "s",
+    "m",
+    "l",
+    "xl"
+  ],
+  "dataset_size": 1079,
+  "split": {
+    "train": 755,
+    "val": 162,
+    "test": 162
+  },
+  "best_val_accuracy": 0.6605,
+  "architecture": "MobileNetV2 + GAP + concat(ref_flag) + Dense(128) + Dropout(0.3) + Dense(4)",
+  "training": {
+    "phase_a": {
+      "epochs": 20,
+      "lr": 0.001,
+      "frozen_base": true
+    },
+    "phase_b": {
+      "epochs": 10,
+      "lr": 1e-05,
+      "unfrozen_layers": 30
+    }
+  }
+}
