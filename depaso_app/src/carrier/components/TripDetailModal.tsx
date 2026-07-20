@@ -30,6 +30,7 @@ export function TripDetailModal({ route, starting, onStartNow, onEdit, onRemove,
   const insets = useSafeAreaInsets();
   const [removing, setRemoving] = useState(false);
 
+  const turno = route.kind === "dedicated_window";
   const habitual = !!route.recurrence_days;
   const now = Date.now();
   const active = effectiveWindow(route, now);
@@ -71,28 +72,30 @@ export function TripDetailModal({ route, starting, onStartNow, onEdit, onRemove,
             <MaterialCommunityIcons name="arrow-left" size={18} color={T.ink} />
           </TouchableOpacity>
           <View className="flex-row items-center gap-[6px] bg-mint px-[10px] py-[5px] rounded-[9px]">
-            <MaterialCommunityIcons name={habitual ? "repeat" : "calendar-star"} size={11} color={T.forest} />
+            <MaterialCommunityIcons name={turno ? "truck-cargo-container" : habitual ? "repeat" : "calendar-star"} size={11} color={T.forest} />
             <Text className="text-[9px] tracking-[1.2px] text-forest font-bold uppercase">
-              {habitual ? "Ruta habitual" : "Viaje especial"}
+              {turno ? "Turno en zona" : habitual ? "Ruta habitual" : "Viaje especial"}
             </Text>
           </View>
           <View className="w-[38px]" />
         </View>
 
         <View className="px-5 pt-4 gap-4">
-          {/* Recorrido */}
+          {/* Recorrido (trayecto) o zona (turno) */}
           <View className="bg-card border border-border rounded-2xl px-[14px] py-[14px] gap-[10px]">
             <View className="flex-row items-center gap-[8px]">
               <View className="w-[9px] h-[9px] rounded-full border-2 border-forest bg-card" />
               <RouteAddress lat={route.origin_lat} lon={route.origin_lon} />
             </View>
-            <View className="flex-row items-center gap-[8px]">
-              <View className="w-[9px] h-[9px] rounded-[2px] bg-emerald rotate-45" />
-              <RouteAddress
-                lat={route.destination_lat ?? route.origin_lat}
-                lon={route.destination_lon ?? route.origin_lon}
-              />
-            </View>
+            {!turno && (
+              <View className="flex-row items-center gap-[8px]">
+                <View className="w-[9px] h-[9px] rounded-[2px] bg-emerald rotate-45" />
+                <RouteAddress
+                  lat={route.destination_lat ?? route.origin_lat}
+                  lon={route.destination_lon ?? route.origin_lon}
+                />
+              </View>
+            )}
           </View>
 
           {/* Días + franja */}
@@ -132,7 +135,9 @@ export function TripDetailModal({ route, starting, onStartNow, onEdit, onRemove,
               <>
                 <MaterialCommunityIcons name="navigation-variant" size={17} color={T.lime} />
                 <Text className="text-[15px] font-bold text-[#F4EFE3]">
-                  {active ? "Iniciar trayecto" : "Iniciar trayecto ahora"}
+                  {turno
+                    ? (active ? "Iniciar turno" : "Iniciar turno ahora")
+                    : (active ? "Iniciar trayecto" : "Iniciar trayecto ahora")}
                 </Text>
               </>
             )}
@@ -165,8 +170,9 @@ export function TripDetailModal({ route, starting, onStartNow, onEdit, onRemove,
           </View>
 
           <Text className="text-[11.5px] text-inkMute leading-[17px] text-center px-2" style={{ marginBottom: insets.bottom }}>
-            Iniciar antes de la franja adelanta la apertura de la ventana de hoy: te ponés en línea y
-            los pedidos de tu recorrido empiezan a entrar desde ahora.
+            {turno
+              ? "Iniciar antes de la franja adelanta la apertura de tu turno: te ponés disponible y los pedidos de tu zona empiezan a entrar desde ahora."
+              : "Iniciar antes de la franja adelanta la apertura de la ventana de hoy: te ponés en línea y los pedidos de tu recorrido empiezan a entrar desde ahora."}
           </Text>
         </View>
       </View>

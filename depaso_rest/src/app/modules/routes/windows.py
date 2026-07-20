@@ -59,3 +59,20 @@ def window_contains(route, at: datetime) -> bool:
     de mañana."""
     w = effective_window(route, at)
     return w is not None and w[0] <= at <= w[1]
+
+
+def window_starts_within(route, at: datetime, lead_minutes: int) -> bool:
+    """True si la ventana efectiva ya contiene `at` o empieza dentro de los
+    próximos `lead_minutes` (y todavía no terminó).
+
+    Es un criterio de feed más laxo que `window_contains`, pensado SOLO para las
+    ventanas dedicadas (`dedicated_window`): el transportista que publicó un
+    turno lo empieza a ver poblado con la agenda unos minutos antes de arrancar
+    (MODALIDADES.md §3.2, "minutos antes de la ventana ya ve la agenda"). El
+    camino colaborativo NO debe usar esto: una trayectoria futura no está viva
+    y no puede llevar nada ahora (sigue con `window_contains`)."""
+    w = effective_window(route, at)
+    if w is None:
+        return False
+    start, end = w
+    return at <= end and start <= at + timedelta(minutes=lead_minutes)

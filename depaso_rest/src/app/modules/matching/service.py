@@ -30,7 +30,11 @@ from src.app.modules.matching.schemas import (
     ScoreBreakdown,
 )
 from src.app.modules.routes.repository import RouteRepository
-from src.app.modules.routes.windows import effective_window, window_contains
+from src.app.modules.routes.windows import (
+    effective_window,
+    window_contains,
+    window_starts_within,
+)
 from src.app.modules.shipments.exceptions import ShipmentNotFoundError
 from src.app.modules.shipments.models import Shipment
 from src.app.modules.shipments.repository import ShipmentRepository
@@ -92,6 +96,15 @@ MAX_GEO_DISTANCE_KM = 15.0
 MAX_PICKUP_DISTANCE_KM = 15.0
 # compat_time: full score inside the window, decaying to 0 this many hours outside.
 TIME_DECAY_HOURS = 3.0
+
+# Lead time del feed de ventanas dedicadas: un carrier cuyo turno ("dedicado por
+# espacio") empieza dentro de estos minutos ya ve en su feed los pedidos "Hoy"
+# compatibles, para arrancar la ventana con la agenda armada (MODALIDADES.md
+# §3.2). Es el espejo backend del lead de "Iniciar trayecto" del front
+# (TRIP_LEAD_MS en depaso_app/src/carrier/routeUtils.ts). Acotado al feed de
+# ventanas dedicadas: NO afecta lo colaborativo (una trayectoria futura no está
+# viva y no cuenta como "De paso").
+WINDOW_FEED_LEAD_MIN = 30
 
 
 def geo_score_collaborative(pickup: Point, dropoff: Point,
@@ -201,15 +214,20 @@ class MatchingService:
         my_windows: list = []
         if self.route_repo is not None:
             for r in await self.route_repo.list_active_in_window(now):
-                # El feed ofrece trabajo para AHORA: una ruta cuya ventana
-                # (efectiva, con recurrencia) no contiene este momento no
-                # genera ofertas — antes una ventana futura ofrecía ya.
-                if r.carrier_id != carrier_id or not window_contains(r, now):
+                if r.carrier_id != carrier_id:
                     continue
                 if r.kind == "collaborative_route":
-                    my_routes.append(r)
+                    # Lo colaborativo ofrece trabajo para AHORA: una trayectoria
+                    # cuya ventana efectiva no contiene este momento no está viva
+                    # y no genera ofertas (una futura no cuenta como "De paso").
+                    if window_contains(r, now):
+                        my_routes.append(r)
                 elif r.kind == "dedicated_window":
-                    my_windows.append(r)
+                    # El turno dedicado se acerca la agenda con anticipación: el
+                    # carrier ve los pedidos "Hoy" desde WINDOW_FEED_LEAD_MIN
+                    # antes de que arranque su ventana (MODALIDADES.md §3.2).
+                    if window_starts_within(r, now, WINDOW_FEED_LEAD_MIN):
+                        my_windows.append(r)
 
         # Active deliveries shape what can still be offered: they consume
         # capacity and anchor the zone where chained pickups make sense.

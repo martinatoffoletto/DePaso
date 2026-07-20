@@ -52,6 +52,22 @@ def test_publish_collaborative_route(client: TestClient, db):
     assert res.status_code == 201, res.text
 
 
+def test_publish_future_dedicated_window(client: TestClient, db):
+    """Turno en zona anticipado: se publica una dedicated_window que empieza
+    más tarde (mañana), sin destino. Debe aceptarse (MODALIDADES.md §3.2)."""
+    h = _verified_carrier(client, db, "futwin@example.com", plate="RT-FUT")
+    ws, we = _win(hours_from=24, hours_to=28)  # mañana
+    res = client.post("/api/v1/routes", json={
+        "kind": "dedicated_window",
+        "origin_lat": -34.6186, "origin_lon": -58.4399,  # zona declarada, sin destino
+        "window_start": ws, "window_end": we,
+    }, headers=h)
+    assert res.status_code == 201, res.text
+    body = res.json()
+    assert body["kind"] == "dedicated_window"
+    assert body["destination_lat"] is None
+
+
 def test_unverified_carrier_cannot_publish(client: TestClient, db):
     reg = client.post("/api/v1/auth/register", json={
         "email": "unverified@example.com", "password": "Password123!",

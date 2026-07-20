@@ -87,14 +87,21 @@ export interface TripSession {
 }
 
 /**
- * Trayecto colaborativo (habitual o especial) en ventana AHORA, o por
- * arrancar dentro de TRIP_LEAD_MS — la "trayectoria viva" de la sesión del
- * rider. Las activas tienen prioridad sobre las próximas.
+ * Sesión de trabajo declarada en ventana AHORA, o por arrancar dentro de
+ * TRIP_LEAD_MS. Cubre las dos declaraciones con ciclo de vida "en ventana /
+ * por arrancar" (ver MODALIDADES.md):
+ *   - trayecto colaborativo (habitual o especial), y
+ *   - turno en zona publicado (dedicated_window NO efímero — el del toggle
+ *     "Dedicado por espacio" se excluye vía isSpaceWindow, lo maneja el toggle).
+ * Las activas tienen prioridad sobre las próximas.
  */
 export function tripSession(routes: CarrierRoute[], now = Date.now()): TripSession | null {
   let next: TripSession | null = null;
   for (const r of routes) {
-    if (!r.is_active || r.kind !== "collaborative_route") continue;
+    if (!r.is_active) continue;
+    const isTrip = r.kind === "collaborative_route";
+    const isTurno = r.kind === "dedicated_window" && !isSpaceWindow(r);
+    if (!isTrip && !isTurno) continue;
     const active = effectiveWindow(r, now);
     if (active) return { route: r, window: active, upcoming: false };
     const soon = upcomingWindow(r, now, TRIP_LEAD_MS);

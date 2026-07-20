@@ -14,7 +14,7 @@ export function PublishedRouteRow({ route: r, onRemove }: {
     <View className="flex-row items-center gap-3 bg-card rounded-[14px] border border-borderSoft p-3">
       <View className="w-[34px] h-[34px] rounded-[10px] bg-mint items-center justify-center border border-border">
         <MaterialCommunityIcons
-          name={r.kind === "dedicated_window" ? "calendar-clock" : r.recurrence_days ? "repeat" : "calendar-star"}
+          name={r.kind === "dedicated_window" ? "truck-cargo-container" : r.recurrence_days ? "repeat" : "calendar-star"}
           size={16}
           color={T.forest}
         />

@@ -3,6 +3,7 @@ import { View, ScrollView, TouchableOpacity, ActivityIndicator, Alert, Modal, Te
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useFocusEffect } from "@react-navigation/native";
+import * as Location from "expo-location";
 import { routesService } from "@/src/shared/api/carriers";
 import { CarrierRoute } from "@/src/shared/types";
 import { AddressField, SelectedAddress } from "@/src/shared/ui/AddressField";
@@ -30,11 +31,22 @@ const DURATIONS = [
   { hours: 12, label: "12 h" },
 ];
 
-// Ambas variantes publican trayectos COLABORATIVOS (kind=collaborative_route):
-// Habitual es recurrente (recurrence_days), Especial es un viaje puntual de un
-// día concreto. La ventana dedicada no se publica desde acá — la maneja el
-// toggle "Dedicado por espacio" de RiderHomeScreen (ver MODALIDADES.md).
+// Dos tipos de publicación (ver MODALIDADES.md §4.2):
+//  - "trayecto" → COLABORATIVO (kind=collaborative_route): Habitual (recurrente)
+//    o Especial (viaje puntual). El paquete aprovecha un recorrido propio.
+//  - "turno"    → DEDICADO POR ESPACIO (kind=dedicated_window): disponibilidad
+//    declarada en una zona + franja, sin recorrido. Es la publicación anticipada
+//    equivalente al toggle "Dedicado por espacio" del RiderHome, pero para un
+//    día/franja futuros. Sin destino ni recurrencia en v1.
+type PublishMode = "trayecto" | "turno";
 type TripVariant = "habitual" | "especial";
+
+function startOfDay(d: Date): Date {
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+}
+function sameDay(a: Date, b: Date): boolean {
+  return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+}
 
 /** Next datetime matching one of the recurrence days at the given hour. */
 function nextOccurrence(days: string[], hour: number): Date {
@@ -58,6 +70,11 @@ export default function PublishTripScreen({ onClose, editRoute }: {
   const editing = !!editRoute;
   const editStart = editRoute ? parseApiDate(editRoute.window_start) : null;
   const editEnd = editRoute ? parseApiDate(editRoute.window_end) : null;
+
+  // Tipo de publicación. Al editar queda fijo: un turno se edita como turno y un
+  // trayecto como trayecto (el PATCH no puede convertir uno en el otro).
+  const isTurnoEdit = editRoute?.kind === "dedicated_window";
+  const [mode, setMode] = useState<PublishMode>(isTurnoEdit ? "turno" : "trayecto");
 
   // La variante no se cambia al editar: el PATCH del backend ignora None y no
   // puede limpiar recurrence_days (habitual -> especial requeriría recrear).
@@ -99,6 +116,23 @@ export default function PublishTripScreen({ onClose, editRoute }: {
       ? Math.max(1, Math.round((editEnd.getTime() - editStart.getTime()) / 3_600_000))
       : 4,
   );
+
+  // Turno en zona: día (por defecto hoy) + franja inicio/fin. La zona reutiliza
+  // originSel/originText (el mismo AddressField); no hay destino.
+  const today = useMemo(() => startOfDay(new Date()), []);
+  const tomorrow = useMemo(() => { const d = startOfDay(new Date()); d.setDate(d.getDate() + 1); return d; }, []);
+  const [turnoDay, setTurnoDay] = useState<Date | null>(
+    isTurnoEdit && editStart ? startOfDay(editStart) : today,
+  );
+  const [showTurnoCalendar, setShowTurnoCalendar] = useState(false);
+  const [turnoStart, setTurnoStart] = useState<number | null>(
+    isTurnoEdit && editStart ? editStart.getHours() : 9,
+  );
+  const [turnoEnd, setTurnoEnd] = useState<number | null>(
+    isTurnoEdit && editEnd ? editEnd.getHours() : 13,
+  );
+  const [locating, setLocating] = useState(false);
+
   const [saving, setSaving] = useState(false);
   const [myRoutes, setMyRoutes] = useState<CarrierRoute[]>([]);
 
@@ -137,7 +171,96 @@ export default function PublishTripScreen({ onClose, editRoute }: {
     setDays((d) => (d.includes(key) ? d.filter((x) => x !== key) : [...d, key]));
   }
 
+  async function useCurrentLocation() {
+    if (locating) return;
+    setLocating(true);
+    try {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== "granted") {
+        Alert.alert("Permiso denegado", "Necesitamos tu ubicación para usar tu zona actual.");
+        return;
+      }
+      const pos = await Location.getLastKnownPositionAsync()
+        ?? await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+      if (!pos) {
+        Alert.alert("Sin ubicación", "No pudimos obtener tu ubicación. Intentá de nuevo.");
+        return;
+      }
+      const label = await reverseGeocode(pos.coords.latitude, pos.coords.longitude).catch(() => "Mi ubicación actual");
+      setOriginText(label);
+      setOriginSel({ label, lat: pos.coords.latitude, lon: pos.coords.longitude });
+    } catch {
+      Alert.alert("Error", "No pudimos obtener tu ubicación.");
+    } finally {
+      setLocating(false);
+    }
+  }
+
+  async function publishTurno() {
+    if (!originSel) {
+      Alert.alert("Falta la zona", "Buscá tu zona y elegila de la lista, o usá tu ubicación actual.");
+      return;
+    }
+    if (!turnoDay) {
+      Alert.alert("Falta el día", "Elegí el día de tu turno.");
+      return;
+    }
+    if (turnoStart == null || turnoEnd == null) {
+      Alert.alert("Falta la franja", "Elegí desde y hasta qué hora vas a estar disponible.");
+      return;
+    }
+    if (turnoEnd <= turnoStart) {
+      Alert.alert("Franja inválida", "La hora de fin tiene que ser posterior a la de inicio.");
+      return;
+    }
+    const windowStart = new Date(turnoDay.getFullYear(), turnoDay.getMonth(), turnoDay.getDate(), turnoStart, 0, 0);
+    const windowEnd = new Date(turnoDay.getFullYear(), turnoDay.getMonth(), turnoDay.getDate(), turnoEnd, 0, 0);
+    // Un turno cuya franja ya terminó no tiene sentido; uno en curso sí (equivale
+    // a prender el toggle "por espacio" hoy). Al editar el pasado es válido.
+    if (!editing && windowEnd <= new Date()) {
+      Alert.alert("Turno inválido", "Ese turno ya terminó. Elegí un día y una franja que todavía no hayan pasado.");
+      return;
+    }
+
+    setSaving(true);
+    try {
+      if (editing && editRoute) {
+        await routesService.update(editRoute.id, {
+          origin_lat: originSel.lat,
+          origin_lon: originSel.lon,
+          window_start: windowStart.toISOString(),
+          window_end: windowEnd.toISOString(),
+        });
+        Alert.alert("Guardado", "Tu turno en zona fue actualizado.", [{ text: "OK", onPress: onClose }]);
+        return;
+      }
+      // Sin destino: así no se marca como ventana efímera del toggle
+      // (routeUtils.isSpaceWindow) y sí aparece en "viajes publicados".
+      const route = await routesService.publish({
+        kind: "dedicated_window",
+        origin_lat: originSel.lat,
+        origin_lon: originSel.lon,
+        window_start: windowStart.toISOString(),
+        window_end: windowEnd.toISOString(),
+      });
+      setMyRoutes((r) => [...r, route]);
+      setOriginText(""); setOriginSel(null);
+      setTurnoStart(9); setTurnoEnd(13); setTurnoDay(today); setShowTurnoCalendar(false);
+      Alert.alert(
+        "Publicado",
+        "Tu turno en zona quedó publicado. Durante la franja, los pedidos «Hoy» de esa zona te llegan uno atrás de otro.",
+      );
+    } catch (err: unknown) {
+      const detail = (err as { response?: { data?: { detail?: unknown } } })?.response?.data?.detail;
+      Alert.alert("No se pudo publicar", typeof detail === "string" ? detail : "Intentá de nuevo.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
   async function publish() {
+    if (mode === "turno") return publishTurno();
+
     if (!originSel) {
       Alert.alert("Falta el origen", "Buscá la dirección y elegila de la lista de sugerencias.");
       return;
@@ -248,8 +371,10 @@ export default function PublishTripScreen({ onClose, editRoute }: {
             <MaterialCommunityIcons name="arrow-left" size={18} color={T.ink} />
           </TouchableOpacity>
           <View className="flex-row items-center gap-[6px] bg-mint px-[10px] py-[5px] rounded-[9px]">
-            <MaterialCommunityIcons name="leaf" size={11} color={T.forest} />
-            <Text className="text-[9px] tracking-[1.2px] text-forest font-bold uppercase">Colaborativo</Text>
+            <MaterialCommunityIcons name={mode === "turno" ? "truck-cargo-container" : "leaf"} size={11} color={T.forest} />
+            <Text className="text-[9px] tracking-[1.2px] text-forest font-bold uppercase">
+              {mode === "turno" ? "Turno en zona" : "Colaborativo"}
+            </Text>
           </View>
           <View className="w-[38px]" />
         </View>
@@ -257,19 +382,25 @@ export default function PublishTripScreen({ onClose, editRoute }: {
         {/* Title */}
         <View className="px-5 pt-4">
           <Text className="text-[10px] tracking-[2.5px] text-emeraldDeep uppercase mb-[6px]">
-            {editing ? "Modificá tu viaje" : "Publicá un viaje"}
+            {mode === "turno"
+              ? (editing ? "Modificá tu turno" : "Publicá un turno")
+              : (editing ? "Modificá tu viaje" : "Publicá un viaje")}
           </Text>
           <Text className="text-[28px] font-bold text-ink tracking-[-1px] leading-[30px]">
-            {editing
-              ? (isEspecial ? "Tu viaje especial" : "Tu ruta habitual")
-              : (isEspecial ? "¿Qué viaje tenés planeado?" : "¿A dónde vas a ir igual?")}
+            {mode === "turno"
+              ? (editing ? "Tu turno en zona" : "¿Dónde vas a estar disponible?")
+              : editing
+                ? (isEspecial ? "Tu viaje especial" : "Tu ruta habitual")
+                : (isEspecial ? "¿Qué viaje tenés planeado?" : "¿A dónde vas a ir igual?")}
           </Text>
           <Text className="text-[12.5px] text-inkSoft leading-[18px] mt-2">
-            {editing
-              ? "Ajustá el recorrido, los horarios o la duración y guardá los cambios."
-              : isEspecial
-                ? "Un viaje puntual que vas a hacer un día concreto. Te ofrecemos paquetes que vayan en el mismo sentido."
-                : "Decinos tu ruta y horario. Te ofrecemos paquetes que van en el mismo sentido."}
+            {mode === "turno"
+              ? "Estás disponible en una zona: los pedidos te van llegando uno atrás de otro, cada entrega exclusiva. No seguís un recorrido fijo."
+              : editing
+                ? "Ajustá el recorrido, los horarios o la duración y guardá los cambios."
+                : isEspecial
+                  ? "Un viaje puntual que vas a hacer un día concreto. Te ofrecemos paquetes que vayan en el mismo sentido."
+                  : "Decinos tu ruta y horario. Te ofrecemos paquetes que van en el mismo sentido."}
           </Text>
         </View>
 
@@ -278,6 +409,40 @@ export default function PublishTripScreen({ onClose, editRoute }: {
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
+          {/* Tipo de publicación — fijo al editar (turno<->trayecto no se convierte) */}
+          {!editing && <View className="gap-2">
+            {([
+              { m: "trayecto" as PublishMode, icon: "map-marker-path" as const, label: "Trayecto", sub: "Un recorrido con origen y destino" },
+              { m: "turno" as PublishMode, icon: "truck-cargo-container" as const, label: "Turno en zona", sub: "Disponible en una zona, sin recorrido fijo" },
+            ]).map((opt) => {
+              const active = mode === opt.m;
+              return (
+                <TouchableOpacity
+                  key={opt.m}
+                  className={`flex-row items-center gap-3 rounded-2xl p-[14px] border-[1.2px] ${active ? "bg-forest border-forest" : "bg-card border-border"}`}
+                  onPress={() => setMode(opt.m)}
+                  activeOpacity={0.85}
+                >
+                  <View className={`w-8 h-8 rounded-[10px] items-center justify-center ${active ? "bg-[#F4EFE3]/15" : "bg-cardSoft"}`}>
+                    <MaterialCommunityIcons name={opt.icon} size={15} color={active ? T.lime : T.inkMute} />
+                  </View>
+                  <View className="flex-1">
+                    <Text className={`text-sm font-bold ${active ? "text-[#F4EFE3]" : "text-ink"}`}>{opt.label}</Text>
+                    <Text className={`text-[10.5px] ${active ? "text-[#F4EFE3]/75" : "text-inkMute"}`}>{opt.sub}</Text>
+                  </View>
+                  {active && (
+                    <View className="w-[18px] h-[18px] rounded-full bg-lime items-center justify-center">
+                      <MaterialCommunityIcons name="check" size={11} color={T.forest} />
+                    </View>
+                  )}
+                </TouchableOpacity>
+              );
+            })}
+          </View>}
+
+          {/* ───────── TRAYECTO (colaborativo) ───────── */}
+          {mode === "trayecto" && <>
+
           {/* Variant toggle — fijo al editar (el PATCH no puede limpiar recurrence_days) */}
           {!editing && <View className="gap-2">
             {([
@@ -425,6 +590,100 @@ export default function PublishTripScreen({ onClose, editRoute }: {
             </Text>
           </View>
 
+          </>}
+
+          {/* ───────── TURNO EN ZONA (dedicado por espacio) ───────── */}
+          {mode === "turno" && <>
+
+          {/* Zona */}
+          <View>
+            <AddressField
+              label="¿En qué zona vas a estar?"
+              placeholder="Ej: Caballito, CABA"
+              kind="origin"
+              value={originText}
+              onChangeText={(t) => { setOriginText(t); setOriginSel(null); }}
+              onSelect={(sel) => { setOriginText(sel.label); setOriginSel(sel); }}
+            />
+            <TouchableOpacity
+              className="flex-row items-center gap-[6px] mt-2 self-start"
+              onPress={useCurrentLocation}
+              disabled={locating}
+              activeOpacity={0.7}
+            >
+              {locating
+                ? <ActivityIndicator size={13} color={T.forest} />
+                : <MaterialCommunityIcons name="crosshairs-gps" size={14} color={T.forest} />}
+              <Text className="text-[12.5px] font-semibold text-forest">Usar mi ubicación actual</Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* Día */}
+          <View>
+            <FieldLabel text="¿Qué día?" />
+            <View className="flex-row gap-2 mb-2">
+              {([
+                { key: "hoy", label: "Hoy", date: today },
+                { key: "manana", label: "Mañana", date: tomorrow },
+              ]).map((c) => {
+                const active = !showTurnoCalendar && turnoDay != null && sameDay(turnoDay, c.date);
+                return (
+                  <TouchableOpacity
+                    key={c.key}
+                    className={`flex-1 h-11 rounded-[12px] border-[1.2px] items-center justify-center ${active ? "bg-forest border-forest" : "bg-card border-border"}`}
+                    onPress={() => { setTurnoDay(c.date); setShowTurnoCalendar(false); }}
+                    activeOpacity={0.8}
+                  >
+                    <Text className={`text-[13px] font-semibold ${active ? "text-[#F4EFE3]" : "text-inkSoft"}`}>{c.label}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+              <TouchableOpacity
+                className={`flex-1 h-11 rounded-[12px] border-[1.2px] flex-row items-center justify-center gap-[6px] ${showTurnoCalendar ? "bg-forest border-forest" : "bg-card border-border"}`}
+                onPress={() => setShowTurnoCalendar(true)}
+                activeOpacity={0.8}
+              >
+                <MaterialCommunityIcons name="calendar-outline" size={14} color={showTurnoCalendar ? T.lime : T.inkMute} />
+                <Text className={`text-[13px] font-semibold ${showTurnoCalendar ? "text-[#F4EFE3]" : "text-inkSoft"}`}>Otra fecha</Text>
+              </TouchableOpacity>
+            </View>
+            {showTurnoCalendar && <MiniCalendar selected={turnoDay} onSelect={setTurnoDay} />}
+          </View>
+
+          {/* Franja */}
+          <View>
+            <FieldLabel text="¿En qué franja estás disponible?" />
+            <View className="flex-row gap-2">
+              <View className="flex-1">
+                <HourSelect
+                  value={turnoStart}
+                  onSelect={(h) => { setTurnoStart(h); if (turnoEnd != null && turnoEnd <= h) setTurnoEnd(null); }}
+                  title="Desde"
+                  placeholder="Desde"
+                />
+              </View>
+              <View className="flex-1">
+                <HourSelect
+                  value={turnoEnd}
+                  onSelect={setTurnoEnd}
+                  title="Hasta"
+                  placeholder="Hasta"
+                  minHour={turnoStart != null ? turnoStart + 1 : 1}
+                />
+              </View>
+            </View>
+          </View>
+
+          {/* Info band turno */}
+          <View className="flex-row gap-[10px] bg-mint rounded-[14px] p-[14px] border border-border">
+            <MaterialCommunityIcons name="information-outline" size={16} color={T.forest} style={{ marginTop: 1 }} />
+            <Text className="flex-1 text-[13px] text-forest leading-[19px]">
+              Durante tu turno, los pedidos «Hoy» de esa zona se encadenan uno tras otro. Cada entrega es exclusiva y no seguís una ruta fija.
+            </Text>
+          </View>
+
+          </>}
+
           {/* Active routes (solo en modo publicar) */}
           {!editing && activeRoutes.length > 0 && (
             <View className="gap-2">
@@ -449,7 +708,9 @@ export default function PublishTripScreen({ onClose, editRoute }: {
               <ActivityIndicator color="#F4EFE3" />
             ) : (
               <>
-                <Text className="text-[15px] font-bold text-[#F4EFE3]">{editing ? "Guardar cambios" : "Publicar viaje"}</Text>
+                <Text className="text-[15px] font-bold text-[#F4EFE3]">
+                  {editing ? "Guardar cambios" : mode === "turno" ? "Publicar turno" : "Publicar viaje"}
+                </Text>
                 <MaterialCommunityIcons name="arrow-right" size={18} color="#F4EFE3" />
               </>
             )}

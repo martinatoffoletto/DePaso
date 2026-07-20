@@ -6,8 +6,8 @@ y **en qué autor o hallazgo de la tesis se apoya** cada decisión. Alineado con
 el capítulo 1 (submodalidades), capítulo 2 (estado del arte) y capítulo 3
 (encuesta n=145) del PFI.
 
-> Este documento describe el modelo objetivo, independiente del estado actual
-> del código. El gap con lo implementado se lista al final.
+> Este documento describe el modelo de producto y cómo se refleja en las
+> pantallas reales de la app. El estado de implementación se lista en §9.
 
 ---
 
@@ -100,15 +100,23 @@ minuto; se resuelve con **capacidad dedicada declarada de antemano**.
 - **Remitente**: elige una franja ("hoy entre 14 y 18") y paga menos que el
   "Ya". No es inmediato ni lento al azar: es *programado* — su pedido entra a
   la agenda de un transportista que declaró esa zona y franja.
-- **Transportista**: declara un turno en zona ("hoy de 14 a 18, Caballito").
-  Durante la ventana **encadena entregas dedicadas una tras otra** — cada
-  viaje sigue siendo exclusivo (regla del dedicado), pero la ventana completa
-  se llena de pedidos secuenciales. Menos pago por viaje que el "Ya", más
-  volumen y cero incertidumbre: sabe cuándo y dónde trabaja.
-- **Por qué es más barato que el "Ya"** (propuesta de pricing): el retiro se
-  agenda dentro de un turno ya comprometido — el costo de acercarse al pickup
-  se reparte entre los pedidos de la ventana en lugar de cargarse a uno solo.
-  Descuento intermedio (~15–20%), a calibrar.
+- **Transportista**: declara un turno en zona ("hoy de 14 a 18, Caballito"),
+  por **dos vías equivalentes** que crean el mismo objeto interno
+  (`dedicated_window`): el **toggle** ("turno que empieza ya", con su ubicación
+  actual) o la **publicación anticipada** (elige día — hoy, mañana, una fecha —,
+  franja aproximada y zona; la zona se declara explícita porque todavía no está
+  ahí). Publicar antes es lo coherente con el eje "por espacio" (la oferta se
+  declara de antemano) y permite que los pedidos "Hoy" se le acerquen con
+  tiempo: minutos antes de la ventana ya ve la agenda del turno. Durante la
+  ventana **encadena entregas dedicadas una tras otra** — cada viaje sigue
+  siendo exclusivo (regla del dedicado), pero la ventana completa se llena de
+  pedidos secuenciales. Menos pago por viaje que el "Ya", más volumen y cero
+  incertidumbre: sabe cuándo y dónde trabaja.
+- **Por qué es más barato que el "Ya"**: el retiro se agenda dentro de un
+  turno ya comprometido — el costo de acercarse al pickup se reparte entre los
+  pedidos de la ventana en lugar de cargarse a uno solo. Descuento del **18%**
+  sobre la tarifa dedicada (`SCHEDULED_DISCOUNT = 0.18`), a recalibrar con
+  historial (Oyama & Akamatsu).
 - **Justificación (tesis)**: Saleh et al. muestran que el *scheduling* dinámico
   óptimo de repartidores requiere RL con datos históricos extensos —
   inaplicable en arranque en frío y no explicable. La alternativa de DePaso es
@@ -163,56 +171,137 @@ diferencia clave: la trayectoria no es un evento, es un **hábito declarado**.
   El 25,5% a pie y 22,4% en bici de la encuesta fundamentan que la movilidad
   blanda participe (con su restricción de ≤5 km y solo carga S).
 
+### 3.5 Cómo no confundirlas: ¿de quién es el viaje?
+
+Las cuatro submodalidades se desambiguan con **una sola pregunta: ¿de quién es
+el viaje?**
+
+- En todo lo **dedicado** (Ya y Hoy) el viaje es *del paquete*: DePaso lo
+  genera y el transportista va adonde el pedido lo mande. No tiene recorrido
+  propio — por eso no existe el desvío ni el ahorro de CO2.
+- En todo lo **colaborativo** (De paso) el viaje es *del transportista*: él ya
+  iba a algún lado y el paquete alquila el espacio que sobra. Solo acá existen
+  desvío (knockout ≤15%) y CO2.
+
+Los tres modos que suelen confundirse, lado a lado:
+
+| | **Turno en zona** (dedicado por espacio) | **De paso en vivo** (colab. por demanda) | **Mi trayecto en ventana** (colab. por espacio) |
+|---|---|---|---|
+| ¿El carrier tiene viaje propio? | **No** — está disponible en una zona, va adonde lo manden | Sí, y está ocurriendo **ahora** | Sí, declarado **antes** |
+| Qué declaró | "Estoy disponible acá, en esta franja" | Su trayecto (ya publicado, hoy activo) | Su trayecto habitual/especial |
+| Cómo le llega el trabajo | Pedidos "Hoy" encadenados durante la franja | Push en medio del viaje: "te queda de paso, +1,2 km" | Lista pre-armada al tocar "Iniciar trayecto" |
+| Cada entrega | **Exclusiva** (regla del dedicado) | Comparte su viaje; puede llevar varios | Ídem |
+| Desvío | No aplica — no hay ruta que proteger | Knockout ≤15% | Knockout ≤15% |
+| CO2 | No | Sí | Sí |
+| Cobra | 82% por entrega, volumen alto | 57%, ingreso marginal | 57%, varios por bundling |
+
+Dos consecuencias que importan para el diseño:
+
+- **Los dos colaborativos no son dos opciones del carrier — son el mismo modo
+  visto en dos momentos.** El carrier publica su trayecto una sola vez ("Mi
+  trayecto"); *por demanda* es cuando un envío aparece mientras su viaje está
+  vivo (el match lo dispara la demanda), *por espacio* es cuando los envíos
+  flexibles se acumularon antes y lo esperan al iniciar su ventana (el match
+  lo dispara su oferta). El carrier no elige entre ellos ni nota la
+  diferencia; por eso en la app son una sola cosa.
+- **Turno en zona vs Mi trayecto sí es una elección real**, y la diferencia es
+  física: en el turno no hay recorrido propio que respetar (por eso cada viaje
+  es exclusivo, sin desvío y mejor pago); en el trayecto la rutina es
+  intocable y el sistema solo acerca lo que no la rompe (por eso desvío
+  knockout, CO2 y precio mínimo).
+
 ---
 
-## 4. Representación por perfil
+## 4. Representación por perfil — cómo se ve cada modalidad en pantalla
 
 ### 4.1 Remitente — elige resultados, nunca taxonomía
 
-Una sola pregunta estructura el flow: **¿cuándo lo necesitás?**
+El flow de creación (`sender/send-flow/FlowNavigator`) tiene 4 pasos:
 
-| Producto | Pregunta que responde | Submodalidad interna | Precio | Promesa |
-|---|---|---|---|---|
-| **Ya** | "Lo necesito ahora" | Dedicado por demanda | 100% | Cadete exclusivo saliendo ya, ETA mínimo |
-| **Hoy** | "Hoy, en esta franja" | Dedicado por espacio | ~80–85% (propuesto) | Retiro programado dentro de la franja, sin vigilar el teléfono |
-| **De paso** | "Puedo esperar a que alguien vaya" | Colaborativo (demanda o espacio — lo decide el matching) | 57% | El más barato y el único con ahorro de CO2 visible; el tiempo depende de que haya un viaje compatible |
+```
+1. Paquete      → foto + clasificación por visión (s/m/l/xl) + peso, descripción, valor declarado
+2. Direcciones  → origen, destino y datos del destinatario
+3. Elegí tu envío → LA pantalla de modalidades (RouteOfferScreen)
+4. Resumen      → mapa con el recorrido, desglose y confirmación (pago simulado en 2º plano)
+```
 
-Reglas de presentación:
-- Los tres productos se muestran **lado a lado con precio, tiempo y CO2** —
-  la encuesta es categórica: el precio es el criterio #1 (82%) y debe verse
-  antes de confirmar, sin cargos ocultos.
-- "De paso" muestra **disponibilidad real** (viajes compatibles ahora / espera
-  estimada) — nunca promete un descuento que depende de una oferta que quizá
-  no existe.
-- XL (mudanza/flete): solo aparece "Ya" y "Hoy", con la explicación de por qué
-  ("por volumen, va siempre en viaje exclusivo").
-- Los nombres internos (dedicado, colaborativo, on_demand…) pueden aparecer
-  como etiqueta secundaria chica, jamás como el título de la opción.
+La modalidad se elige en el **paso 3**, bajo el título literal **"PASO 03 ·
+¿CUÁNDO LO NECESITÁS?"**. La pantalla es: mapa arriba (pines origen→destino +
+card flotante con distancia), y abajo un bottom-sheet con **tres cards
+apiladas** (`ProductOptionCard`), cada una con radio de selección, badge,
+precio a la derecha y una línea de contexto:
+
+| Card | Badge | Precio mostrado | Qué más muestra |
+|---|---|---|---|
+| **Ya** | `DEDICADA` | `price_dedicated` (100%) | ETA en minutos + *"Un cadete sale ahora, sólo por tu envío"* |
+| **Hoy** | `PROGRAMADA` | `price_scheduled` (−18%) | Al seleccionarla se despliega **inline** el selector de franja (`InlineWindowPicker`); no deja continuar sin franja válida; elegida la franja, la card la muestra como subtítulo |
+| **De paso** | `ECO −43%` | `price_collaborative`, con el precio dedicado **tachado** | Card destacada en verde (variante eco); ETA + kg de CO₂ ahorrados; abajo, la señal de disponibilidad |
+
+Dos detalles de la card "De paso" que encarnan las reglas del §3.3:
+
+- **Señal honesta de disponibilidad** (`collaborative_routes_now`, que el
+  backend calcula contra las trayectorias vivas en ventana con desvío ≤15%):
+  chip verde *"N viajes compatibles ahora"* si hay, o el texto *"Nadie va en
+  camino ahora — tu envío queda publicado y te avisamos apenas alguien
+  coincida"* si no. Sin viajes vivos la card se **atenúa pero no se bloquea**:
+  el envío colaborativo puede esperar a que aparezca un trayecto.
+- **XL (mudanza/flete)**: la card se reemplaza por un placeholder
+  deshabilitado con la explicación: *"«De paso» no disponible — las mudanzas y
+  fletes van siempre en un viaje dedicado, por su volumen"*.
+
+El **paso 4 (resumen)** es el único punto del sistema donde el producto se
+traduce a la taxonomía interna:
+
+```
+ya     → dedicated    + on_demand
+hoy    → dedicated    + by_availability
+depaso → collaborative + (by_availability si eligió franja; on_demand si no)
+```
+
+Reglas de presentación que sobreviven a cualquier rediseño:
+- El precio de cada producto **se ve antes de confirmar, siempre** — criterio
+  #1 de la encuesta (82%), sin cargos ocultos. Nunca "a convenir".
+- Los nombres internos (dedicado, colaborativo, on_demand…) solo aparecen como
+  badge secundario chico, jamás como título de la opción.
 
 ### 4.2 Transportista — elige cómo trabajar, nunca qué submodalidad servir
 
-Una sola pregunta estructura la home: **¿cómo querés trabajar?**
+La home del rider (`carrier/RiderHomeScreen`) es un mapa con panel inferior.
+La pregunta *"¿cómo querés trabajar?"* está representada por **dos toggles y
+la lista de viajes publicados**:
 
-| Modo | Qué declara | Submodalidad que sirve | Qué recibe |
-|---|---|---|---|
-| **Salir a repartir** | Nada — un toggle + GPS | Dedicado por demanda | Viajes exclusivos inmediatos, mejor pago por viaje |
-| **Turno en zona** | Zona + franja ("hoy 14–18, Caballito") | Dedicado por espacio | Cadena de entregas programadas durante la ventana |
-| **Mi trayecto** | Origen→destino + horario; **habitual** (días recurrentes) o **especial** (un día puntual) | Colaborativo — demanda **y** espacio a la vez | Pedidos que le quedan de paso: push en vivo + lista al entrar en ventana; lleva varios según capacidad residual |
+| Modo | Cómo se ve en pantalla | Qué pasa al activarlo |
+|---|---|---|
+| **Salir a repartir** | Toggle principal "en línea" | Entra al pool on-demand publicando su GPS; recibe pedidos "Ya" exclusivos |
+| **Turno en zona** | Toggle secundario "Dedicado por espacio" (turno ya) **o** publicación anticipada desde "Publicar viaje" (día + franja + zona) | Ambas vías crean una `dedicated_window`; encadena pedidos "Hoy" durante la ventana. **El toggle se oculta mientras hay un trayecto activo** (exclusividad operativa) |
+| **Mi trayecto** | Botón "Publicar viaje" + lista de viajes publicados | Abre `PublishTripScreen`, que ofrece **Trayecto** (variantes **Habitual** — *"Tu trayecto de todos los días"*, con días recurrentes — y **Especial** — *"Un viaje puntual, un día concreto"*) además del **Turno en zona** anticipado |
 
-Reglas de presentación:
-- "Mi trayecto" es **una sola declaración que sirve a las dos submodalidades
-  colaborativas**: la misma ruta publicada recibe matches en vivo (demanda) y
-  sugerencias al conectarse en la franja (espacio). El transportista no tiene
-  por qué saber que internamente son dos.
-- Cada oferta colaborativa muestra **el desvío en km y %** y la ganancia — el
-  91,8% participa solo si no se desvía de su rutina, así que el desvío es EL
-  dato de la decisión, no un detalle.
-- Nada es punitivo: rechazar ofertas, no conectarse o cerrar una ventana no
-  degrada reputación (OIT 2020 como antipatrón explícito). La reputación se
-  construye solo con entregas realizadas y calificaciones.
-- Los tres modos son combinables en el tiempo pero con exclusividad operativa
-  clara: un dedicado en curso bloquea todo lo demás; una trayectoria activa
-  oculta el modo "turno en zona".
+Ciclo de vida del trayecto en la UI:
+
+- **30 minutos antes** de la ventana aparece la `ActiveTripCard` (si está
+  offline) o el banner sobre el mapa (si está online) con el CTA **"Iniciar
+  trayecto"** — el inicio es una **acción explícita del carrier**, nunca
+  automática: la app le avisa, él decide.
+- Cada viaje publicado (fila `TripRow`) es **tocable** y abre el
+  `TripDetailModal`: estado de la ventana, días de recurrencia, y las acciones
+  **Iniciar (antes de hora) / Modificar / Eliminar** — todas sin penalidad
+  (ver §6).
+- Con el trayecto vivo, el feed lista los pedidos compatibles del recorrido
+  (*"Buscando pedidos que te queden de paso…"*) y los matches en vivo llegan
+  como `IncomingOfferModal`, que muestra **el desvío en km** en primer plano —
+  el 91,8% participa solo si no se desvía de su rutina, así que el desvío es
+  EL dato de la decisión, no un detalle.
+
+Durante una entrega (cualquier modalidad), el `ActiveJobPanel` del mapa
+concentra la operación: los hitos de la máquina de estados como botón único
+(*"Llegué al origen" → "Retiré el paquete" → "Entregué el paquete"*), botón
+para llamar al destinatario, y el botón **"Navegar"** que abre la app de
+navegación que el carrier prefiera (ver §8).
+
+Regla transversal de presentación: "Mi trayecto" es **una sola declaración que
+sirve a las dos submodalidades colaborativas** — la misma ruta recibe matches
+en vivo (demanda) y la lista al entrar en ventana (espacio). El transportista
+no tiene por qué saber que internamente son dos.
 
 ---
 
@@ -224,7 +313,7 @@ trade-offs donde cada escalón cede urgencia a cambio de precio:
 ```
    precio                          certeza temporal
     100%  ── Ya (exclusivo) ─────── máxima (ETA directo)
-  ~80–85% ── Hoy (turno en zona) ── alta (franja pactada)
+     82%  ── Hoy (turno en zona) ── alta (franja pactada)
      57%  ── De paso (colaborativo) ─ variable (depende de un viaje compatible)
                                       + único con ahorro CO2
 ```
@@ -236,7 +325,40 @@ comisiones altas" — hallazgo 5).
 
 ---
 
-## 6. Reglas transversales (invariantes de las 4)
+## 6. Penalidades: qué se pena y qué no
+
+Pregunta obligada de la defensa: *¿alguna modalidad penaliza al transportista?*
+**Ninguna modalidad penaliza por sí misma.** La única penalidad del sistema es
+transversal a las cuatro y castiga el incumplimiento de un compromiso ya
+asumido — nunca la disponibilidad:
+
+| Acción del carrier | ¿Penaliza? |
+|---|---|
+| Rechazar o ignorar una oferta (push o feed) | No |
+| No conectarse / no iniciar su trayecto en la ventana | No |
+| Modificar o eliminar un viaje publicado | No |
+| Apagar cualquier toggle / desconectarse del pool | No |
+| **Cancelar un envío que ya aceptó** | **Sí: −0,3 de reputación** (RF-CAR-07) |
+| Abandonar un envío ya en tránsito | No permitido — la transición no existe en la máquina de estados |
+
+Mecánica de la única penalidad (`carrier_cancel`): el envío vuelve a `PENDING`
+y se reabre al matching, el pago del remitente queda retenido para el próximo
+carrier (no se reintegra), y la reputación baja `CARRIER_CANCEL_PENALTY = 0.3`
+(con piso en 0). La UI lo advierte antes de confirmar: *"Cancelar después de
+aceptar penaliza tu reputación"*.
+
+**Justificación (tesis)**: la OIT (2020) documenta como antipatrón la gestión
+algorítmica que penaliza la *disponibilidad* (rechazar pedidos, desconectarse,
+no cumplir cuotas). DePaso adopta ese principio para todo lo declarativo: la
+oferta de capacidad es libre y retractable sin costo. Pero una vez aceptado un
+envío hay un remitente con una promesa concreta — la penalidad protege esa
+promesa, y es proporcional (−0,3 sobre 5, recuperable con buenas entregas), no
+expulsiva. La línea divisoria es nítida: **libertad total antes de aceptar,
+responsabilidad después**.
+
+---
+
+## 7. Reglas transversales (invariantes de las 4)
 
 - **XL siempre dedicado** — nunca colaborativo, por volumen (spec 3.3).
 - **Desvío ≤15% como knockout** en todo lo colaborativo — filtro previo al
@@ -252,12 +374,48 @@ comisiones altas" — hallazgo 5).
 
 ---
 
-## 7. Gap con lo implementado hoy
+## 8. Navegación: DePaso asigna, no rutea
 
-| Tema | Hoy | Objetivo (este doc) |
-|---|---|---|
-| Elección del sender | 2 cards (dedicada/colaborativa) + franja que deriva `assignment_mode` | 3 productos explícitos (Ya / Hoy / De paso) con la escalera de precios visible |
-| Pricing del tier "Hoy" | Mismo precio que "Ya" | Descuento intermedio ~15–20% (propuesta, a calibrar) |
-| Disponibilidad colaborativa | La card promete −43% sin chequear si hay trayectos vivos | Señal real: "N viajes compatibles ahora" o espera estimada |
-| Carrier: modos de trabajo | Toggle en línea + toggle espacio + publicar viaje (habitual/especial) | Mismos tres modos, presentados como una sola pregunta ("¿cómo querés trabajar?") |
-| `assignment_mode` en colaborativos | Se guarda pero el matching no lo lee | Correcto por diseño: la distinción es la dirección del flujo (push vs feed), documentarlo así en la tesis |
+DePaso no resuelve un problema de ruteo de vehículos (VRP/TSP): resuelve un
+problema de **asignación** — qué paquete viaja con qué trayectoria. Esa
+distinción delimita qué es de la plataforma y qué del transportista:
+
+- **El desvío ≤15% se calcula ex-ante**, en el momento del matching (OSRM),
+  como criterio de compatibilidad — no es una ruta prescripta. La plataforma
+  fija *qué* lleva el carrier y *entre qué puntos*, no por qué calles va.
+- **La promesa al remitente es de puntos e hitos, no de camino**: retiro y
+  entrega se verifican con la máquina de estados y el tracking GPS, que corre
+  por debajo independientemente de con qué app navegue el carrier.
+- **El turn-by-turn se delega** a la app que el carrier prefiera: el botón
+  "Navegar" del panel de entrega activa abre Google Maps / Waze / Apple Maps
+  hacia la *próxima parada* (al origen hasta retirar, al destino después), con
+  URLs universales que caen al browser si la app no está instalada. Es la
+  práctica estándar de la industria (Uber, Rappi, PedidosYa deep-linkean la
+  navegación) y es coherente con el modelo: en colaborativo el carrier **ya
+  conoce su trayecto** — prescribirle la ruta contradiría el hallazgo del
+  91,8% y el diseño no punitivo (§6). Además, Waze/Google Maps son
+  insuperables en tráfico en tiempo real por efecto de red (datos
+  crowdsourced); competir con eso no aporta al problema de investigación.
+- **El mapa in-app es de referencia, no de navegación**: responde *"a dónde
+  voy y en qué orden"* (pines de retiro/entrega y recorrido; el orden de
+  paradas cuando lleva varios paquetes es donde la plataforma sí agrega valor,
+  porque sale del bundling). La app externa responde *"por qué calles"*.
+
+Se documenta como decisión de alcance del MVP, igual que la cobertura ante
+daños.
+
+---
+
+## 9. Estado de implementación
+
+| Tema | Estado |
+|---|---|
+| 3 productos del sender (Ya / Hoy / De paso) | ✅ `RouteOfferScreen` + `ProductOptionCard` + `InlineWindowPicker` |
+| Pricing del tier "Hoy" | ✅ `SCHEDULED_DISCOUNT = 0.18` (`pricing.py`); el quote devuelve `price_scheduled` |
+| Señal de disponibilidad colaborativa | ✅ `collaborative_routes_now` (`matching.count_compatible_routes`: trayectorias vivas en ventana, desvío ≤15%) |
+| Precio siempre obligatorio | ✅ `estimated_price` NOT NULL en modelo, schema y DB — nunca "a convenir" |
+| Modos de trabajo del carrier | ✅ toggle en línea + toggle espacio (oculto con trayecto activo) + Habitual/Especial + banner 30′ antes + `TripDetailModal` (iniciar/modificar/eliminar) |
+| Navegación externa | ✅ botón "Navegar" (`ActiveJobPanel` → `openExternalNavigation`: Google Maps / Waze / Apple Maps) |
+| Penalidad única por cancelar tras aceptar | ✅ `carrier_cancel`: −0,3 reputación + reapertura del envío (§6) |
+| `assignment_mode` en colaborativos | Se guarda pero el matching no lo lee — **correcto por diseño**: la distinción es la dirección del flujo (push en vivo vs feed en ventana) |
+| Descuento "Hoy" calibrado con historial | Pendiente post-MVP (Oyama & Akamatsu: elasticidad por zona/franja) |

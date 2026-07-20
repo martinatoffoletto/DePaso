@@ -43,6 +43,12 @@ class FakeRepo:
     async def list_active_in_window(self, at=None):
         return list(self._items.values())
 
+    async def list_pending(self):
+        return list(self._items.values())
+
+    async def list_active_by_carrier(self, carrier_id):
+        return []
+
 
 def make_carrier(id=1, vehicle_type="car", lat=None, lon=None, **kw):
     return SimpleNamespace(
@@ -71,18 +77,21 @@ def make_shipment(id=1, modality="dedicated", package_size="m",
         origin_lat=origin[0], origin_lon=origin[1],
         destination_lat=destination[0], destination_lon=destination[1],
         weight_kg=weight_kg,
+        # Campos que consume el feed al armar el FeedItemResponse.
+        estimated_price=1000.0, photo_url=None, description=None, declared_value=None,
     )
 
 
 def make_route(id=1, carrier_id=1, origin=CABALLITO, destination=MICROCENTRO,
-               kind="collaborative_route", hours=2):
+               kind="collaborative_route", hours=2,
+               window_start=None, window_end=None):
     now = datetime.utcnow()
     return SimpleNamespace(
         id=id, carrier_id=carrier_id, kind=kind,
         origin_lat=origin[0], origin_lon=origin[1],
         destination_lat=destination[0], destination_lon=destination[1],
-        window_start=now - timedelta(hours=1),
-        window_end=now + timedelta(hours=hours),
+        window_start=window_start if window_start is not None else now - timedelta(hours=1),
+        window_end=window_end if window_end is not None else now + timedelta(hours=hours),
         recurrence_days=None, is_active=True,
     )
 
@@ -210,3 +219,50 @@ async def test_match_best_raises_when_no_candidates():
     service = make_service([], [shipment])
     with pytest.raises(NotFoundError):
         await service.match_best(1)
+
+
+# --- feed: lead time de la ventana dedicada (turno en zona anticipado) --------
+
+async def test_feed_shows_by_availability_when_window_starts_within_lead():
+    """Un turno dedicado que empieza dentro de WINDOW_FEED_LEAD_MIN ya acerca
+    al carrier los pedidos 'Hoy' (dedicated + by_availability) — arranca la
+    ventana con la agenda armada (MODALIDADES.md §3.2)."""
+    now = datetime.utcnow()
+    carrier = make_carrier(id=1)
+    window = make_route(id=1, carrier_id=1, kind="dedicated_window",
+                        window_start=now + timedelta(minutes=15),
+                        window_end=now + timedelta(hours=4))
+    shipment = make_shipment(id=1, modality="dedicated",
+                             assignment_mode="by_availability")
+    service = make_service([carrier], [shipment], [window])
+
+    feed = await service.feed_for_carrier(1)
+    assert [i.shipment_id for i in feed] == [1]
+
+
+async def test_feed_hides_by_availability_when_window_far_in_future():
+    """Con la ventana empezando en 3+ horas (fuera del lead), el pedido
+    by_availability todavía NO aparece en el feed."""
+    now = datetime.utcnow()
+    carrier = make_carrier(id=1)
+    window = make_route(id=1, carrier_id=1, kind="dedicated_window",
+                        window_start=now + timedelta(hours=3),
+                        window_end=now + timedelta(hours=7))
+    shipment = make_shipment(id=1, modality="dedicated",
+                             assignment_mode="by_availability")
+    service = make_service([carrier], [shipment], [window])
+
+    assert await service.feed_for_carrier(1) == []
+
+
+async def test_count_compatible_routes_ignores_future_collaborative_route():
+    """La señal 'De paso' cuenta solo trayectorias VIVAS: una colaborativa que
+    empieza más tarde no debe sumar (no-regresión del lead dedicado)."""
+    now = datetime.utcnow()
+    future = make_route(id=1, carrier_id=1, kind="collaborative_route",
+                        window_start=now + timedelta(minutes=15),
+                        window_end=now + timedelta(hours=4))
+    service = make_service([], [], [future])
+
+    count = await service.count_compatible_routes(Point(*CABALLITO), Point(*MICROCENTRO))
+    assert count == 0

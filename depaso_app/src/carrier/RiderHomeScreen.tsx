@@ -207,12 +207,14 @@ export default function RiderHomeScreen() {
     }
   }, [visibleFeed, online]);
 
-  // "Dedicado por espacio": derived from the routes themselves — an active
-  // dedicated window covering this moment means the toggle is on.
+  // "Dedicado por espacio": el toggle refleja SOLO su propia ventana efímera
+  // (isSpaceWindow) vigente ahora — nunca un "Turno en zona" publicado desde
+  // "Publicar viaje". Así un turno futuro no prende el toggle ni se borra al
+  // apagarlo (el turno tiene su propia tarjeta de sesión, ver tripSession).
   // parseApiDate: las fechas llegan UTC sin "Z" — con new Date() la ventana
   // quedaba 3 h "en el futuro" y el toggle nunca prendía.
   const spaceRoute = useMemo(() => routes.find((r) =>
-    r.kind === "dedicated_window" && r.is_active &&
+    isSpaceWindow(r) && r.is_active &&
     parseApiDate(r.window_start).getTime() <= now && now <= parseApiDate(r.window_end).getTime(),
   ) ?? null, [routes, now]);
 

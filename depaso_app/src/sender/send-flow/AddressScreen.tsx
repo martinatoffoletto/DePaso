@@ -13,7 +13,7 @@ import { searchAddresses, formatAddress, Suggestion } from "@/src/shared/utils/a
 import { useAuthStore } from "@/src/shared/session/authStore";
 import { useAddressBookStore } from "@/src/shared/profile/addressBookStore";
 import { SavedAddressesModal } from "@/src/sender/components/SavedAddressesModal";
-import { PICKUP_ASAP } from "@/src/sender/pickupSchedule";
+import { PICKUP_ASAP, type PickupSchedule } from "@/src/sender/pickupSchedule";
 import type { Coords } from "./FlowNavigator";
 
 type IconName = React.ComponentProps<typeof MaterialCommunityIcons>["name"];

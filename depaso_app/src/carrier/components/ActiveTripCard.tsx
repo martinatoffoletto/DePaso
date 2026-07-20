@@ -40,15 +40,18 @@ export function ActiveTripCard({ route, windowStart, windowEnd, offersCount, upc
   onStart: () => void;
 }) {
   const { origin, dest } = useTripAddresses(route);
+  const turno = route.kind === "dedicated_window";
   const habitual = !!route.recurrence_days;
+  const kindLabel = turno ? "Tu turno en zona" : habitual ? "Tu trayecto habitual" : "Tu viaje especial";
+  const startVerb = turno ? "turno" : "trayecto";
   return (
     <View className="bg-forest rounded-[24px] px-5 pt-[18px] pb-[18px] overflow-hidden">
       <View className="flex-row items-center gap-2 mb-3">
-        <MaterialCommunityIcons name={habitual ? "repeat" : "calendar-star"} size={13} color={T.lime} />
+        <MaterialCommunityIcons name={turno ? "truck-cargo-container" : habitual ? "repeat" : "calendar-star"} size={13} color={T.lime} />
         <Text className="text-[10px] tracking-[2px] text-lime font-bold uppercase">
           {upcoming
-            ? `${habitual ? "Tu trayecto habitual" : "Tu viaje especial"} arranca a las ${hhmm(windowStart)}`
-            : `${habitual ? "Tu trayecto habitual" : "Tu viaje especial"} está en ventana`}
+            ? `${kindLabel} arranca a las ${hhmm(windowStart)}`
+            : turno ? `${kindLabel} está activo` : `${kindLabel} está en ventana`}
         </Text>
       </View>
 
@@ -56,10 +59,12 @@ export function ActiveTripCard({ route, windowStart, windowEnd, offersCount, upc
         <View className="w-[9px] h-[9px] rounded-full border-2 border-lime bg-forest" />
         <Text className="text-[14px] text-[#F4EFE3] font-semibold flex-1" numberOfLines={1}>{origin}</Text>
       </View>
-      <View className="flex-row items-center gap-2">
-        <View className="w-[9px] h-[9px] rounded-[2px] bg-lime rotate-45" />
-        <Text className="text-[14px] text-[#F4EFE3] font-semibold flex-1" numberOfLines={1}>{dest}</Text>
-      </View>
+      {!turno && (
+        <View className="flex-row items-center gap-2">
+          <View className="w-[9px] h-[9px] rounded-[2px] bg-lime rotate-45" />
+          <Text className="text-[14px] text-[#F4EFE3] font-semibold flex-1" numberOfLines={1}>{dest}</Text>
+        </View>
+      )}
 
       <View className="flex-row items-center gap-[6px] mt-[10px]">
         <MaterialCommunityIcons name="clock-outline" size={13} color="#F4EFE3" style={{ opacity: 0.75 }} />
@@ -68,7 +73,7 @@ export function ActiveTripCard({ route, windowStart, windowEnd, offersCount, upc
             ? `Ventana de ${hhmm(windowStart)} a ${hhmm(windowEnd)}`
             : `Ventana activa hasta las ${hhmm(windowEnd)}`}
           {offersCount > 0
-            ? ` · ${offersCount} ${offersCount === 1 ? "pedido listo" : "pedidos listos"} en tu recorrido`
+            ? ` · ${offersCount} ${offersCount === 1 ? "pedido listo" : "pedidos listos"} en tu ${turno ? "zona" : "recorrido"}`
             : ""}
         </Text>
       </View>
@@ -86,7 +91,7 @@ export function ActiveTripCard({ route, windowStart, windowEnd, offersCount, upc
           <>
             <MaterialCommunityIcons name="navigation-variant" size={18} color={T.forest} />
             <Text className="text-[15px] font-bold text-forest tracking-[-0.3px]">
-              {upcoming ? "Iniciar trayecto ahora" : "Iniciar trayecto"}
+              {upcoming ? `Iniciar ${startVerb} ahora` : `Iniciar ${startVerb}`}
             </Text>
           </>
         )}
@@ -104,14 +109,15 @@ export function ActiveTripBanner({ route, windowStart, windowEnd, upcoming }: {
   upcoming: boolean;
 }) {
   const { origin, dest } = useTripAddresses(route);
+  const turno = route.kind === "dedicated_window";
   return (
     <View
       className="self-start mt-2 flex-row items-center gap-[8px] bg-forest border-[1.2px] border-forest rounded-[12px] px-3 py-[7px]"
       style={{ shadowColor: "#000", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.15, shadowRadius: 10, elevation: 4, maxWidth: "100%" }}
     >
-      <MaterialCommunityIcons name="navigation-variant" size={13} color={T.lime} />
+      <MaterialCommunityIcons name={turno ? "truck-cargo-container" : "navigation-variant"} size={13} color={T.lime} />
       <Text className="text-[11.5px] font-bold text-[#F4EFE3]" numberOfLines={1} style={{ flexShrink: 1 }}>
-        {origin.split(",")[0]} → {dest.split(",")[0]}
+        {turno ? `Turno · ${origin.split(",")[0]}` : `${origin.split(",")[0]} → ${dest.split(",")[0]}`}
       </Text>
       <Text className="text-[10.5px] text-[#F4EFE3]/70">
         {upcoming ? `desde ${hhmm(windowStart)}` : `hasta ${hhmm(windowEnd)}`}
